@@ -1,6 +1,9 @@
 
 from database import SessionLocal, engine
 import models
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated=["auto"])
 
 # Create tables
 models.Base.metadata.create_all(bind=engine)
@@ -75,6 +78,15 @@ def seed_data():
         if not db.query(models.Sector).filter_by(name=s_name).first():
             db.add(models.Sector(name=s_name))
             print(f" - Added {s_name}")
+    
+    # 5. Seed Admin User
+    print("Seeding Users...")
+    # Create ADMIN
+    if not db.query(models.User).filter_by(username="admin").first():
+        hashed_pw = pwd_context.hash("admin123")
+        admin_user = models.User(username="admin", hashed_password=hashed_pw, role="admin") # <--- Role: admin
+        db.add(admin_user)
+        print(" - Added Super Admin (admin / admin123)")
 
     # SAVE AND CLOSE ONLY AT THE VERY END
     db.commit()
