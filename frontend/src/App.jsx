@@ -2,11 +2,11 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import Login from './components/Login';
 import ResidentList from './components/ResidentList';
 import AddResidentForm from './components/AddResidentForm';
-import ProtectedRoute from './components/ProtectedRoute'; // Import the guard
+import ProtectedRoute from './components/ProtectedRoute';
 import { LogOut, UserCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
-// A Wrapper Component for the "Dashboard" Layout (Header + List)
+
 function DashboardLayout() {
   const navigate = useNavigate();
   const [showAddForm, setShowAddForm] = useState(false);
@@ -14,7 +14,7 @@ function DashboardLayout() {
   const [userRole, setUserRole] = useState(localStorage.getItem('role'));
 
   const handleLogout = () => {
-    localStorage.clear(); // Wipe everything
+    localStorage.clear();
     navigate('/login');
   };
 
@@ -75,12 +75,11 @@ function DashboardLayout() {
   );
 }
 
-// MAIN APP COMPONENT WITH ROUTES
 function App() {
   const navigate = useNavigate();
 
   const handleLoginSuccess = (role) => {
-    navigate('/dashboard'); // Redirect to dashboard after login
+    navigate('/dashboard');
   };
 
   return (
@@ -92,14 +91,8 @@ function App() {
       <Route element={<ProtectedRoute />}>
          <Route path="/dashboard" element={<DashboardLayout />} />
          
-         {/* Example: If you create an Admin-Only page later:
-         <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-            <Route path="/admin-settings" element={<AdminPage />} />
-         </Route> 
-         */}
       </Route>
 
-      {/* DEFAULT: Redirect root "/" to dashboard (which will redirect to login if needed) */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );

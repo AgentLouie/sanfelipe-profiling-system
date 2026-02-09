@@ -1,4 +1,3 @@
-// src/components/AddResidentForm.jsx
 import { useState, useEffect } from 'react';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { Plus, Trash2 } from 'lucide-react';

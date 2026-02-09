@@ -97,7 +97,7 @@ export default function ResidentList() {
                             key={sector.id} 
                             className={`text-xs px-2 py-1 rounded border ${
                               sector.name === "Others" 
-                                ? "bg-yellow-100 text-yellow-800 border-yellow-200" // Different color for "Others"
+                                ? "bg-yellow-100 text-yellow-800 border-yellow-200"
                                 : "bg-blue-100 text-blue-800 border-blue-200"
                             }`}
                           >
