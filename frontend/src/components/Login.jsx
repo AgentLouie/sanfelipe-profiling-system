@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import api from '../api';
 import { User, Lock } from 'lucide-react';
+import sanFelipeSeal from '../assets/san_felipe_seal.png'; // Import the seal
 
 export default function Login({ onLogin }) {
   const [username, setUsername] = useState('');
@@ -35,9 +36,16 @@ export default function Login({ onLogin }) {
   return (
     <div className="flex items-center justify-center min-h-screen bg-blue-900">
       <div className="bg-white p-8 rounded-lg shadow-2xl w-96 transform transition-all hover:scale-105">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-800">San Felipe Profile</h1>
-          <p className="text-gray-500 text-sm">Secure Access Portal</p>
+        
+        {/* HEADER WITH SEAL AND NEW TITLE */}
+        <div className="text-center mb-8 flex flex-col items-center">
+          <img 
+            src={sanFelipeSeal} 
+            alt="LGU San Felipe Seal" 
+            className="w-24 h-24 mb-4 drop-shadow-md" 
+          />
+          <h1 className="text-2xl font-bold text-gray-800">LGU San Felipe</h1>
+          <p className="text-gray-500 text-sm">Residential Profile System</p>
         </div>
 
         {error && (

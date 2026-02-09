@@ -1,43 +1,23 @@
-import { useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import Login from './components/Login';
 import ResidentList from './components/ResidentList';
 import AddResidentForm from './components/AddResidentForm';
-import Login from './components/Login';
+import ProtectedRoute from './components/ProtectedRoute'; // Import the guard
 import { LogOut, UserCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
-function App() {
-  const [token, setToken] = useState(null);
-  const [userRole, setUserRole] = useState(null);
+// A Wrapper Component for the "Dashboard" Layout (Header + List)
+function DashboardLayout() {
+  const navigate = useNavigate();
   const [showAddForm, setShowAddForm] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-  // Check login status on load
-  useEffect(() => {
-    const savedToken = localStorage.getItem('token');
-    const savedRole = localStorage.getItem('role');
-    if (savedToken) {
-      setToken(savedToken);
-      setUserRole(savedRole);
-    }
-  }, []);
-
-  const handleLogin = (role) => {
-    setToken(localStorage.getItem('token'));
-    setUserRole(role);
-  };
+  const [userRole, setUserRole] = useState(localStorage.getItem('role'));
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('role');
-    setToken(null);
-    setUserRole(null);
+    localStorage.clear(); // Wipe everything
+    navigate('/login');
   };
 
-  // 1. Show Login if no token
-  if (!token) {
-    return <Login onLogin={handleLogin} />;
-  }
-
-  // 2. Show Dashboard if logged in
   return (
     <div className="min-h-screen bg-gray-100 p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
@@ -63,7 +43,7 @@ function App() {
           </div>
         </div>
 
-        {/* MAIN CONTENT */}
+        {/* CONTENT */}
         {showAddForm ? (
           <div className="bg-white p-6 rounded-lg shadow-lg">
              <div className="flex justify-between items-center mb-4">
@@ -87,12 +67,41 @@ function App() {
                 + Add Resident
               </button>
             </div>
-            {/* Pass the key to force refresh, and role to control buttons */}
             <ResidentList key={refreshTrigger} userRole={userRole} />
           </>
         )}
       </div>
     </div>
+  );
+}
+
+// MAIN APP COMPONENT WITH ROUTES
+function App() {
+  const navigate = useNavigate();
+
+  const handleLoginSuccess = (role) => {
+    navigate('/dashboard'); // Redirect to dashboard after login
+  };
+
+  return (
+    <Routes>
+      {/* PUBLIC ROUTE: Login */}
+      <Route path="/login" element={<Login onLogin={handleLoginSuccess} />} />
+
+      {/* PROTECTED ROUTES: Any route inside here requires a Token */}
+      <Route element={<ProtectedRoute />}>
+         <Route path="/dashboard" element={<DashboardLayout />} />
+         
+         {/* Example: If you create an Admin-Only page later:
+         <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+            <Route path="/admin-settings" element={<AdminPage />} />
+         </Route> 
+         */}
+      </Route>
+
+      {/* DEFAULT: Redirect root "/" to dashboard (which will redirect to login if needed) */}
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
   );
 }
 
