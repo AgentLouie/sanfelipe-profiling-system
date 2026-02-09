@@ -2,17 +2,19 @@
 from database import SessionLocal, engine
 import models
 
+# Create tables
 models.Base.metadata.create_all(bind=engine)
 
 db = SessionLocal()
 
-# Define Initial Base
+# --- DATA LISTS ---
+
 initial_barangays = [
     "Amagna", "Apostol", "Balincaguing", "Farañal", "Feria", 
     "Manglicmot", "Rosete", "San Rafael", "Santo Niño", "Sindol", "Maloma"
 ]
 
-inital_puroks = [
+initial_puroks = [
     "Purok 1", "Purok 2", "Purok 3", "Purok 4", "Purok 5", "Purok 6",
     "Purok 7", "Purok 8", "Purok 9", "Purok 10", "Purok 11", "Purok 12",
     "Purok 13", "Purok 14", "Purok 15", "Purok 16", "Purok 17", "Purok 18",
@@ -45,44 +47,36 @@ initial_sectors = [
     "Others"
 ]
 
-# Seeding data
 def seed_data():
-    # Seed Barangays
+    # 1. Seed Barangays
     print("Seeding Barangays...")
     for b_name in initial_barangays:
-        exists = db.query(models.Barangay).filter_by(name=b_name).first()
-        if not exists:
+        if not db.query(models.Barangay).filter_by(name=b_name).first():
             db.add(models.Barangay(name=b_name))
             print(f" - Added {b_name}")
-    
-    # Seed Puroks
+
+    # 2. Seed Puroks
     print("Seeding Puroks...")
-    for p_name in inital_puroks:
-        exists = db.query(models.Purok).filter_by(name=p_name).first()
-        if not exists:
+    for p_name in initial_puroks:
+        if not db.query(models.Purok).filter_by(name=p_name).first():
             db.add(models.Purok(name=p_name))
             print(f" - Added {p_name}")
-    
-    # Seed Relationships
+
+    # 3. Seed Relationships
     print("Seeding Relationships...")
     for r_name in initial_relationships:
-        exists = db.query(models.Relationship).filter_by(name=r_name).first()
-        if not exists:
+        if not db.query(models.Relationship).filter_by(name=r_name).first():
             db.add(models.Relationship(name=r_name))
             print(f" - Added {r_name}")
-    
-    db.commit()
-    print("Seeding completed!")
-    db.close()
-    
-    # Seed Sectors
+
+    # 4. Seed Sectors
     print("Seeding Sectors...")
     for s_name in initial_sectors:
-        exists = db.query(models.Sector).filter_by(name=s_name).first()
-        if not exists:
+        if not db.query(models.Sector).filter_by(name=s_name).first():
             db.add(models.Sector(name=s_name))
             print(f" - Added {s_name}")
 
+    # SAVE AND CLOSE ONLY AT THE VERY END
     db.commit()
     print("Seeding Complete!")
     db.close()

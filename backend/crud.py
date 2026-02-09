@@ -1,45 +1,57 @@
-# backend/crud.py
 from sqlalchemy.orm import Session
 import models, schemas
-import json
-
-# --- READ (GET) ---
+from sqlalchemy import or_
 
 def get_resident(db: Session, resident_id: int):
-    return db.query(models.ResidentProfile).filter(
-        models.ResidentProfile.id == resident_id, 
-        models.ResidentProfile.is_active == True
-    ).first()
+    return db.query(models.ResidentProfile).filter(models.ResidentProfile.id == resident_id).first()
 
 def get_residents(db: Session, skip: int = 0, limit: int = 100, search: str = None):
-    query = db.query(models.ResidentProfile).filter(models.ResidentProfile.is_active == True)
+    query = db.query(models.ResidentProfile)
+    
     if search:
-        query = query.filter(models.ResidentProfile.last_name.ilike(f"%{search}%"))
+        search_fmt = f"%{search}%"
+        query = query.filter(
+            or_(
+                models.ResidentProfile.last_name.ilike(search_fmt),
+                models.ResidentProfile.first_name.ilike(search_fmt)
+            )
+        )
+    
     return query.offset(skip).limit(limit).all()
-
-# --- CREATE (POST) - DEBUGGED ---
 
 def create_resident(db: Session, resident: schemas.ResidentCreate):
     try:
         resident_data = resident.model_dump()
         
-        # 1. Extract List Data
+        # Extract List Data
         family_members_data = resident_data.pop("family_members", [])
         sector_ids = resident_data.pop("sector_ids", [])
+        resident_data.pop("sector_summary", None)
         
-        # 2. Create Resident Head
-        db_resident = models.ResidentProfile(**resident_data)
-        
-        # 3. Associate Sectors
+        # Create the "sector_summary" string
+        sector_names_list = []
         if sector_ids:
-            sectors = db.query(models.Sector).filter(models.Sector.id.in_(sector_ids)).all()
-            db_resident.sectors = sectors
-
+            selected_sectors = db.query(models.Sector).filter(models.Sector.id.in_(sector_ids)).all()
+            sector_names_list = [sector.name for sector in selected_sectors]
+            
+        summary_string = ", ".join(sector_names_list)
+        
+        # Create Resident Object
+        db_resident = models.ResidentProfile(
+            **resident_data,
+            sector_summary=summary_string
+        )
+        
         db.add(db_resident)
         db.commit()
         db.refresh(db_resident)
+
+        # Associate Sectors
+        if sector_ids:
+            sectors = db.query(models.Sector).filter(models.Sector.id.in_(sector_ids)).all()
+            db_resident.sectors = sectors
         
-        # 4. Create Family Members
+        # Create Family Members
         for member_data in family_members_data:
             db_member = models.FamilyMember(**member_data, profile_id=db_resident.id)
             db.add(db_member)
@@ -52,11 +64,9 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
         db.rollback()
         raise e
 
-# --- DELETE ---
-
 def delete_resident(db: Session, resident_id: int):
-    db_resident = get_resident(db, resident_id)
+    db_resident = db.query(models.ResidentProfile).filter(models.ResidentProfile.id == resident_id).first()
     if db_resident:
-        db_resident.is_active = False
+        db.delete(db_resident)
         db.commit()
     return db_resident

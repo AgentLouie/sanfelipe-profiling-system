@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, DateTime, Table
-from sqlalchemy.orm import relationship as orm_relationship # <--- RENAMED HERE TO AVOID CONFLICT
+from sqlalchemy.orm import relationship as orm_relationship
 from sqlalchemy.sql import func
 from database import Base
 
@@ -31,39 +31,50 @@ class Sector(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True)
 
-# --- MAIN TABLES ---
+# --- MAIN TABLE ---
 class ResidentProfile(Base):
     __tablename__ = "resident_profiles"
 
     id = Column(Integer, primary_key=True, index=True)
     
-    # Personal & Address
+    # 1. PERSONAL INFO
     last_name = Column(String, index=True)
     first_name = Column(String, index=True)
     middle_name = Column(String, nullable=True)
-    ext_name = Column(String, nullable=True)
+    ext_name = Column(String, nullable=True) # e.g. Jr, Sr
     
+    # 2. ADDRESS
     house_no = Column(String, nullable=True)
     purok = Column(String, index=True)
     barangay = Column(String, index=True)
 
-    # Demographics
+    # 3. DEMOGRAPHICS
     birthdate = Column(Date)
     sex = Column(String)
+    precinct_no = Column(String, nullable=True) # Added
+    
+    # 4. STATUS & CONTACT
     civil_status = Column(String)
-    religion = Column(String, nullable=True)
-    occupation = Column(String, nullable=True)
-    precinct_no = Column(String, nullable=True)
+    religion = Column(String, nullable=True)    # Added
+    occupation = Column(String, nullable=True)  # Added
     contact_no = Column(String, nullable=True)
-    other_sector_details = Column(String, nullable=True)
+
+    # 5. SPOUSE / PARTNER (Split into parts to match form)
+    spouse_last_name = Column(String, nullable=True)
+    spouse_first_name = Column(String, nullable=True)
+    spouse_middle_name = Column(String, nullable=True)
+    spouse_ext_name = Column(String, nullable=True)
+
+    # 6. SECTORS (Dynamic + Summary)
+    other_sector_details = Column(String, nullable=True) 
+    sector_summary = Column(String, nullable=True) # Stores "Senior, PWD" string
 
     # System Fields
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # --- RELATIONSHIPS (LINKS) ---
-    # We use 'orm_relationship' here so it doesn't clash with any column names
+    # --- RELATIONSHIPS ---
     family_members = orm_relationship("FamilyMember", back_populates="head", cascade="all, delete-orphan")
     sectors = orm_relationship("Sector", secondary=resident_sectors, backref="residents")
 
@@ -77,11 +88,7 @@ class FamilyMember(Base):
     first_name = Column(String)
     middle_name = Column(String, nullable=True)
     ext_name = Column(String, nullable=True)
-    
-    # This column caused the crash before because it was named the same as the function
     relationship = Column(String) 
     
     is_active = Column(Boolean, default=True)
-    
-    # LINK BACK
     head = orm_relationship("ResidentProfile", back_populates="family_members")
