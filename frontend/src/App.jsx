@@ -4,18 +4,32 @@ import ResidentList from './components/ResidentList';
 import AddResidentForm from './components/AddResidentForm';
 import ProtectedRoute from './components/ProtectedRoute';
 import { LogOut, UserCircle } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
-
+// 1. DASHBOARD LAYOUT (The Main Page Logic)
 function DashboardLayout() {
   const navigate = useNavigate();
   const [showAddForm, setShowAddForm] = useState(false);
+  const [residentToEdit, setResidentToEdit] = useState(null); // State for editing
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [userRole, setUserRole] = useState(localStorage.getItem('role'));
 
   const handleLogout = () => {
     localStorage.clear();
     navigate('/login');
+  };
+
+  // Function to start editing (Passed down to List)
+  const handleEdit = (resident) => {
+    setResidentToEdit(resident);
+    setShowAddForm(true);
+  };
+
+  // Function when form saves successfully
+  const handleSuccess = () => {
+    setShowAddForm(false);
+    setResidentToEdit(null); // Clear edit mode
+    setRefreshTrigger(prev => prev + 1); // Refresh list
   };
 
   return (
@@ -47,27 +61,37 @@ function DashboardLayout() {
         {showAddForm ? (
           <div className="bg-white p-6 rounded-lg shadow-lg">
              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Add New Resident</h2>
+                <h2 className="text-xl font-bold">
+                  {residentToEdit ? "Edit Resident" : "Add New Resident"}
+                </h2>
              </div>
             <AddResidentForm 
-              onSuccess={() => {
+              residentToEdit={residentToEdit}
+              onSuccess={handleSuccess}
+              onCancel={() => {
                 setShowAddForm(false);
-                setRefreshTrigger(prev => prev + 1);
+                setResidentToEdit(null);
               }}
-              onCancel={() => setShowAddForm(false)}
             />
           </div>
         ) : (
           <>
             <div className="flex justify-end mb-4">
               <button 
-                onClick={() => setShowAddForm(true)}
+                onClick={() => {
+                  setResidentToEdit(null);
+                  setShowAddForm(true);
+                }}
                 className="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 transition flex items-center gap-2"
               >
                 + Add Resident
               </button>
             </div>
-            <ResidentList key={refreshTrigger} userRole={userRole} />
+            <ResidentList 
+              key={refreshTrigger} 
+              userRole={userRole} 
+              onEdit={handleEdit} 
+            />
           </>
         )}
       </div>
@@ -75,6 +99,7 @@ function DashboardLayout() {
   );
 }
 
+// 2. MAIN APP COMPONENT (The Router Logic)
 function App() {
   const navigate = useNavigate();
 
@@ -84,13 +109,10 @@ function App() {
 
   return (
     <Routes>
-      {/* PUBLIC ROUTE: Login */}
       <Route path="/login" element={<Login onLogin={handleLoginSuccess} />} />
 
-      {/* PROTECTED ROUTES: Any route inside here requires a Token */}
       <Route element={<ProtectedRoute />}>
          <Route path="/dashboard" element={<DashboardLayout />} />
-         
       </Route>
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

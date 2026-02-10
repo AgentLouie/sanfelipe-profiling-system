@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import api from '../api';
 import { Trash2, Edit, Search, User } from 'lucide-react';
 
-export default function ResidentList({ userRole }) {
+
+export default function ResidentList({ userRole, onEdit }) {
   const [residents, setResidents] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -127,6 +128,7 @@ export default function ResidentList({ userRole }) {
                       {userRole === 'admin' ? (
                         <>
                           <button 
+                            onClick={() => onEdit(r)} // <--- THIS IS THE MAGIC LINE
                             className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition" 
                             title="Edit Resident"
                           >
