@@ -8,6 +8,8 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
+import os
+from dotenv import load_dotenv
 
 import models, schemas, crud
 from database import engine, get_db
@@ -31,8 +33,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+load_dotenv()
+
 # SECURITY CONFIGURATION
-SECRET_KEY = "thesis-super-secret-key-change-me"
+SECRET_KEY = os.getenv("SECRET_KEY", "fallback-secret-key-for-dev-only") 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 # Extended to 1 hour for convenience
 
@@ -129,6 +133,26 @@ def read_resident(
         raise HTTPException(status_code=404, detail="Resident not found")
     return db_resident
 
+# UPDATE RESIDENT
+@app.put("/residents/{resident_id}", response_model=schemas.Resident)
+def update_resident(
+    resident_id: int, 
+    resident: schemas.ResidentUpdate, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user) # Secure: Must be logged in
+):
+    # Call the CRUD function
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=403, 
+            detail="Access Denied: Only Admins can edit records."
+        )
+
+    db_resident = crud.update_resident(db, resident_id=resident_id, resident_data=resident)
+    if db_resident is None:
+        raise HTTPException(status_code=404, detail="Resident not found")
+    return db_resident
+
 # 4. DELETE RESIDENT (Locked + Admin Only)
 @app.delete("/residents/{resident_id}", response_model=schemas.Resident)
 def delete_resident(
@@ -149,8 +173,6 @@ def delete_resident(
     return db_resident
 
 # --- REFERENCE DATA ENDPOINTS ---
-# (We lock these too so only logged-in users can fetch them)
-
 @app.get("/barangays/", response_model=List[schemas.Barangay])
 def get_barangays(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.Barangay).all()

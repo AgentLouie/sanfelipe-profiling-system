@@ -61,6 +61,9 @@ class ResidentCreate(ResidentBase):
     family_members: List[FamilyMemberCreate] = []
     sector_ids: List[int] = [] 
 
+class ResidentUpdate(ResidentBase):
+    family_members: Optional[List[FamilyMemberCreate]] = None
+    sector_ids: List[int] = None
 class Resident(ResidentBase):
     id: int
     is_active: bool

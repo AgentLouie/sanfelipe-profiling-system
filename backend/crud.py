@@ -63,6 +63,43 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
     except Exception as e:
         db.rollback()
         raise e
+    
+def update_resident(db: Session, resident_id: int, resident_data: schemas.ResidentUpdate):
+    # 1. Get the existing resident
+    db_resident = db.query(models.ResidentProfile).filter(models.ResidentProfile.id == resident_id).first()
+    if not db_resident:
+        return None
+
+    # 2. Update Basic Fields
+    # We convert the input data to a dictionary, excluding the complex lists
+    update_data = resident_data.dict(exclude={'sector_ids', 'family_members'})
+    
+    for key, value in update_data.items():
+        setattr(db_resident, key, value) # Update the field
+
+    # 3. Update Sectors (Clear old, Add new)
+    db_resident.sectors.clear() # Remove all existing sectors
+    for s_id in resident_data.sector_ids:
+        sector = db.query(models.Sector).filter(models.Sector.id == s_id).first()
+        if sector:
+            db_resident.sectors.append(sector)
+
+    # 4. Update Family Members (Delete old, Add new)
+    # First, delete all existing family members for this person
+    db.query(models.FamilyMember).filter(models.FamilyMember.profile_id == resident_id).delete()
+    
+    # Then add the new list
+    for fm_data in resident_data.family_members:
+        new_fm = models.FamilyMember(
+            **fm_data.dict(),
+            profile_id=resident_id # Link to this resident
+        )
+        db.add(new_fm)
+
+    # 5. Save Changes
+    db.commit()
+    db.refresh(db_resident)
+    return db_resident
 
 def delete_resident(db: Session, resident_id: int):
     db_resident = db.query(models.ResidentProfile).filter(models.ResidentProfile.id == resident_id).first()
