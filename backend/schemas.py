@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import date, datetime
 
 class ReferenceBase(BaseModel):
@@ -43,7 +43,7 @@ class ResidentBase(BaseModel):
     birthdate: date
     sex: str
     civil_status: str
-    religion: Optional[str] = None
+    #religion: Optional[str] = None
     occupation: Optional[str] = None
     precinct_no: Optional[str] = None
     contact_no: Optional[str] = None
@@ -70,7 +70,15 @@ class Resident(ResidentBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     family_members: List[FamilyMember] = []
-    sectors: List[Sector] = [] 
+    sectors: List[Sector] = []
+
+class DashboardStats(BaseModel):
+    total_residents: int
+    total_households: int
+    total_male: int
+    total_female: int
+    population_by_barangay: Dict[str, int]
+    population_by_sector: Dict[str, int] 
 
     class Config:
         from_attributes = True

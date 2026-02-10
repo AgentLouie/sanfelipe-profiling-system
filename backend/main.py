@@ -188,3 +188,10 @@ def get_relationships(db: Session = Depends(get_db), current_user: models.User =
 @app.get("/sectors/", response_model=List[schemas.Sector])
 def get_sectors(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return db.query(models.Sector).all()
+
+@app.get("/dashboard/stats", response_model=schemas.DashboardStats)
+def get_stats(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return crud.get_dashboard_stats(db)

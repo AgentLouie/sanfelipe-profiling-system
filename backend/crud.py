@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 import models, schemas
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 
 def get_resident(db: Session, resident_id: int):
     return db.query(models.ResidentProfile).filter(models.ResidentProfile.id == resident_id).first()
@@ -107,3 +107,40 @@ def delete_resident(db: Session, resident_id: int):
         db.delete(db_resident)
         db.commit()
     return db_resident
+
+def get_dashboard_stats(db: Session):
+    # 1. Basic Counts
+    total_residents = db.query(models.ResidentProfile).count()
+    
+    # Count Unique House Numbers
+    total_households = db.query(models.ResidentProfile.house_no).distinct().count()
+
+    # 2. Gender Split
+    total_male = db.query(models.ResidentProfile).filter(models.ResidentProfile.sex == "Male").count()
+    total_female = db.query(models.ResidentProfile).filter(models.ResidentProfile.sex == "Female").count()
+
+    # 3. Count by Barangay (Group By)
+    barangay_counts = db.query(
+        models.ResidentProfile.barangay, func.count(models.ResidentProfile.id)
+    ).group_by(models.ResidentProfile.barangay).all()
+    
+    # Convert list of tuples to dictionary { "Amagna": 150, "Apostol": 200 }
+    stats_barangay = {b: count for b, count in barangay_counts if b}
+
+    # 4. Count by Sector (Group By)
+    # This is trickier because it's a Many-to-Many relationship. 
+    # We query the link table directly or join.
+    sector_counts = db.query(
+        models.Sector.name, func.count(models.resident_sectors.c.resident_id)
+    ).join(models.resident_sectors).group_by(models.Sector.name).all()
+    
+    stats_sector = {s: count for s, count in sector_counts if s}
+
+    return {
+        "total_residents": total_residents,
+        "total_households": total_households,
+        "total_male": total_male,
+        "total_female": total_female,
+        "population_by_barangay": stats_barangay,
+        "population_by_sector": stats_sector
+    }
