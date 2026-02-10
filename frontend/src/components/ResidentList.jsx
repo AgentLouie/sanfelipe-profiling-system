@@ -188,13 +188,22 @@ export default function ResidentList({ userRole, onEdit }) {
                       <div className="text-xs text-stone-400 ml-4">{r.barangay}</div>
                     </td>
                     <td className="py-4 px-4">
-                      {r.sector_summary ? (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-100 shadow-sm shadow-rose-100/50">
-                          {r.sector_summary}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-stone-400 italic">None</span>
-                      )}
+                      <div className="flex flex-col gap-1.5">
+                        {r.sector_summary ? (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-100 shadow-sm shadow-rose-100/50 w-fit">
+                            {r.sector_summary}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-stone-400 italic">None</span>
+                        )}
+                        
+                        {r.other_sector_details && (
+                          <div className="text-[10px] font-bold text-stone-500 uppercase flex items-center gap-1 ml-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-stone-400"></span>
+                            Details: {r.other_sector_details}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="py-4 px-4 text-center" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-center gap-2">
