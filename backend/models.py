@@ -62,7 +62,6 @@ class ResidentProfile(Base):
     
     # 4. STATUS & CONTACT
     civil_status = Column(String)
-    religion = Column(String, nullable=True)    # Added
     occupation = Column(String, nullable=True)  # Added
     contact_no = Column(String, nullable=True)
 
