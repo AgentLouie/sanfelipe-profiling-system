@@ -82,6 +82,7 @@ class ResidentBase(BaseModel):
     
     # Summary
     sector_summary: Optional[str] = None
+    other_sector_details: Optional[str] = None
 
 class ResidentCreate(ResidentBase):
     sector_ids: List[int] = []

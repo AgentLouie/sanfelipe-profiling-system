@@ -3,7 +3,8 @@ import api from '../api';
 import { 
   Trash2, Edit, Search, ChevronDown, ChevronUp, 
   Loader2, Filter, Phone, Fingerprint, Heart, User, 
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight 
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+  Briefcase 
 } from 'lucide-react';
 import ExportButton from './ExportButton';
 import toast, { Toaster } from 'react-hot-toast';
@@ -22,6 +23,22 @@ export default function ResidentList({ userRole, onEdit }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+
+  // --- HELPER: REPLACE "OTHERS" WITH SPECIFIC TEXT ---
+  const formatSectors = (summary, details) => {
+    if (!summary) return "None";
+    // Check if "Others" exists and we have specific details to show
+    if (summary.includes("Others") && details) {
+      // Replace the word "Others" with the specific detail (e.g., "Student")
+      return summary.replace("Others", details);
+    }
+    // Check capitalization mismatch just in case (e.g. "OTHERS")
+    if (summary.toUpperCase().includes("OTHERS") && details) {
+         // Regex to replace "Others" case-insensitively
+         return summary.replace(/Others/i, details);
+    }
+    return summary;
+  };
 
   const totalPages = Math.ceil(totalItems / itemsPerPage);
 
@@ -132,8 +149,11 @@ export default function ResidentList({ userRole, onEdit }) {
     }
   };
 
+  // --- DETAILS COMPONENT ---
   const ResidentDetails = ({ r }) => (
     <div className="p-5 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-8 bg-stone-50/50 border-t border-stone-100 animate-in slide-in-from-top-2 duration-300">
+      
+      {/* LEFT COLUMN: Personal & Spouse */}
       <div className="space-y-6">
         <div className="space-y-3">
           <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
@@ -164,7 +184,7 @@ export default function ResidentList({ userRole, onEdit }) {
         </div>
 
         {(r.spouse_first_name || r.spouse_last_name) && (
-          <div className="space-y-3 pt-4 border-t border-stone-100">
+          <div className="space-y-3 pt-4 border-t border-stone-200">
             <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
               <Heart size={14} className="text-rose-400 fill-rose-400" /> Spouse / Partner
             </h4>
@@ -178,34 +198,46 @@ export default function ResidentList({ userRole, onEdit }) {
         )}
       </div>
 
-      <div className="space-y-4">
-        <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
-          <User size={14} /> Family Members
-        </h4>
-        {r.family_members?.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {r.family_members.map((fm, i) => (
-              <div key={i} className="px-3 py-1.5 bg-white border border-stone-200 rounded-lg shadow-sm text-xs">
-                <span className="font-bold text-stone-800">{fm.first_name} {fm.last_name}</span>
-                <span className="ml-2 text-stone-400 italic">({fm.relationship})</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-stone-400 italic">No additional family members recorded.</p>
-        )}
+      {/* RIGHT COLUMN: Sectors & Family */}
+      <div className="space-y-6">
+        <div className="space-y-3">
+            <h4 className="text-[10px] font-black text-orange-500 uppercase tracking-widest flex items-center gap-2">
+              <Briefcase size={14} /> Sector Affiliation
+            </h4>
+            <div className="bg-white p-3 rounded-xl border border-stone-200 shadow-sm space-y-2">
+              <p className="text-sm font-bold text-stone-800">
+                {/* USE HELPER HERE */}
+                {formatSectors(r.sector_summary, r.other_sector_details)}
+              </p>
+            </div>
+        </div>
+
+        <div className="space-y-3 pt-4 border-t border-stone-200">
+          <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
+            <User size={14} /> Family Members
+          </h4>
+          {r.family_members?.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {r.family_members.map((fm, i) => (
+                <div key={i} className="px-3 py-1.5 bg-white border border-stone-200 rounded-lg shadow-sm text-xs">
+                  <span className="font-bold text-stone-800">{fm.first_name} {fm.last_name}</span>
+                  <span className="ml-2 text-stone-400 italic">({fm.relationship})</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-stone-400 italic">No additional family members recorded.</p>
+          )}
+        </div>
       </div>
     </div>
   );
 
   return (
-    /* We add "relative" and "mt-0" to ensure the modal stays inside this content box and matches the top */
     <div className="relative mt-0 space-y-4 animate-in fade-in duration-500">
       <Toaster position="top-center" />
 
-      {/* --- DELETE CONFIRMATION MODAL --- */}
       {deleteModal.isOpen && (
-        /* Changed "fixed" to "absolute" so it stays within the ResidentList boundaries and doesn't cover the sidebar */
         <div className="absolute inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-600 mb-4">
@@ -277,7 +309,6 @@ export default function ResidentList({ userRole, onEdit }) {
 
       <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden relative min-h-[400px]">
         {loading && (
-          /* Loader also changed to absolute to stay inside the table container */
           <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-50 flex flex-col items-center justify-center">
             <Loader2 className="animate-spin text-rose-600 mb-2" size={32} />
             <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">Syncing Records...</span>
@@ -317,7 +348,8 @@ export default function ResidentList({ userRole, onEdit }) {
                       </td>
                       <td className="py-4 px-6">
                         <span className="text-[10px] px-2 py-1 rounded-full bg-stone-100 font-bold text-stone-500 uppercase">
-                          {r.sector_summary || "None"}
+                          {/* APPLY HELPER HERE (Main Table Row) */}
+                          {formatSectors(r.sector_summary, r.other_sector_details)}
                         </span>
                       </td>
                       <td className="py-4 px-6" onClick={(e) => e.stopPropagation()}>
@@ -344,6 +376,7 @@ export default function ResidentList({ userRole, onEdit }) {
 
       {/* Pagination Footer */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 bg-white border border-stone-100 rounded-2xl shadow-sm">
+        {/* ... pagination controls ... */}
         <div className="flex items-center gap-3 text-xs text-stone-500 order-2 md:order-1">
           <span>Rows per page:</span>
           <div className="relative">
@@ -369,7 +402,6 @@ export default function ResidentList({ userRole, onEdit }) {
             disabled={currentPage === 1 || loading}
             onClick={() => setCurrentPage(1)}
             className="p-2 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50 disabled:opacity-30 transition-all"
-            title="First Page"
           >
             <ChevronsLeft size={16} />
           </button>
@@ -411,7 +443,6 @@ export default function ResidentList({ userRole, onEdit }) {
             disabled={currentPage === totalPages || loading}
             onClick={() => setCurrentPage(totalPages)}
             className="p-2 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50 disabled:opacity-30 transition-all"
-            title="Last Page"
           >
             <ChevronsRight size={16} />
           </button>
