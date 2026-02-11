@@ -23,7 +23,7 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="San Felipe Residential Profile Form")
 
-# CORS Config
+# CORS Config - Updated to match Vercel/Railway domains
 origins = [
     "http://localhost:5173",
     "https://sanfelipe-profiling-system.vercel.app",
@@ -156,21 +156,17 @@ def delete_user(
     db: Session = Depends(get_db), 
     current_user: models.User = Depends(get_current_user)
 ):
-    # 1. Security Check: Only admins can delete accounts
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admins can delete users")
 
-    # 2. Find the user in the database
     user_to_delete = db.query(models.User).filter(models.User.id == user_id).first()
     
     if not user_to_delete:
         raise HTTPException(status_code=404, detail="User account not found")
 
-    # 3. Safety Check: Prevent the admin from deleting their own account
     if user_to_delete.id == current_user.id:
         raise HTTPException(status_code=400, detail="You cannot delete your own account while logged in")
 
-    # 4. Global Safety: Ensure at least one admin remains
     if user_to_delete.role == "admin":
         admin_count = db.query(models.User).filter(models.User.role == "admin").count()
         if admin_count <= 1:
@@ -182,7 +178,6 @@ def delete_user(
         return {"message": f"User {user_to_delete.username} has been removed from the system"}
     except Exception as e:
         db.rollback()
-        # This triggers if the user has data linked to them (Foreign Key Constraint)
         raise HTTPException(
             status_code=400, 
             detail="Cannot delete user: This account has registered residents linked to it."
@@ -199,17 +194,13 @@ def create_resident(
     current_user: models.User = Depends(get_current_user)
 ):
     # --- FIX: FORCE BARANGAY NAME FOR STAFF ---
-    # If the user is NOT admin, we overwrite the 'barangay' field
-    # to match their account. This ensures they can always see what they create.
     if current_user.role != "admin":
-        # e.g., converts "rosete" -> "Rosete"
         resident.barangay = current_user.username.capitalize() 
 
     return crud.create_resident(db=db, resident=resident)
 
-# main.py
-
-@app.get("/residents/")
+# --- FIX: Updated schema to match 'ResidentPagination' ---
+@app.get("/residents/", response_model=schemas.ResidentPagination)
 def read_residents(
     skip: int = 0, 
     limit: int = 20, 
@@ -218,7 +209,6 @@ def read_residents(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # Determine filter scope based on isolation logic
     filter_barangay = barangay
     if current_user.role != "admin":
         # Force staff to see only their assigned barangay
@@ -230,10 +220,12 @@ def read_residents(
     # 2. Get the specific chunk of residents
     residents = crud.get_residents(db, skip=skip, limit=limit, search=search, barangay=filter_barangay)
 
-    # 3. RETURN OBJECT, NOT LIST
+    # 3. Return Object matching ResidentPagination schema
     return {
         "items": residents,
-        "total": total
+        "total": total,
+        "page": (skip // limit) + 1,
+        "size": limit
     }
 
 @app.get("/residents/{resident_id}", response_model=schemas.Resident)
@@ -254,8 +246,12 @@ def update_resident(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    # Allow admins OR the specific barangay staff to edit
     if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Access Denied")
+        # Additional safety: Check if resident belongs to this staff
+        existing = crud.get_resident(db, resident_id)
+        if existing and existing.barangay != current_user.username.capitalize():
+            raise HTTPException(status_code=403, detail="You can only edit residents in your barangay")
 
     db_resident = crud.update_resident(db, resident_id=resident_id, resident_data=resident)
     if db_resident is None:
@@ -269,7 +265,10 @@ def delete_resident(
     current_user: models.User = Depends(get_current_user)
 ):
     if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Access Denied")
+         # Additional safety: Check if resident belongs to this staff
+        existing = crud.get_resident(db, resident_id)
+        if existing and existing.barangay != current_user.username.capitalize():
+            raise HTTPException(status_code=403, detail="You can only delete residents in your barangay")
 
     db_resident = crud.delete_resident(db, resident_id=resident_id)
     if db_resident is None:
@@ -314,23 +313,28 @@ def get_stats(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # --- ADDED: ONLY ADMIN CAN SEE DASHBOARD STATS ---
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Access denied to dashboard statistics")
         
     return crud.get_dashboard_stats(db)
 
+# --- SYSTEM FIX ENDPOINTS (SECURED) ---
 @app.get("/system/fix-ghost-records")
 def fix_ghost_records(
     target_barangay: str = Query(..., description="The name of the barangay to assign records to (e.g., Faranal)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user) # Secured!
 ):
+    # Only Admin can run system fixes
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only Admins can perform system maintenance.")
+
     try:
-        # Dynamic SQL: Moves 'San Felipe' or NULL records to the specific target_barangay
-        # WARNING: This moves ALL current ghost records to this one target.
-        sql = text(f"UPDATE resident_profiles SET barangay = '{target_barangay}' WHERE barangay IS NULL OR barangay = 'San Felipe';")
+        # Secure way to use target_barangay (Avoid SQL Injection risk)
+        # Using :target bind parameter is safer than f-string
+        sql = text("UPDATE resident_profiles SET barangay = :target WHERE barangay IS NULL OR barangay = 'San Felipe';")
         
-        result = db.execute(sql)
+        result = db.execute(sql, {"target": target_barangay})
         db.commit()
         
         return {"status": "success", "message": f"Moved ghost records to '{target_barangay}'!"}
@@ -342,11 +346,8 @@ def fix_ghost_records(
 @app.get("/debug/tables")
 def debug_tables(db: Session = Depends(get_db)):
     try:
-        # Ask PostgreSQL for a list of all table names
         query = text("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
         result = db.execute(query).fetchall()
-        
-        # Return the list so you can see it in your browser
         tables = [row[0] for row in result]
         return {"status": "success", "tables": tables}
     except Exception as e:
