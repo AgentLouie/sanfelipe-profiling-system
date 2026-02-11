@@ -25,7 +25,7 @@ app = FastAPI(title="San Felipe Residential Profile Form")
 # CORS Config
 origins = [
     "http://localhost:5173",
-    "http://localhost:3000",
+    "https://sanfelipe-profiling-system.vercel.app",
     "https://sanfelipe-profiling-system-production.up.railway.app",
 ]
 
