@@ -379,3 +379,29 @@ def debug_tables(db: Session = Depends(get_db)):
         return {"status": "success", "tables": tables}
     except Exception as e:
         return {"status": "error", "detail": str(e)}
+    
+@app.get("/debug/diagnose")
+def debug_diagnose(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # 1. Check logic for the current user
+    mapped_name = BARANGAY_MAPPING.get(current_user.username.lower(), "Not Found in Map")
+    fallback_name = current_user.username.replace("_", " ").title()
+    
+    # 2. Get raw data samples (first 5 records)
+    raw_residents = db.query(models.ResidentProfile).limit(5).all()
+    sample_data = [{"id": r.id, "name": f"{r.first_name} {r.last_name}", "barangay_stored_in_db": r.barangay} for r in raw_residents]
+    
+    return {
+        "WHO_YOU_ARE": {
+            "username": current_user.username,
+            "role": current_user.role,
+            "system_thinks_your_barangay_is": mapped_name if mapped_name != "Not Found in Map" else fallback_name,
+            "using_mapping": mapped_name != "Not Found in Map"
+        },
+        "DATABASE_CONTENT": {
+            "total_records": db.query(models.ResidentProfile).count(),
+            "sample_records": sample_data
+        }
+    }
