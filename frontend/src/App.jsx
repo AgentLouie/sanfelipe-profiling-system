@@ -87,7 +87,7 @@ export default function App() {
           path="overview" 
           element={
             role === 'admin' ? (
-              <DashboardStats />
+              <DashboardStats userRole={role} />
             ) : (
               <Navigate to="/dashboard/residents" replace />
             )
