@@ -30,25 +30,23 @@ export default function ResidentList({ userRole, onEdit }) {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
       
-      // Determine filter scope
-      let filterBarangay = barangay;
-      if (userRole !== 'admin') {
-        const storedUsername = localStorage.getItem('username') || '';
-        filterBarangay = storedUsername.charAt(0).toUpperCase() + storedUsername.slice(1).toLowerCase();
+      // --- FIX: RELY ON BACKEND MAPPING ---
+      // We ONLY send the barangay filter if the user is an ADMIN.
+      // If the user is Staff, we send NOTHING. The backend will automatically 
+      // detect their token and force the correct barangay (e.g. "Santo Niño").
+      if (userRole === 'admin' && barangay) {
+        params.append('barangay', barangay);
       }
       
-      if (filterBarangay) params.append('barangay', filterBarangay);
       params.append('skip', skip);
       params.append('limit', pageSize);
 
       const response = await api.get(`/residents/?${params.toString()}`);
       
-      // If your backend returns a pagination object { items, total }
       if (response.data.items) {
         setResidents(response.data.items);
         setTotalItems(response.data.total);
       } else {
-        // Fallback for non-paginated backend responses
         setResidents(response.data);
         setTotalItems(response.data.length);
       }
@@ -69,15 +67,14 @@ export default function ResidentList({ userRole, onEdit }) {
 
     fetchBarangays();
 
-    // Initial load with isolation check
-    const initialBarangay = userRole !== 'admin' ? localStorage.getItem('username') : '';
-    fetchResidents(searchTerm, initialBarangay, currentPage);
-  }, [userRole, currentPage]);
+    // Initial load
+    fetchResidents(searchTerm, selectedBarangay, currentPage);
+  }, [userRole, currentPage]); // Removing selectedBarangay from dependency to prevent double fetch on mount
 
   const handleSearchChange = (e) => {
     const val = e.target.value;
     setSearchTerm(val);
-    setCurrentPage(1); // Reset to first page on search
+    setCurrentPage(1); 
     fetchResidents(val, selectedBarangay, 1);
   };
 
@@ -86,11 +83,6 @@ export default function ResidentList({ userRole, onEdit }) {
     setSelectedBarangay(val);
     setCurrentPage(1);
     fetchResidents(searchTerm, val, 1);
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
   const toggleRow = (id) => {
@@ -181,6 +173,7 @@ export default function ResidentList({ userRole, onEdit }) {
             <Search className="absolute left-3 top-3.5 text-stone-400 group-focus-within:text-rose-500" size={18} />
           </div>
 
+          {/* ONLY ADMIN CAN SEE BARANGAY DROPDOWN */}
           {userRole === 'admin' && (
             <div className="relative">
               <select
@@ -233,7 +226,7 @@ export default function ResidentList({ userRole, onEdit }) {
                       </td>
                       <td className="py-4 px-6">
                         <p className="text-sm font-bold text-stone-800">{r.last_name}, {r.first_name} {r.ext_name}</p>
-                        <p className="text-[10px] text-rose-500 font-bold uppercase">{r.occupation || "N/A"}</p>
+                        <p className="text-sm font-bold text-rose-500 uppercase">{r.occupation || "N/A"}</p>
                       </td>
                       <td className="py-4 px-6">
                         <p className="text-sm text-stone-600">{r.purok}, {r.barangay}</p>
@@ -265,12 +258,11 @@ export default function ResidentList({ userRole, onEdit }) {
         </div>
       </div>
 
-      {/* PAGINATION CONTROLS */}
+      {/* PAGINATION */}
       <div className="flex items-center justify-between px-6 py-4 bg-white border border-stone-100 rounded-2xl shadow-sm">
         <p className="text-xs text-stone-500 font-medium">
           Showing <span className="font-bold text-stone-900">{residents.length}</span> of <span className="font-bold text-stone-900">{totalItems}</span> residents
         </p>
-        
         <div className="flex items-center gap-2">
           <button 
             disabled={currentPage === 1 || loading}
@@ -279,11 +271,9 @@ export default function ResidentList({ userRole, onEdit }) {
           >
             <ChevronLeft size={18} />
           </button>
-          
           <span className="text-[10px] font-bold px-4 py-2 bg-stone-50 rounded-lg border border-stone-100 uppercase tracking-widest text-stone-600">
             Page {currentPage} of {totalPages || 1}
           </span>
-
           <button 
             disabled={currentPage >= totalPages || loading}
             onClick={() => setCurrentPage(prev => prev + 1)}
@@ -294,7 +284,7 @@ export default function ResidentList({ userRole, onEdit }) {
         </div>
       </div>
 
-      {/* DELETE MODAL */}
+      {/* DELETE MODAL (Unchanged) */}
       {deleteModal.isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setDeleteModal({ isOpen: false, residentId: null, name: '' })}></div>

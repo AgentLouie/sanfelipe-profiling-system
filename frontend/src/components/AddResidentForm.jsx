@@ -3,7 +3,24 @@ import api from '../api';
 import { X, Plus, Trash2, User, MapPin, Briefcase, Heart, Save, Phone, Fingerprint } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
-// --- HELPER COMPONENTS ---
+// Helper: Enhanced to support disabled state
+const SelectGroup = ({ label, name, value, onChange, options, required = false, disabled = false }) => (
+  <div className="space-y-1 w-full">
+    <label className="text-[10px] font-bold text-stone-500 uppercase">{label}</label>
+    <select 
+      name={name} value={value || ''} onChange={onChange} required={required} disabled={disabled}
+      className={`w-full p-3 border border-stone-200 rounded-xl focus:border-rose-500 outline-none text-sm appearance-none
+        ${disabled ? 'bg-stone-100 text-stone-400 cursor-not-allowed' : 'bg-white text-stone-800'}
+      `}
+    >
+      <option value="">{disabled ? "Auto-Assigned" : "Select..."}</option>
+      {options.map((opt) => (
+        <option key={opt.id || opt} value={opt.name || opt}>{opt.name || opt}</option>
+      ))}
+    </select>
+  </div>
+);
+
 const InputGroup = ({ label, name, value, onChange, type = "text", required = false, placeholder }) => (
   <div className="space-y-1 w-full">
     <label className="text-[10px] font-bold text-stone-500 uppercase">{label}</label>
@@ -11,21 +28,6 @@ const InputGroup = ({ label, name, value, onChange, type = "text", required = fa
       type={type} name={name} value={value || ''} onChange={onChange} required={required} placeholder={placeholder}
       className="w-full p-3 bg-stone-50 border border-transparent focus:bg-white focus:border-rose-500 rounded-xl transition-all outline-none text-sm text-stone-800" 
     />
-  </div>
-);
-
-const SelectGroup = ({ label, name, value, onChange, options, required = false }) => (
-  <div className="space-y-1 w-full">
-    <label className="text-[10px] font-bold text-stone-500 uppercase">{label}</label>
-    <select 
-      name={name} value={value || ''} onChange={onChange} required={required}
-      className="w-full p-3 bg-white border border-stone-200 rounded-xl focus:border-rose-500 outline-none text-sm appearance-none"
-    >
-      <option value="">Select...</option>
-      {options.map((opt) => (
-        <option key={opt.id || opt} value={opt.name || opt}>{opt.name || opt}</option>
-      ))}
-    </select>
   </div>
 );
 
@@ -43,6 +45,9 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
   const [purokOptions, setPurokOptions] = useState([]);
   const [sectorOptions, setSectorOptions] = useState([]);
   const [loading, setLoading] = useState(false);
+  
+  // Get User Role to determine if we lock the barangay field
+  const userRole = localStorage.getItem('role') || 'staff'; 
 
   useEffect(() => {
     const fetchOptions = async () => {
@@ -73,7 +78,6 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     const { name, value } = e.target;
     setFormData(prev => {
       const newState = { ...prev, [name]: value };
-      // Clear spouse info if status changes to Single or Widowed
       if (name === "civil_status" && value !== "Married") {
         newState.spouse_last_name = '';
         newState.spouse_first_name = '';
@@ -136,7 +140,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
 
       <form onSubmit={handleSubmit} className="space-y-6">
         
-        {/* PERSONAL INFO SECTION */}
+        {/* PERSONAL INFO */}
         <section className="bg-white p-5 md:p-8 rounded-2xl border border-stone-100 shadow-sm space-y-6">
           <div className="flex items-center gap-2 border-b border-stone-50 pb-4">
             <User className="text-rose-500" size={20} />
@@ -156,7 +160,6 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
             <SelectGroup label="Civil Status *" name="civil_status" value={formData.civil_status} onChange={handleChange} options={['Single', 'Married', 'Widowed']} required />
           </div>
 
-          {/* DYNAMIC SPOUSE SECTION */}
           {(formData.civil_status === 'Married' || formData.civil_status === 'Live-in Partner') && (
             <div className="p-5 bg-rose-50/40 rounded-2xl border border-rose-100 animate-in zoom-in-95 duration-300">
               <h4 className="text-xs font-bold text-rose-600 uppercase mb-3 flex items-center gap-2">
@@ -178,7 +181,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
           </div>
         </section>
 
-        {/* ADDRESS SECTION */}
+        {/* ADDRESS */}
         <section className="bg-white p-5 md:p-8 rounded-2xl border border-stone-100 shadow-sm space-y-6">
           <div className="flex items-center gap-2 border-b border-stone-50 pb-4">
             <MapPin className="text-red-500" size={20} />
@@ -187,11 +190,22 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <InputGroup label="House No." name="house_no" value={formData.house_no} onChange={handleChange} />
             <SelectGroup label="Purok *" name="purok" value={formData.purok} onChange={handleChange} options={purokOptions} required />
-            <SelectGroup label="Barangay *" name="barangay" value={formData.barangay} onChange={handleChange} options={barangayOptions} required />
+            
+            {/* --- FIX: DISABLE BARANGAY SELECTION FOR STAFF --- */}
+            {/* If user is Admin, they can select. If Staff, it's disabled. */}
+            <SelectGroup 
+              label={userRole === 'admin' ? "Barangay *" : "Barangay (Auto-Assigned)"}
+              name="barangay" 
+              value={formData.barangay} 
+              onChange={handleChange} 
+              options={barangayOptions} 
+              required={userRole === 'admin'} 
+              disabled={userRole !== 'admin'} 
+            />
           </div>
         </section>
 
-        {/* FAMILY SECTION */}
+        {/* FAMILY MEMBERS */}
         <section className="bg-white p-5 md:p-8 rounded-2xl border border-stone-100 shadow-sm space-y-6">
           <div className="flex justify-between items-center border-b border-stone-50 pb-4">
             <div className="flex items-center gap-2">
@@ -212,7 +226,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
           </div>
         </section>
 
-        {/* SECTORS SECTION */}
+        {/* SECTORS */}
         <section className="bg-white p-5 md:p-8 rounded-2xl border border-stone-100 shadow-sm space-y-6">
           <div className="flex items-center gap-2 border-b border-stone-50 pb-4">
             <Briefcase className="text-orange-500" size={20} />
@@ -231,7 +245,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
           )}
         </section>
 
-        {/* FLOATING ACTION BAR */}
+        {/* ACTIONS */}
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t flex flex-col sm:flex-row justify-end gap-3 z-50 shadow-lg">
           <button type="button" onClick={onCancel} className="w-full sm:w-auto px-8 py-3 font-bold text-stone-500 hover:bg-stone-50 rounded-xl transition-colors">Cancel</button>
           <button type="submit" disabled={loading} className="w-full sm:w-auto px-12 py-3 bg-red-600 text-white rounded-xl font-bold shadow-xl shadow-red-200 hover:bg-red-700 active:scale-95 transition-all">
