@@ -49,12 +49,17 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
     try:
         resident_data = resident.model_dump()
         
-        # Extract List Data
+        # 1. Extract List Data
         family_members_data = resident_data.pop("family_members", [])
         sector_ids = resident_data.pop("sector_ids", [])
         resident_data.pop("sector_summary", None)
-        
-        # Create the "sector_summary" string for quick display
+
+        # 2. SAFETY FILTER: Remove keys that don't exist in the DB Model
+        # This prevents "invalid keyword argument" errors if schema and model don't match
+        valid_columns = {c.name for c in models.ResidentProfile.__table__.columns}
+        filtered_data = {k: v for k, v in resident_data.items() if k in valid_columns}
+
+        # 3. Create the "sector_summary" string
         sector_names_list = []
         if sector_ids:
             selected_sectors = db.query(models.Sector).filter(models.Sector.id.in_(sector_ids)).all()
@@ -62,9 +67,9 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
             
         summary_string = ", ".join(sector_names_list)
         
-        # Create Resident Object
+        # 4. Create Resident Object using FILTERED data
         db_resident = models.ResidentProfile(
-            **resident_data,
+            **filtered_data,  # <--- WE USE THE CLEAN DATA HERE
             sector_summary=summary_string
         )
         
@@ -72,15 +77,27 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
         db.commit()
         db.refresh(db_resident)
 
-        # Associate Sectors (Many-to-Many)
+        # 5. Associate Sectors
         if sector_ids:
             sectors = db.query(models.Sector).filter(models.Sector.id.in_(sector_ids)).all()
             db_resident.sectors = sectors
         
-        # Create Family Members
+        # 6. Create Family Members
+        # We also filter family member data just in case
+        valid_fm_columns = {c.name for c in models.FamilyMember.__table__.columns}
+        
         for member_data in family_members_data:
-            db_member = models.FamilyMember(**member_data, profile_id=db_resident.id)
-            db.add(db_member)
+            # Clean the member data too
+            clean_member_data = {k: v for k, v in member_data.items() if k in valid_fm_columns}
+            if isinstance(member_data, dict): # Ensure it's a dict
+                 db_member = models.FamilyMember(**clean_member_data, profile_id=db_resident.id)
+                 db.add(db_member)
+            else:
+                 # Fallback if Pydantic object
+                 clean_member_dict = member_data.model_dump()
+                 final_member_data = {k: v for k, v in clean_member_dict.items() if k in valid_fm_columns}
+                 db_member = models.FamilyMember(**final_member_data, profile_id=db_resident.id)
+                 db.add(db_member)
         
         db.commit()
         db.refresh(db_resident)
