@@ -1,6 +1,6 @@
 from pydantic import BaseModel
-from typing import List, Optional
-from datetime import date
+from typing import List, Optional, Dict
+from datetime import date, datetime  # <--- FIX: Added datetime here
 
 # =======================
 # REFERENCE DATA SCHEMAS
@@ -95,14 +95,16 @@ class ResidentUpdate(ResidentBase):
 
 class Resident(ResidentBase):
     id: int
-    created_at: Optional[datetime] = None  # Ensure you import datetime if needed, or use date
+    created_at: Optional[datetime] = None  # Now this will work!
     family_members: List[FamilyMember] = []
     sectors: List[Sector] = []
 
     class Config:
         from_attributes = True
 
-# --- 🚨 THIS IS THE MISSING PART CAUSING THE ERROR 🚨 ---
+# =======================
+# PAGINATION SCHEMA (CRITICAL FOR MAIN.PY)
+# =======================
 class ResidentPagination(BaseModel):
     items: List[Resident]
     total: int
@@ -144,5 +146,5 @@ class DashboardStats(BaseModel):
     total_households: int
     total_male: int
     total_female: int
-    population_by_barangay: dict
-    population_by_sector: dict
+    population_by_barangay: Dict[str, int] # Fix: Use Dict for type safety
+    population_by_sector: Dict[str, int]
