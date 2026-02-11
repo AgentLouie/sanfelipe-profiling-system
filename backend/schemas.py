@@ -38,7 +38,7 @@ class FamilyMemberBase(BaseModel):
     relationship: str
     birthdate: Optional[date] = None
     occupation: Optional[str] = None
-    education: Optional[str] = None
+    # Removed: education
 
 class FamilyMemberCreate(FamilyMemberBase):
     pass
@@ -66,21 +66,14 @@ class ResidentBase(BaseModel):
     # Personal Info
     sex: str
     birthdate: Optional[date] = None
-    birthplace: Optional[str] = None
     civil_status: Optional[str] = None
-    citizenship: Optional[str] = None
     occupation: Optional[str] = None
+    
+    # Removed: birthplace, citizenship, sss_no, tin_no, philhealth_no, covid_status, voter_status
     
     # Contact / Govt IDs
     contact_no: Optional[str] = None
     precinct_no: Optional[str] = None
-    sss_no: Optional[str] = None
-    tin_no: Optional[str] = None
-    philhealth_no: Optional[str] = None
-    
-    # Health / Status
-    covid_status: Optional[str] = None
-    voter_status: Optional[str] = None
     
     # Summary
     sector_summary: Optional[str] = None
@@ -95,22 +88,18 @@ class ResidentUpdate(ResidentBase):
 
 class Resident(ResidentBase):
     id: int
-    created_at: Optional[datetime] = None  # Now this will work!
+    created_at: Optional[datetime] = None
     family_members: List[FamilyMember] = []
-    sectors: List[Sector] = []
+    sectors: List[Sector] = [] # Note: Assuming Sector schema exists above
 
     class Config:
         from_attributes = True
 
-# =======================
-# PAGINATION SCHEMA (CRITICAL FOR MAIN.PY)
-# =======================
 class ResidentPagination(BaseModel):
     items: List[Resident]
     total: int
     page: int
     size: int
-
     class Config:
         from_attributes = True
 

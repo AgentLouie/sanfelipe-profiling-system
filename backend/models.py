@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship as orm_relationship
 from sqlalchemy.sql import func
 from database import Base
 
-# --- ASSOCIATION TABLE ---
+# --- ASSOCIATION TABLE (Many-to-Many) ---
 resident_sectors = Table(
     'resident_sectors', Base.metadata,
     Column('resident_id', Integer, ForeignKey('resident_profiles.id')),
@@ -48,7 +48,7 @@ class ResidentProfile(Base):
     last_name = Column(String, index=True)
     first_name = Column(String, index=True)
     middle_name = Column(String, nullable=True)
-    ext_name = Column(String, nullable=True) # e.g. Jr, Sr
+    ext_name = Column(String, nullable=True)
     
     # 2. ADDRESS
     house_no = Column(String, nullable=True)
@@ -58,21 +58,14 @@ class ResidentProfile(Base):
     # 3. DEMOGRAPHICS
     birthdate = Column(Date)
     sex = Column(String)
-    precinct_no = Column(String, nullable=True) 
+    civil_status = Column(String, nullable=True)
+    precinct_no = Column(String, nullable=True)
     
-    # 4. STATUS & CONTACT
-    civil_status = Column(String)
-    #religion = Column(String, nullable=True)   
+    # 4. WORK & CONTACT
     occupation = Column(String, nullable=True)
     contact_no = Column(String, nullable=True)
 
-    # 5. SPOUSE / PARTNER
-    spouse_last_name = Column(String, nullable=True)
-    spouse_first_name = Column(String, nullable=True)
-    spouse_middle_name = Column(String, nullable=True)
-    spouse_ext_name = Column(String, nullable=True)
-
-    # 6. SECTORS
+    # 5. SECTORS (Text Summary)
     other_sector_details = Column(String, nullable=True) 
     sector_summary = Column(String, nullable=True)
 
@@ -96,6 +89,9 @@ class FamilyMember(Base):
     middle_name = Column(String, nullable=True)
     ext_name = Column(String, nullable=True)
     relationship = Column(String) 
+    
+    birthdate = Column(Date, nullable=True)
+    occupation = Column(String, nullable=True)
     
     is_active = Column(Boolean, default=True)
     head = orm_relationship("ResidentProfile", back_populates="family_members")
