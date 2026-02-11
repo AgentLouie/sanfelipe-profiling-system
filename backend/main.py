@@ -48,6 +48,18 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
+BARANGAY_MAPPING = {
+    # username : "Official Database Spelling"
+    "faranal": "Faranal",
+    "rosete": "Rosete",
+    "santo_nino": "Santo Niño",   # Fixes the ñ issue
+    "santonino": "Santo Niño",    # Handles alternative spelling   # Handles spaces
+    "amagna": "Amagna",
+    "apostol": "Apostol",
+    "balincaguing": "Balincaguing",
+    "maloma": "Maloma",
+    "sindol": "Sindol",
+}
 # --- AUTH HELPER FUNCTIONS ---
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
@@ -193,9 +205,17 @@ def create_resident(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # --- FIX: FORCE BARANGAY NAME FOR STAFF ---
+    # --- FIX: FORCE CORRECT SPELLING ---
     if current_user.role != "admin":
-        resident.barangay = current_user.username.capitalize() 
+        # Check the map first
+        official_name = BARANGAY_MAPPING.get(current_user.username.lower())
+        
+        if official_name:
+            resident.barangay = official_name
+        else:
+            # Fallback for usernames not in map (e.g. new accounts)
+            # Use .title() instead of .capitalize() to handle "San Felipe" correctly
+            resident.barangay = current_user.username.replace("_", " ").title()
 
     return crud.create_resident(db=db, resident=resident)
 
@@ -210,17 +230,24 @@ def read_residents(
     current_user: models.User = Depends(get_current_user)
 ):
     filter_barangay = barangay
+    
+    # --- FIX: FORCE STAFF TO SEE ONLY THEIR OFFICIAL BARANGAY ---
     if current_user.role != "admin":
-        # Force staff to see only their assigned barangay
-        filter_barangay = current_user.username.capitalize()
+        # Look up the official name from the map
+        official_name = BARANGAY_MAPPING.get(current_user.username.lower())
+        
+        if official_name:
+            filter_barangay = official_name
+        else:
+            # Fallback
+            filter_barangay = current_user.username.replace("_", " ").title()
 
-    # 1. Get total for the pagination UI
+    # 1. Get total for pagination
     total = crud.get_resident_count(db, search=search, barangay=filter_barangay)
     
-    # 2. Get the specific chunk of residents
+    # 2. Get the residents
     residents = crud.get_residents(db, skip=skip, limit=limit, search=search, barangay=filter_barangay)
 
-    # 3. Return Object matching ResidentPagination schema
     return {
         "items": residents,
         "total": total,
