@@ -220,7 +220,13 @@ def create_resident(
     # --- FIX: FORCE CORRECT SPELLING ---
     if current_user.role != "admin":
         # Check the map first
-        official_name = BARANGAY_MAPPING.get(current_user.username.lower())
+        username_lower = current_user.username.lower()
+
+        official_name = None
+        for key in BARANGAY_MAPPING:
+            if key in username_lower:
+                official_name = BARANGAY_MAPPING[key]
+                break
         
         if official_name:
             resident.barangay = official_name
@@ -246,7 +252,14 @@ def read_residents(
     # --- FIX: FORCE STAFF TO SEE ONLY THEIR OFFICIAL BARANGAY ---
     if current_user.role != "admin":
         # Look up the official name from the map
-        official_name = BARANGAY_MAPPING.get(current_user.username.lower())
+        username_lower = current_user.username.lower()
+
+        official_name = None
+        for key in BARANGAY_MAPPING:
+            if key in username_lower:
+                official_name = BARANGAY_MAPPING[key]
+                break
+
         
         if official_name:
             filter_barangay = official_name
