@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 import models, schemas
 from sqlalchemy import or_, func
 
@@ -27,8 +27,11 @@ def get_resident_count(db: Session, search: str = None, barangay: str = None):
 
 # --- FIX: Updated Fetcher with Pagination & Strict Filtering ---
 def get_residents(db: Session, skip: int = 0, limit: int = 20, search: str = None, barangay: str = None):
-    query = db.query(models.ResidentProfile)
-    
+    query = db.query(models.ResidentProfile).options(
+        joinedload(models.ResidentProfile.family_members),
+        joinedload(models.ResidentProfile.sectors)
+    )
+
     if search:
         search_fmt = f"%{search}%"
         query = query.filter(
@@ -37,12 +40,10 @@ def get_residents(db: Session, skip: int = 0, limit: int = 20, search: str = Non
                 models.ResidentProfile.first_name.ilike(search_fmt)
             )
         )
-    
-    # FIX: Ensure this filter is applied
+
     if barangay:
         query = query.filter(models.ResidentProfile.barangay == barangay)
-    
-    # Order by ID descending so the newest (just added) resident appears at the top
+
     return query.order_by(models.ResidentProfile.id.desc()).offset(skip).limit(limit).all()
 
 def create_resident(db: Session, resident: schemas.ResidentCreate):
