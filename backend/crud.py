@@ -2,6 +2,46 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func
 import models, schemas
 
+# =====================================================
+# CREATE RESIDENT
+# =====================================================
+
+def create_resident(db: Session, resident: schemas.ResidentCreate):
+    resident_data = resident.model_dump()
+
+    family_members_data = resident_data.pop("family_members", [])
+    sector_ids = resident_data.pop("sector_ids", [])
+    resident_data.pop("sector_summary", None)
+
+    valid_columns = {c.name for c in models.ResidentProfile.__table__.columns}
+    filtered_data = {k: v for k, v in resident_data.items() if k in valid_columns}
+
+    db_resident = models.ResidentProfile(**filtered_data)
+
+    db.add(db_resident)
+    db.commit()
+    db.refresh(db_resident)
+
+    # Attach sectors
+    if sector_ids:
+        sectors = db.query(models.Sector).filter(
+            models.Sector.id.in_(sector_ids)
+        ).all()
+        db_resident.sectors = sectors
+
+    # Add family members
+    for member_data in family_members_data:
+        db_member = models.FamilyMember(
+            **member_data.model_dump(),
+            profile_id=db_resident.id
+        )
+        db.add(db_member)
+
+    db.commit()
+    db.refresh(db_resident)
+
+    return db_resident
+
 
 # =====================================================
 # HELPER: SAFE BARANGAY FILTER
