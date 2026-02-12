@@ -160,6 +160,9 @@ def get_dashboard_stats(db: Session):
         func.lower(models.ResidentProfile.sex).in_(["female", "f"])
     ).scalar() or 0
 
+    # ------------------------------
+    # POPULATION BY BARANGAY
+    # ------------------------------
     barangay_counts = db.query(
         func.trim(models.ResidentProfile.barangay),
         func.count(models.ResidentProfile.id)
@@ -169,11 +172,37 @@ def get_dashboard_stats(db: Session):
 
     stats_barangay = {b: count for b, count in barangay_counts if b}
 
+    # ------------------------------
+    # POPULATION BY SECTOR
+    # ------------------------------
+    sector_counts = db.query(
+        models.ResidentProfile.sector_summary,
+        func.count(models.ResidentProfile.id)
+    ).filter(
+        models.ResidentProfile.sector_summary.isnot(None)
+    ).group_by(
+        models.ResidentProfile.sector_summary
+    ).all()
+
+    stats_sector = {}
+    for sector_summary, count in sector_counts:
+        if not sector_summary or sector_summary.lower() == "none":
+            continue
+
+        # split multiple sectors
+        sectors = [s.strip() for s in sector_summary.split(",")]
+
+        for s in sectors:
+            if s not in stats_sector:
+                stats_sector[s] = 0
+            stats_sector[s] += count
+
     return {
         "total_residents": total_residents,
         "total_households": total_households,
         "total_male": total_male,
         "total_female": total_female,
         "population_by_barangay": stats_barangay,
-        "population_by_sector": {}
+        "population_by_sector": stats_sector
     }
+
