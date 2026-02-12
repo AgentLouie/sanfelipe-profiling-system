@@ -22,15 +22,52 @@ def parse_date(date_val):
             continue
     return None
 
+def get_sectors(row):
+    """
+    Scans the specific boolean columns in the Excel file.
+    If a column has ANY value (not empty), we consider the resident part of that sector.
+    """
+    active_sectors = []
+    
+    # List of columns to check (based on your Excel header)
+    possible_sectors = [
+        'FARMER', 'FISHERFOLK', 'FISHERMAN/BANCA OWNER', 'TODA', 
+        'BRGY BNS/BHW', 'BRGY TANOD', 'BRGY OFFICIAL', 'LGU EMPLOYEE', 
+        'INDIGENOUS PEOPLE', 'PWD', 'OFW', 'STUDENT', 
+        'SENIOR CITIZEN', 'LIFEGUARD', 'SOLO PARENT'
+    ]
+
+    for sector in possible_sectors:
+        val = row.get(sector)
+        # If the cell is not null and not empty string, add the sector
+        if pd.notnull(val) and str(val).strip() != "":
+            active_sectors.append(sector)
+
+    # Handle "OTHERS" specifically
+    # If "OTHERS" has text (e.g., "Vendor"), add "Others: Vendor"
+    # If it just has a checkmark, add "Others"
+    other_val = row.get('OTHERS')
+    other_details = None
+    
+    if pd.notnull(other_val) and str(other_val).strip() != "":
+        val_str = str(other_val).strip()
+        active_sectors.append("Others")
+        # If the value is descriptive (longer than 1 char), save it as details
+        if len(val_str) > 1:
+            other_details = val_str
+
+    # Join all found sectors with commas
+    summary = ", ".join(active_sectors) if active_sectors else "None"
+    
+    return summary, other_details
+
 def process_excel_import(file_content, db: Session):
     # 1. Read File (Robust Method)
     try:
-        # Try Excel first
         df = pd.read_excel(file_content, dtype=str, engine='openpyxl')
     except Exception as e_xlsx:
         file_content.seek(0)
         try:
-            # Fallback to CSV
             df = pd.read_csv(file_content, dtype=str, encoding='cp1252')
         except Exception as e_csv:
             return {"added": 0, "errors": [f"Could not read file. Error: {str(e_xlsx)}"]}
@@ -53,13 +90,12 @@ def process_excel_import(file_content, db: Session):
                 continue
 
             # --- PARSE PERSONAL ---
-            # Use .get() with default to prevent KeyErrors
             fname = row.get('FIRST NAME', '')
             mname = row.get('MIDDLE NAME', '')
             ext   = row.get('EXT NAME', '')
             
             # --- PARSE SPOUSE ---
-            # Pandas renames duplicates to .1, .2. We check safely.
+            # Pandas renames duplicates to .1, .2
             spouse_lname  = row.get('LAST NAME.1', '') 
             spouse_fname  = row.get('FIRST NAME.1', '')
             spouse_mname  = row.get('MIDDLE NAME.1', '')
@@ -67,6 +103,9 @@ def process_excel_import(file_content, db: Session):
 
             # --- PARSE DATE ---
             birthdate = parse_date(row.get('BIRTHDATE'))
+
+            # --- PARSE SECTORS (NEW LOGIC) ---
+            sector_summary_str, other_details_str = get_sectors(row)
 
             # --- CREATE OBJECT ---
             resident = ResidentProfile(
@@ -90,7 +129,8 @@ def process_excel_import(file_content, db: Session):
                 precinct_no=str(row.get('PRECINT NO', '')),
                 
                 # Sectors
-                sector_summary=str(row.get('SECTOR', '')),
+                sector_summary=sector_summary_str,
+                other_sector_details=other_details_str, # Make sure schema supports this
                 
                 # Spouse
                 spouse_last_name=str(spouse_lname),
@@ -106,7 +146,6 @@ def process_excel_import(file_content, db: Session):
             errors.append(f"Row {index + 2} Skipped: {str(e)}")
 
     # 4. SAFE COMMIT
-    # This detects if the database rejects the data (e.g., duplicates)
     try:
         db.commit()
     except Exception as e:
