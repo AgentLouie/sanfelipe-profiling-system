@@ -33,7 +33,7 @@ def get_resident(db: Session, resident_id: int):
 
 
 # =====================================================
-# COUNT RESIDENTS (FOR PAGINATION)
+# COUNT RESIDENTS
 # =====================================================
 
 def get_resident_count(db: Session, search: str = None, barangay: str = None):
@@ -54,7 +54,7 @@ def get_resident_count(db: Session, search: str = None, barangay: str = None):
 
 
 # =====================================================
-# GET RESIDENT LIST (PAGINATED)
+# GET RESIDENT LIST
 # =====================================================
 
 def get_residents(

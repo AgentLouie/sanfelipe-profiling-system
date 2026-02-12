@@ -52,18 +52,25 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 BARANGAY_MAPPING = {
-    # username : "Official Database Spelling"
-    "faranal": "Faranal",
-    "rosete": "Rosete",
-    "santo_nino": "Santo Niño",   # Fixes the ñ issue
-    "santonino": "Santo Niño",    # Handles alternative spelling   # Handles spaces
-    "amagna": "Amagna",
-    "apostol": "Apostol",
-    "balincaguing": "Balincaguing",
-    "maloma": "Maloma",
-    "sindol": "Sindol",
-    "sanrafael": "San Rafael",
-    "san rafael": "San Rafael",  # Handles space variation
+    "faranal": "FARAÑAL",
+
+    # allow multiple username/typing variants
+    "santo_nino": "STO NIÑO",
+    "santonino": "STO NIÑO",
+    "sto_nino": "STO NIÑO",
+    "sto nino": "STO NIÑO",
+    "sto niño": "STO NIÑO",
+    "santo nino": "STO NIÑO",
+    "santo niño": "STO NIÑO",
+
+    "rosete": "ROSETE",
+    "amagna": "AMAGNA",
+    "apostol": "APOSTOL",
+    "balincaguing": "BALINCAGUING",
+    "maloma": "MALOMA",
+    "sindol": "SINDOL",
+    "sanrafael": "SAN RAFAEL",
+    "san rafael": "SAN RAFAEL",
 }
 # --- AUTH HELPER FUNCTIONS ---
 def verify_password(plain_password, hashed_password):
