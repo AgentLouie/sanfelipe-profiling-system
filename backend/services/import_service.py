@@ -14,30 +14,29 @@ def clean_str(val):
 
 
 def parse_date(date_val):
-    if not date_val:
+    if date_val is None:
         return None
 
-    text_val = clean_str(date_val)
+    # If already Timestamp
+    if isinstance(date_val, pd.Timestamp):
+        return date_val.date()
 
-    try:
-        if "T" in text_val:
-            return datetime.fromisoformat(text_val).date()
-    except:
-        pass
-
-    formats = [
-        "%m/%d/%Y",
-        "%Y-%m-%d",
-        "%d-%m-%Y"
-    ]
-
-    for fmt in formats:
+    # Excel numeric serial date
+    if isinstance(date_val, (int, float)):
         try:
-            return datetime.strptime(text_val, fmt).date()
+            return pd.to_datetime(date_val, origin="1899-12-30", unit="D").date()
         except:
-            continue
+            return None
 
-    return None
+    text_val = clean_str(date_val)
+    if text_val == "":
+        return None
+
+    # Try automatic pandas parsing (handles ISO, mixed formats)
+    try:
+        return pd.to_datetime(text_val).date()
+    except:
+        return None
 
 
 def process_excel_import(file_content, db: Session):
@@ -67,15 +66,15 @@ def process_excel_import(file_content, db: Session):
 
     for index, row in df.iterrows():
         try:
-            last_name = clean_str(row["LAST NAME.1"])
-            first_name = clean_str(row["FIRST NAME"])
+            last_name = clean_str(row.get("LAST NAME.1"))
+            first_name = clean_str(row.get("FIRST NAME"))
 
             if last_name == "" and first_name == "":
                 continue
 
-            birthdate = parse_date(row["BIRTHDATE"])
+            birthdate = parse_date(row.get("BIRTHDATE"))
 
-            # SECTORS
+            # -------- SECTORS --------
             active_sectors = []
             for col in sector_columns:
                 if clean_str(row.get(col)) == "\\":
@@ -83,45 +82,61 @@ def process_excel_import(file_content, db: Session):
 
             sector_summary = ", ".join(active_sectors) if active_sectors else "None"
 
+            # -------- SPOUSE HANDLING --------
+            spouse_last = clean_str(row.get("LAST NAME.2"))
+            spouse_first = clean_str(row.get("FIRST NAME.1"))
+            spouse_middle = clean_str(row.get("MIDDLE NAME.1"))
+
+            # If structured spouse empty, try full name column
+            if spouse_last == "" and spouse_first == "":
+                spouse_full = clean_str(row.get("SPOUSE/PARTNER"))
+                if spouse_full:
+                    parts = spouse_full.split()
+                    if len(parts) >= 2:
+                        spouse_first = parts[0]
+                        spouse_last = parts[-1]
+                        if len(parts) > 2:
+                            spouse_middle = " ".join(parts[1:-1])
+
+            # -------- CREATE RESIDENT --------
             resident = ResidentProfile(
                 last_name=last_name,
                 first_name=first_name,
-                middle_name=clean_str(row["MIDDLE NAME"]),
-                ext_name=clean_str(row["EXT NAME"]),
-                house_no=clean_str(row["HOUSE NO. / STREET"]),
-                purok=clean_str(row["PUROK"]),
-                barangay=clean_str(row["BARANGAY"]),
+                middle_name=clean_str(row.get("MIDDLE NAME")),
+                ext_name=clean_str(row.get("EXT NAME")),
+                house_no=clean_str(row.get("HOUSE NO. / STREET")),
+                purok=clean_str(row.get("PUROK")),
+                barangay=clean_str(row.get("BARANGAY")),
                 birthdate=birthdate,
-                sex=clean_str(row["SEX"]),
-                civil_status=clean_str(row["CIVIL STATUS"]),
-                religion=clean_str(row["RELIGION"]),
-                occupation=clean_str(row["OCCUPATION"]),
-                contact_no=clean_str(row["CONTACT NUMBER"]),
-                spouse_last_name=clean_str(row["LAST NAME.2"]),
-                spouse_first_name=clean_str(row["FIRST NAME.1"]),
-                spouse_middle_name=clean_str(row["MIDDLE NAME.1"]),
+                sex=clean_str(row.get("SEX")),
+                civil_status=clean_str(row.get("CIVIL STATUS")),
+                religion=clean_str(row.get("RELIGION")),
+                occupation=clean_str(row.get("OCCUPATION")),
+                contact_no=clean_str(row.get("CONTACT NUMBER")),
+                spouse_last_name=spouse_last,
+                spouse_first_name=spouse_first,
+                spouse_middle_name=spouse_middle,
                 sector_summary=sector_summary
             )
 
-            # FAMILY MEMBERS
+            # -------- FAMILY MEMBERS --------
             for i in range(1, 6):
                 lname_key = f"{i}. LAST NAME"
                 fname_key = f"{i}. FIRST NAME"
                 mname_key = f"{i}. MIDDLE NAME (IF NOT APPLICABLE, LEAVE IT BLANK)"
                 rel_key = f"{i}. RELATIONSHIP"
 
-                if lname_key in row and fname_key in row:
-                    fam_last = clean_str(row[lname_key])
-                    fam_first = clean_str(row[fname_key])
+                fam_last = clean_str(row.get(lname_key))
+                fam_first = clean_str(row.get(fname_key))
 
-                    if fam_last or fam_first:
-                        member = FamilyMember(
-                            last_name=fam_last,
-                            first_name=fam_first,
-                            middle_name=clean_str(row.get(mname_key)),
-                            relationship=clean_str(row.get(rel_key))
-                        )
-                        resident.family_members.append(member)
+                if fam_last or fam_first:
+                    member = FamilyMember(
+                        last_name=fam_last,
+                        first_name=fam_first,
+                        middle_name=clean_str(row.get(mname_key)),
+                        relationship=clean_str(row.get(rel_key))
+                    )
+                    resident.family_members.append(member)
 
             db.add(resident)
             success_count += 1
