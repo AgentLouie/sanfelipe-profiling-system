@@ -114,6 +114,7 @@ def process_excel_import(file_content, db: Session):
         "SENIOR CITIZEN",
         "LIFEGUARD",
         "SOLO PARENT"
+        "OTHERS"
     ]
 
     relationship_keywords = {
