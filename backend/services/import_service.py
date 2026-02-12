@@ -105,21 +105,33 @@ def process_excel_import(file_content, db: Session):
     errors = []
 
     # ✅ FIXED SECTOR LIST (comma added + correct names)
+    possible_sectors = [
+    "INDIGENOUS PEOPLE",
+    "SENIOR CITIZEN",
+    "PWD",
+    "BRGY OFFICIAL",
+    "BRGY OFFICIAL/EMPLOYEE",
+    "BRGY BNS/BHW",
+    "BRGY TANOD",
+    "OFW",
+    "SOLO PARENT",
+    "FARMERS",
+    "FISHERFOLK",
+    "FISHERMAN/BANCA OWNER",
+    "LGU EMPLOYEE",
+    "TODA",
+    "STUDENT",
+    "LIFEGUARD",
+    "OTHERS"
+]
+
+    # Normalize Excel headers
+    excel_columns = [col.strip().upper() for col in df.columns]
+
+    # Only keep sectors that exist in Excel
     sector_columns = [
-        "INDIGENOUS PEOPLE",
-        "SENIOR CITIZEN",
-        "PWD",
-        "BRGY. OFFICIAL/EMPLOYEE",
-        "OFW",
-        "SOLO PARENT",
-        "FARMERS",
-        "FISHERFOLK",
-        "FISHERMAN/BANCA OWNER",
-        "LGU EMPLOYEE",
-        "TODA",
-        "STUDENT",
-        "LIFEGUARD",
-        "OTHERS"
+        col for col in possible_sectors
+        if col in excel_columns
     ]
 
     for index, row in df.iterrows():
