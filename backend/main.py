@@ -494,3 +494,21 @@ def debug_barangay(
         "filter_used": barangay,
         "count_found": len(residents)
     }
+
+@app.get("/debug/others-check")
+def debug_others(db: Session = Depends(get_db)):
+    records = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.other_sector_details != None
+    ).all()
+
+    return {
+        "count": len(records),
+        "sample": [
+            {
+                "name": f"{r.first_name} {r.last_name}",
+                "sector_summary": r.sector_summary,
+                "other_sector_details": r.other_sector_details
+            }
+            for r in records[:5]
+        ]
+    }
