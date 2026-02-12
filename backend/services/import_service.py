@@ -2,41 +2,42 @@ import pandas as pd
 from sqlalchemy.orm import Session
 from models import ResidentProfile, FamilyMember
 from datetime import datetime
-import io
+import re
+
 
 # =========================================================
 # CLEAN STRING
 # =========================================================
 def clean_str(val):
-    if pd.isna(val) or val is None:
+    if val is None:
+        return ""
+    if isinstance(val, float) and pd.isna(val):
         return ""
     text = str(val).strip()
-    if text.lower() in ['nan', 'none', 'null', '0', '0.0']:
+    if text.lower() in ["nan", "none", "null", "-", "na", "n/a", "0", "0.0"]:
         return ""
     return text
 
 
 # =========================================================
-# ROBUST DATE PARSER (Handles Excel Serial Dates)
+# SAFE DATE PARSER (handles Excel serial numbers)
 # =========================================================
 def parse_date(date_val):
-    if pd.isna(date_val) or str(date_val).strip() == "":
+    if date_val is None or clean_str(date_val) == "":
         return None
 
-    # Excel numeric serial date
+    # Excel serial date
     if isinstance(date_val, (int, float)):
         try:
             return pd.to_datetime(date_val, origin='1899-12-30', unit='D').date()
         except:
             return None
 
-    # Pandas timestamp
+    # Timestamp
     if isinstance(date_val, (pd.Timestamp, datetime)):
         return date_val.date()
 
-    text_val = str(date_val).strip()
-    if text_val.lower() in ['nan', 'none', 'null', '-', 'na', 'n/a']:
-        return None
+    text_val = clean_str(date_val)
 
     formats = [
         '%m/%d/%Y', '%Y-%m-%d', '%d-%b-%y',
@@ -54,48 +55,42 @@ def parse_date(date_val):
 
 
 # =========================================================
-# SMART COLUMN FINDER (Keyword Based)
+# FIND COLUMN BY KEYWORDS (prevents exact-match failures)
 # =========================================================
 def find_column_value(row, keywords):
-    """
-    Finds a column containing ALL keywords in its header.
-    """
     for col in row.index:
         col_clean = " ".join(str(col).replace("\n", " ").split()).upper()
-        if all(keyword.upper() in col_clean for keyword in keywords):
-            val = row.get(col)
-            if pd.notna(val):
-                return val
-    return None
+        if all(k.upper() in col_clean for k in keywords):
+            val = row[col]
+            return clean_str(val)
+    return ""
 
 
 # =========================================================
-# SECTOR DETECTOR
+# SECTOR DETECTION
 # =========================================================
 def get_sectors(row):
-    active_sectors = []
-    possible_sectors = [
-        'FARMER', 'FISHERFOLK', 'FISHERMAN/BANCA OWNER', 'TODA',
-        'BRGY BNS/BHW', 'BRGY TANOD', 'BRGY OFFICIAL',
-        'LGU EMPLOYEE', 'INDIGENOUS PEOPLE', 'PWD',
-        'OFW', 'STUDENT', 'SENIOR CITIZEN',
-        'LIFEGUARD', 'SOLO PARENT'
+    sector_keywords = [
+        "FARMER", "FISHERFOLK", "FISHERMAN", "TODA",
+        "BRGY BNS", "BRGY TANOD", "BRGY OFFICIAL",
+        "LGU EMPLOYEE", "INDIGENOUS", "PWD",
+        "OFW", "STUDENT", "SENIOR", "LIFEGUARD",
+        "SOLO PARENT"
     ]
 
-    for sector in possible_sectors:
-        val = find_column_value(row, [sector])
-        if clean_str(val) != "":
-            active_sectors.append(sector)
+    active = []
 
-    other_val = find_column_value(row, ['OTHERS'])
-    other_details = None
-    if clean_str(other_val) != "":
-        active_sectors.append("Others")
-        if len(clean_str(other_val)) > 1:
-            other_details = clean_str(other_val)
+    for keyword in sector_keywords:
+        for col in row.index:
+            col_clean = str(col).upper()
+            if keyword in col_clean:
+                val = clean_str(row[col])
+                if val != "":
+                    active.append(keyword)
+                break
 
-    summary = ", ".join(active_sectors) if active_sectors else "None"
-    return summary, other_details
+    summary = ", ".join(active) if active else "None"
+    return summary, None
 
 
 # =========================================================
@@ -103,121 +98,97 @@ def get_sectors(row):
 # =========================================================
 def process_excel_import(file_content, db: Session):
 
-    # ---------------------------
-    # READ FILE
-    # ---------------------------
     try:
-        df = pd.read_excel(file_content, header=None, engine='openpyxl')
+        df = pd.read_excel(file_content, dtype=object, engine="openpyxl")
     except:
         file_content.seek(0)
-        df = pd.read_csv(file_content, header=None, encoding='cp1252')
+        df = pd.read_csv(file_content, dtype=object, encoding="cp1252")
 
-    # ---------------------------
-    # FIND HEADER ROW
-    # ---------------------------
-    header_index = -1
+    # -----------------------------------------------------
+    # FIX DUPLICATE HEADERS
+    # -----------------------------------------------------
+    cleaned_columns = []
+    seen = {}
 
-    for i in range(min(25, len(df))):
-        row_values = [str(x).strip().upper() for x in df.iloc[i].values]
-        if "LAST NAME" in row_values and "FIRST NAME" in row_values:
-            header_index = i
-            df.columns = df.iloc[i].values
-            df = df.iloc[i+1:].reset_index(drop=True)
-            break
+    for col in df.columns:
+        col_clean = " ".join(str(col).replace("\n", " ").split()).upper()
 
-    if header_index == -1:
-        return {"added": 0, "errors": ["Header row not found."]}
+        if col_clean in seen:
+            seen[col_clean] += 1
+            col_clean = f"{col_clean}.{seen[col_clean]}"
+        else:
+            seen[col_clean] = 0
 
-    # Clean column names
-    df.columns = [
-        " ".join(str(c).replace("\n", " ").split()).upper()
-        for c in df.columns
-    ]
+        cleaned_columns.append(col_clean)
+
+    df.columns = cleaned_columns
 
     df = df.where(pd.notnull(df), None)
 
     success_count = 0
     errors = []
 
-    # =====================================================
+    # -----------------------------------------------------
     # PROCESS ROWS
-    # =====================================================
+    # -----------------------------------------------------
     for index, row in df.iterrows():
         try:
-            lname = clean_str(find_column_value(row, ["LAST", "NAME"]))
-            if not lname:
+            last_name = find_column_value(row, ["LAST"])
+            first_name = find_column_value(row, ["FIRST"])
+
+            if last_name == "" and first_name == "":
                 continue
 
-            fname = clean_str(find_column_value(row, ["FIRST", "NAME"]))
-            mname = clean_str(find_column_value(row, ["MIDDLE", "NAME"]))
-            ext   = clean_str(find_column_value(row, ["EXT"]))
-
-            # -------- Robust Fields --------
             birth_raw = find_column_value(row, ["BIRTH"])
             birthdate = parse_date(birth_raw)
 
-            occupation_val = clean_str(
-                find_column_value(row, ["OCCUPATION"])
+            civil_status = find_column_value(row, ["CIVIL"])
+            occupation = find_column_value(row, ["OCCUPATION"]) \
                 or find_column_value(row, ["JOB"])
-            )
 
-            civil_status_val = clean_str(
-                find_column_value(row, ["CIVIL"])
-                or find_column_value(row, ["STATUS"])
-            )
+            purok = find_column_value(row, ["PUROK"])
+            barangay = find_column_value(row, ["BARANGAY"])
 
-            religion_val = clean_str(find_column_value(row, ["RELIGION"]))
-            sex_val = clean_str(find_column_value(row, ["SEX"]))
-            contact_val = clean_str(
-                find_column_value(row, ["CONTACT"])
-                or find_column_value(row, ["PHONE"])
-            )
+            sex = find_column_value(row, ["SEX"])
+            religion = find_column_value(row, ["RELIGION"])
+            contact = find_column_value(row, ["CONTACT"])
+            precinct = find_column_value(row, ["PRECINCT"]) \
+                or find_column_value(row, ["PRECINT"])
 
-            precinct_val = clean_str(find_column_value(row, ["PRECINCT"]))
+            sector_summary, other_sector = get_sectors(row)
 
-            purok_val = clean_str(find_column_value(row, ["PUROK"]))
-            barangay_val = clean_str(find_column_value(row, ["BARANGAY"]))
-            house_val = clean_str(find_column_value(row, ["HOUSE"]))
-
-            sector_str, other_str = get_sectors(row)
-
-            # -------- Create Resident --------
             resident = ResidentProfile(
-                last_name=lname,
-                first_name=fname,
-                middle_name=mname,
-                ext_name=ext,
-
-                house_no=house_val,
-                purok=purok_val,
-                barangay=barangay_val,
-
-                sex=sex_val,
+                last_name=last_name,
+                first_name=first_name,
+                middle_name=find_column_value(row, ["MIDDLE"]),
+                ext_name=find_column_value(row, ["EXT"]),
+                house_no=find_column_value(row, ["HOUSE"]),
+                purok=purok,
+                barangay=barangay,
+                sex=sex,
                 birthdate=birthdate,
-                civil_status=civil_status_val,
-                religion=religion_val,
-                occupation=occupation_val,
-                contact_no=contact_val,
-                precinct_no=precinct_val,
-
-                sector_summary=sector_str,
-                other_sector_details=other_str
+                civil_status=civil_status,
+                religion=religion,
+                occupation=occupation,
+                contact_no=contact,
+                precinct_no=precinct,
+                sector_summary=sector_summary,
+                other_sector_details=other_sector
             )
 
-            # -------- Family Members (1-5) --------
+            # -------------------------------------------------
+            # FAMILY MEMBERS (1-5 pattern detection)
+            # -------------------------------------------------
             for i in range(1, 6):
-                fam_lname = clean_str(find_column_value(row, [f"{i}.", "LAST"]))
-                fam_fname = clean_str(find_column_value(row, [f"{i}.", "FIRST"]))
+                fam_last = find_column_value(row, [f"{i}", "LAST"])
+                fam_first = find_column_value(row, [f"{i}", "FIRST"])
 
-                if fam_lname or fam_fname:
-                    fam_mname = clean_str(find_column_value(row, [f"{i}.", "MIDDLE"]))
-                    fam_rel = clean_str(find_column_value(row, [f"{i}.", "RELATIONSHIP"]))
-
+                if fam_last != "" or fam_first != "":
                     member = FamilyMember(
-                        last_name=fam_lname,
-                        first_name=fam_fname,
-                        middle_name=fam_mname,
-                        relationship=fam_rel
+                        last_name=fam_last,
+                        first_name=fam_first,
+                        middle_name=find_column_value(row, [f"{i}", "MIDDLE"]),
+                        relationship=find_column_value(row, [f"{i}", "RELATION"])
                     )
                     resident.family_members.append(member)
 
@@ -227,9 +198,6 @@ def process_excel_import(file_content, db: Session):
         except Exception as e:
             errors.append(f"Row {index + 2}: {str(e)}")
 
-    # ---------------------------
-    # COMMIT
-    # ---------------------------
     try:
         db.commit()
     except Exception as e:
