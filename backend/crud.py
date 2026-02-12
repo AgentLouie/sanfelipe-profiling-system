@@ -173,26 +173,37 @@ def delete_resident(db: Session, resident_id: int):
 
 def get_dashboard_stats(db: Session):
 
-    total_residents = db.query(func.count(models.ResidentProfile.id)).scalar() or 0
-
-    total_households = db.query(
-        func.count(func.distinct(
-            func.concat(
-                models.ResidentProfile.barangay,
-                "-",
-                models.ResidentProfile.house_no
-            )
-        ))
+    total_residents = db.query(
+        func.count(models.ResidentProfile.id)
     ).scalar() or 0
 
-    total_male = db.query(func.count(models.ResidentProfile.id)).filter(
+    total_households = db.query(
+        func.count(
+            func.distinct(
+                func.concat(
+                    models.ResidentProfile.barangay,
+                    "-",
+                    models.ResidentProfile.house_no
+                )
+            )
+        )
+    ).scalar() or 0
+
+    total_male = db.query(
+        func.count(models.ResidentProfile.id)
+    ).filter(
         func.lower(models.ResidentProfile.sex).in_(["male", "m"])
     ).scalar() or 0
 
-    total_female = db.query(func.count(models.ResidentProfile.id)).filter(
+    total_female = db.query(
+        func.count(models.ResidentProfile.id)
+    ).filter(
         func.lower(models.ResidentProfile.sex).in_(["female", "f"])
     ).scalar() or 0
 
+    # ===============================
+    # Barangay Count
+    # ===============================
     barangay_counts = db.query(
         models.ResidentProfile.barangay,
         func.count(models.ResidentProfile.id)
@@ -200,10 +211,9 @@ def get_dashboard_stats(db: Session):
 
     stats_barangay = {b: count for b, count in barangay_counts if b}
 
-    sector_counts = db.query(
-        models.Sector.name,
-        func.count(models.resident_sectors.c.resident_id)
-    ).join(models.resident_sectors).group_by(models.Sector.name).all()
+    # ===============================
+    # SECTOR COUNT (FROM sector_summary STRING)
+    # ===============================
 
     required_sectors = [
         "Indigenous People",
@@ -222,14 +232,16 @@ def get_dashboard_stats(db: Session):
         "Others"
     ]
 
-    stats_sector = {sector: 0 for sector in required_sectors}
+    stats_sector = {}
 
-    for name, count in sector_counts:
-        key = name.strip().title()
-        if key in stats_sector:
-            stats_sector[key] += count
-        else:
-            stats_sector["Others"] += count
+    for sector in required_sectors:
+        count = db.query(
+            func.count(models.ResidentProfile.id)
+        ).filter(
+            func.lower(models.ResidentProfile.sector_summary).like(f"%{sector.lower()}%")
+        ).scalar() or 0
+
+        stats_sector[sector] = count
 
     return {
         "total_residents": total_residents,
@@ -239,3 +251,4 @@ def get_dashboard_stats(db: Session):
         "population_by_barangay": stats_barangay,
         "population_by_sector": stats_sector
     }
+
