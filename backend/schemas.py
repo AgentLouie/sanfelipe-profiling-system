@@ -32,22 +32,25 @@ class Sector(BaseModel):
 # =======================
 # FAMILY MEMBER SCHEMAS
 # =======================
+
 class FamilyMemberBase(BaseModel):
-    first_name: str
-    last_name: str
-    relationship: str
-    birthdate: Optional[date] = None
-    occupation: Optional[str] = None
-    # Removed: education
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    middle_name: Optional[str] = None
+    relationship: Optional[str] = None
+
 
 class FamilyMemberCreate(FamilyMemberBase):
     pass
 
+
 class FamilyMember(FamilyMemberBase):
     id: int
     profile_id: int
+
     class Config:
         from_attributes = True
+
 
 # =======================
 # RESIDENT SCHEMAS
