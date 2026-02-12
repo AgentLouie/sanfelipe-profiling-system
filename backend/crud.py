@@ -24,10 +24,23 @@ def apply_sector_filter(query, sector: str):
     if not sector:
         return query
 
+    normalized = sector.strip().lower()
+
+    if normalized == "others":
+        return query.filter(
+            or_(
+                func.lower(
+                    func.coalesce(models.ResidentProfile.sector_summary, "")
+                ).like("%others%"),
+                func.coalesce(models.ResidentProfile.other_sector_details, "") != ""
+            )
+        )
+
+    # Normal sectors
     return query.filter(
         func.lower(
             func.coalesce(models.ResidentProfile.sector_summary, "")
-        ).like(f"%{sector.strip().lower()}%")
+        ).like(f"%{normalized}%")
     )
 
 
