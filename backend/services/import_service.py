@@ -2,7 +2,6 @@ import pandas as pd
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from models import ResidentProfile, FamilyMember
-from datetime import datetime
 
 
 # ===============================
@@ -21,10 +20,7 @@ def clean_str(val):
 # PARSE DATE (ROBUST)
 # ===============================
 def parse_date(date_val):
-    if date_val is None:
-        return None
-
-    if pd.isna(date_val):
+    if date_val is None or pd.isna(date_val):
         return None
 
     if isinstance(date_val, pd.Timestamp):
@@ -75,6 +71,19 @@ def family_member_exists(db: Session, profile_id, lname, fname, rel):
 
 
 # ===============================
+# SAFE COLUMN GETTER (IMPORTANT)
+# ===============================
+def get_value(row, possible_names):
+    """
+    Tries multiple possible column names safely.
+    """
+    for name in possible_names:
+        if name in row:
+            return row.get(name)
+    return None
+
+
+# ===============================
 # MAIN IMPORT FUNCTION
 # ===============================
 def process_excel_import(file_content, db: Session):
@@ -82,6 +91,9 @@ def process_excel_import(file_content, db: Session):
     df = pd.read_excel(file_content, dtype=object, engine="openpyxl")
     df = df.replace({pd.NaT: None})
     df = df.where(pd.notnull(df), None)
+
+    # Normalize column names (remove trailing spaces)
+    df.columns = df.columns.str.strip()
 
     success_count = 0
     skipped_duplicates = 0
@@ -159,13 +171,25 @@ def process_excel_import(file_content, db: Session):
                         if len(parts) > 2:
                             spouse_middle = " ".join(parts[1:-1])
 
+            # -------- ADDRESS (HOUSE NO / STREET SAFE) --------
+            house_no_value = clean_str(
+                get_value(row, [
+                    "HOUSE NO. / STREET",
+                    "HOUSE NO./STREET",
+                    "HOUSE NO / STREET",
+                    "HOUSE NO.",
+                    "HOUSE NO",
+                    "ADDRESS"
+                ])
+            )
+
             # -------- CREATE RESIDENT --------
             resident = ResidentProfile(
                 last_name=last_name,
                 first_name=first_name,
                 middle_name=middle_name,
                 ext_name=clean_str(row.get("EXT NAME")),
-                house_no=clean_str(row.get("HOUSE NO. / STREET")),
+                house_no=house_no_value,
                 purok=clean_str(row.get("PUROK")),
                 barangay=barangay,
                 birthdate=birthdate,
@@ -181,7 +205,7 @@ def process_excel_import(file_content, db: Session):
             )
 
             db.add(resident)
-            db.flush()  # Get ID without full commit
+            db.flush()
 
             # -------- FAMILY MEMBERS --------
             for i in range(1, 6):
@@ -191,7 +215,6 @@ def process_excel_import(file_content, db: Session):
                 mname = clean_str(row.get(f"{i}. MIDDLE NAME (IF NOT APPLICABLE, LEAVE IT BLANK)"))
                 rel = clean_str(row.get(f"{i}. RELATIONSHIP"))
 
-                # Fix shifted relationship issue
                 if lname.upper() in relationship_keywords and rel == "":
                     rel = lname
                     lname = fname
@@ -201,7 +224,6 @@ def process_excel_import(file_content, db: Session):
                 if lname == "" and fname == "" and rel == "":
                     continue
 
-                # 🔒 FAMILY DUPLICATE CHECK
                 if family_member_exists(db, resident.id, lname, fname, rel):
                     continue
 
