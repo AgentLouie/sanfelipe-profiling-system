@@ -36,7 +36,8 @@ def get_resident_count(db: Session, search: str = None, barangay: str = None):
     # ✅ FIX: Case-insensitive barangay filtering
     if barangay:
         query = query.filter(
-            func.upper(models.ResidentProfile.barangay) == barangay.upper()
+            func.replace(func.upper(models.ResidentProfile.barangay), 'Ñ', 'N') ==
+            barangay.upper().replace('Ñ', 'N')
         )
 
     return query.count()
@@ -65,7 +66,8 @@ def get_residents(db: Session, skip: int = 0, limit: int = 20,
     # ✅ FIX: Case-insensitive barangay filtering
     if barangay:
         query = query.filter(
-            func.upper(models.ResidentProfile.barangay) == barangay.upper()
+            func.replace(func.upper(models.ResidentProfile.barangay), 'Ñ', 'N') ==
+            barangay.upper().replace('Ñ', 'N')
         )
 
     return (
