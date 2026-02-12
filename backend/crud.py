@@ -24,9 +24,12 @@ def apply_sector_filter(query, sector: str):
     if not sector:
         return query
 
-    return query.join(models.ResidentProfile.sectors).filter(
-        func.lower(models.Sector.name) == sector.strip().lower()
+    return query.filter(
+        func.lower(
+            func.coalesce(models.ResidentProfile.sector_summary, "")
+        ).like(f"%{sector.strip().lower()}%")
     )
+
 
 
 
