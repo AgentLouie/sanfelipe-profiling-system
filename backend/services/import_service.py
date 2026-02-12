@@ -37,12 +37,12 @@ def get_sectors(row):
         'SENIOR CITIZEN', 'LIFEGUARD', 'SOLO PARENT'
     ]
     
-    # Check normalized uppercase columns
     for sector in possible_sectors:
-        # We try to get the column; if missing, we skip
-        val = row.get(sector) 
-        if clean_str(val) != "":
-            active_sectors.append(sector)
+        # Check if key exists before accessing to avoid errors during shift
+        if sector in row:
+            val = row.get(sector) 
+            if clean_str(val) != "":
+                active_sectors.append(sector)
 
     other_val = clean_str(row.get('OTHERS'))
     other_details = None
@@ -60,13 +60,12 @@ def process_excel_import(file_content, db: Session):
     
     # --- PHASE 1: READ THE FILE ---
     try:
-        # Try as Excel
-        df = pd.read_excel(file_content, header=None, dtype=str, engine='openpyxl')
+        # Load raw first to find headers
+        df_raw = pd.read_excel(file_content, header=None, dtype=str, engine='openpyxl')
     except Exception as e_xlsx:
         file_content.seek(0)
         try:
-            # Try as CSV
-            df = pd.read_csv(file_content, header=None, dtype=str, encoding='cp1252')
+            df_raw = pd.read_csv(file_content, header=None, dtype=str, encoding='cp1252')
         except Exception as e_csv:
             return {"added": 0, "errors": [f"CRITICAL: Could not read file. {str(e_xlsx)}"]}
 
@@ -74,27 +73,22 @@ def process_excel_import(file_content, db: Session):
     found_header = False
     
     # Scan first 20 rows for "LAST NAME"
-    for i in range(min(20, len(df))):
-        # Create a clean list of values for this row
-        row_values = [str(x).strip().upper() for x in df.iloc[i].values]
+    for i in range(min(20, len(df_raw))):
+        row_values = [str(x).strip().upper() for x in df_raw.iloc[i].values]
         
         if "LAST NAME" in row_values:
             header_index = i
             found_header = True
             
-            # Reset DataFrame with this row as header
-            # We explicitly set the column names from this row
-            df.columns = row_values
+            # Set columns from this row
+            df_raw.columns = row_values
+            # Slice data to exclude header and above
+            df = df_raw.iloc[i+1:].reset_index(drop=True)
             
-            # Drop the header row and previous rows from data
-            df = df.iloc[i+1:].reset_index(drop=True)
-            
-            # Rename duplicates (Handling the two "LAST NAME" columns)
-            # Pandas does this automatically on read, but since we manually set columns,
-            # we need to ensure unique names for the Spouse columns.
+            # Rename duplicates (e.g. Spouse Last Name)
             new_cols = []
             seen = {}
-            for c in df.columns:
+            for c in df_raw.columns:
                 if c in seen:
                     seen[c] += 1
                     new_cols.append(f"{c}.{seen[c]}")
@@ -102,15 +96,41 @@ def process_excel_import(file_content, db: Session):
                     seen[c] = 0
                     new_cols.append(c)
             df.columns = new_cols
-            
             break
             
     if not found_header:
-        # DEBUG: Return the first few rows to see what the server sees
-        preview = df.head(3).to_string()
-        return {"added": 0, "errors": [f"Could not find 'LAST NAME' in first 20 rows. Preview of file content:\n{preview}"]}
+        preview = df_raw.head(3).to_string()
+        return {"added": 0, "errors": [f"Could not find 'LAST NAME' in first 20 rows. Preview:\n{preview}"]}
 
-    # --- PHASE 3: PROCESS DATA ---
+    # --- PHASE 3: SHIFT DETECTION & FIX ---
+    # Issue: Sometimes data is shifted 1 column to the right (Column A is empty)
+    # Check if 'LAST NAME' column is mostly empty but 'FIRST NAME' (next col) has data
+    
+    # Get non-null counts
+    lname_col = df['LAST NAME']
+    fname_col = df['FIRST NAME']
+    
+    # Count empty values
+    empty_last = lname_col.isna().sum() + (lname_col == '').sum() + (lname_col == 'nan').sum() + (lname_col == 'None').sum()
+    total_rows = len(df)
+    
+    # If LAST NAME is >90% empty, check if shifting helps
+    if total_rows > 0 and (empty_last / total_rows) > 0.9:
+        # Check if FIRST NAME looks populated (Last names often appear here in shifted data)
+        # We assume the "FIRST NAME" column actually holds the LAST NAME
+        
+        # APPLY SHIFT: Move headers one step to the RIGHT
+        # Old Headers: [LAST NAME, FIRST NAME, MIDDLE NAME...]
+        # New Headers: [SHIFT_FIX, LAST NAME, FIRST NAME, MIDDLE NAME...]
+        
+        current_columns = df.columns.tolist()
+        # Create new column list: Insert dummy at start, remove last
+        shifted_columns = ['SHIFT_FIX'] + current_columns[:-1]
+        
+        df.columns = shifted_columns
+        # print("LOG: Applied Column Shift Correction")
+
+    # --- PHASE 4: PROCESS DATA ---
     df = df.where(pd.notnull(df), None)
     success_count = 0
     errors = []
@@ -120,7 +140,6 @@ def process_excel_import(file_content, db: Session):
             # Strict Check
             lname = clean_str(row.get('LAST NAME'))
             if not lname:
-                # Silent skip for empty rows
                 continue
 
             # --- MAP COLUMNS ---
@@ -130,12 +149,10 @@ def process_excel_import(file_content, db: Session):
                 middle_name=clean_str(row.get('MIDDLE NAME')),
                 ext_name=clean_str(row.get('EXT NAME')),
                 
-                # Address
                 house_no=clean_str(row.get('HOUSE NO. / STREET')),
                 purok=clean_str(row.get('PUROK/SITIO')),
                 barangay=clean_str(row.get('BARANGAY')),
                 
-                # Personal
                 sex=clean_str(row.get('SEX')),
                 birthdate=parse_date(row.get('BIRTHDATE')),
                 civil_status=clean_str(row.get('CIVIL STATUS')),
@@ -145,11 +162,10 @@ def process_excel_import(file_content, db: Session):
                 precinct_no=clean_str(row.get('PRECINT NO')),
                 
                 # Sectors
-                # Pass the whole row so helper can find columns
                 sector_summary=get_sectors(row)[0],
                 other_sector_details=get_sectors(row)[1],
                 
-                # Spouse (Using .1 suffix for duplicates)
+                # Spouse
                 spouse_last_name=clean_str(row.get('LAST NAME.1')),
                 spouse_first_name=clean_str(row.get('FIRST NAME.1')),
                 spouse_middle_name=clean_str(row.get('MIDDLE NAME.1')),
@@ -162,14 +178,14 @@ def process_excel_import(file_content, db: Session):
         except Exception as e:
             errors.append(f"Row {index + 2}: {str(e)}")
 
-    # --- PHASE 4: FINAL CHECK ---
+    # --- PHASE 5: FINAL CHECK ---
     if success_count == 0:
         return {
             "added": 0, 
             "errors": [
                 "Header found, but no rows added.",
-                f"Detected Columns: {list(df.columns)}",
-                "Possible Issue: 'LAST NAME' column might be empty or misnamed."
+                f"Data looks shifted? Last Name Empty Count: {empty_last}/{total_rows}",
+                f"Detected Columns: {list(df.columns)}"
             ]
         }
 
