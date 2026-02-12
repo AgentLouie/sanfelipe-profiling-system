@@ -163,7 +163,7 @@ def process_excel_import(file_content, db: Session):
                 first_name=first_name,
                 middle_name=middle_name,
                 ext_name=clean_str(row.get("EXT NAME")),
-                house_no=clean_str(row.get("HOUSE NO.")),
+                house_no=clean_str(row.get("HOUSE NO. / STREET")),
                 purok=clean_str(row.get("PUROK")),
                 barangay=barangay,
                 birthdate=birthdate,
