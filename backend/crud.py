@@ -26,7 +26,15 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
         sectors = db.query(models.Sector).filter(
             models.Sector.id.in_(sector_ids)
         ).all()
+
         db_resident.sectors = sectors
+
+        # 🔥 AUTO GENERATE SUMMARY
+        sector_names = [s.name for s in sectors]
+        db_resident.sector_summary = ", ".join(sector_names)
+    else:
+        db_resident.sector_summary = "None"
+
 
     # Add family members
     for member_data in family_members_data:
@@ -62,11 +70,20 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
 
     # Update sectors
     db_resident.sectors.clear()
+
     if resident_data.sector_ids:
         new_sectors = db.query(models.Sector).filter(
             models.Sector.id.in_(resident_data.sector_ids)
         ).all()
+
         db_resident.sectors = new_sectors
+
+        # 🔥 AUTO GENERATE sector_summary
+        sector_names = [s.name for s in new_sectors]
+        db_resident.sector_summary = ", ".join(sector_names)
+
+    else:
+        db_resident.sector_summary = "None"
 
     # Update family members
     db.query(models.FamilyMember).filter(
