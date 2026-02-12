@@ -1,10 +1,12 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Query
+from fastapi import FastAPI, Depends, HTTPException, status, Query, UploadFile, File
 from fastapi.responses import StreamingResponse 
 from sqlalchemy.orm import Session
 from typing import List
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import text
+from services.import_service import process_excel_import
+import io
 
 # Authentication Imports
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -334,6 +336,25 @@ def export_residents_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+    
+# --- EXCEL IMPORT ENDPOINT ---
+@app.post("/import/excel")
+async def import_residents_excel(
+    file: UploadFile = File(...), 
+    db: Session = Depends(get_db)
+):
+    # Validate file type
+    if not (file.filename.endswith('.xlsx') or file.filename.endswith('.csv')):
+        raise HTTPException(status_code=400, detail="Please upload an Excel (.xlsx) or CSV file.")
+
+    contents = await file.read()
+    
+    # We pass the bytes to pandas
+    try:
+        result = process_excel_import(io.BytesIO(contents), db)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- REFERENCE DATA ENDPOINTS ---
 @app.get("/barangays/", response_model=List[schemas.Barangay])
