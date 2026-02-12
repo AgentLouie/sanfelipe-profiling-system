@@ -166,6 +166,14 @@ def process_excel_import(file_content, db: Session):
                         active_sectors.append(col)
 
             sector_summary = ", ".join(active_sectors) if active_sectors else "None"
+            
+            # ===============================
+            # SPOUSE PROCESSING
+            # ===============================
+            spouse_last = clean_str(row.get("LAST NAME.2"))
+            spouse_first = clean_str(row.get("FIRST NAME.1"))
+            spouse_middle = clean_str(row.get("MIDDLE NAME.1"))
+            spouse_ext = clean_str(row.get("EXT NAME.1"))
 
             # ===============================
             # CREATE RESIDENT
@@ -184,6 +192,13 @@ def process_excel_import(file_content, db: Session):
                 religion=clean_str(row.get("RELIGION")),
                 occupation=clean_str(row.get("OCCUPATION")),
                 contact_no=clean_str(row.get("CONTACT NUMBER")),
+
+                # ✅ ADD THESE
+                spouse_last_name=spouse_last,
+                spouse_first_name=spouse_first,
+                spouse_middle_name=spouse_middle,
+                spouse_ext_name=spouse_ext,
+
                 sector_summary=sector_summary
             )
 
