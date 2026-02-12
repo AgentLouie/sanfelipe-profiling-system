@@ -3,7 +3,16 @@ import models, schemas
 from sqlalchemy import or_, func
 
 def get_resident(db: Session, resident_id: int):
-    return db.query(models.ResidentProfile).filter(models.ResidentProfile.id == resident_id).first()
+    return (
+        db.query(models.ResidentProfile)
+        .options(
+            joinedload(models.ResidentProfile.family_members),
+            joinedload(models.ResidentProfile.sectors)
+        )
+        .filter(models.ResidentProfile.id == resident_id)
+        .first()
+    )
+
 
 # --- FIX: Added Count Function for Pagination ---
 def get_resident_count(db: Session, search: str = None, barangay: str = None):
