@@ -17,7 +17,9 @@ def parse_date(date_val):
     if date_val is None:
         return None
 
-    # If already Timestamp
+    if pd.isna(date_val):
+        return None
+
     if isinstance(date_val, pd.Timestamp):
         return date_val.date()
 
@@ -42,8 +44,8 @@ def parse_date(date_val):
 def process_excel_import(file_content, db: Session):
 
     df = pd.read_excel(file_content, dtype=object, engine="openpyxl")
+    df = df.replace({pd.NaT: None})
     df = df.where(pd.notnull(df), None)
-
     success_count = 0
     errors = []
 
