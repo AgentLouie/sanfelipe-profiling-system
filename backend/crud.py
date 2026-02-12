@@ -276,10 +276,12 @@ def get_dashboard_stats(db: Session):
     ).scalar() or 0
 
     barangay_counts = db.query(
-        func.trim(models.ResidentProfile.barangay),
+        func.upper(func.trim(models.ResidentProfile.barangay)).label("barangay"),
         func.count(models.ResidentProfile.id)
+    ).filter(
+        models.ResidentProfile.barangay.isnot(None)
     ).group_by(
-        func.trim(models.ResidentProfile.barangay)
+        func.upper(func.trim(models.ResidentProfile.barangay))
     ).all()
 
     stats_barangay = {b: count for b, count in barangay_counts if b}
