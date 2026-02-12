@@ -240,19 +240,20 @@ def create_resident(
 # --- FIX: Updated schema to match 'ResidentPagination' ---
 @app.get("/residents/", response_model=schemas.ResidentPagination)
 def read_residents(
-    skip: int = 0, 
-    limit: int = 20, 
-    search: str = None, 
+    skip: int = 0,
+    limit: int = 20,
+    search: str = None,
     barangay: str = Query(None),
-    sector: str = Query(None), 
+    sector: str = Query(None),
+    sort_by: str = Query("last_name"),
+    sort_order: str = Query("asc"),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
     filter_barangay = barangay
-    
-    # --- FIX: FORCE STAFF TO SEE ONLY THEIR OFFICIAL BARANGAY ---
+
+    # Restrict staff to own barangay
     if current_user.role != "admin":
-        # Look up the official name from the map
         username_lower = current_user.username.lower()
 
         official_name = None
@@ -261,19 +262,13 @@ def read_residents(
                 official_name = BARANGAY_MAPPING[key]
                 break
 
-        
-        if official_name:
-            filter_barangay = official_name
-        else:
-            # Fallback
-            filter_barangay = current_user.username.replace("_", " ").title()
+        filter_barangay = official_name or current_user.username.replace("_", " ").title()
 
-    # 1. Get total for pagination
     total = crud.get_resident_count(
-    db,
-    search=search,
-    barangay=filter_barangay,
-    sector=sector
+        db,
+        search=search,
+        barangay=filter_barangay,
+        sector=sector
     )
 
     residents = crud.get_residents(
@@ -282,7 +277,9 @@ def read_residents(
         limit=limit,
         search=search,
         barangay=filter_barangay,
-        sector=sector
+        sector=sector,
+        sort_by=sort_by,
+        sort_order=sort_order
     )
 
     return {

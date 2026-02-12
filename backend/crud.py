@@ -185,13 +185,16 @@ def get_residents(
     limit: int = 20,
     search: str = None,
     barangay: str = None,
-    sector: str = None
+    sector: str = None,
+    sort_by: str = "last_name",
+    sort_order: str = "asc"
 ):
     query = db.query(models.ResidentProfile).options(
         joinedload(models.ResidentProfile.family_members),
         joinedload(models.ResidentProfile.sectors)
     )
 
+    # SEARCH
     if search:
         search_fmt = f"%{search.strip()}%"
         query = query.filter(
@@ -204,15 +207,27 @@ def get_residents(
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
 
-    return (
-        query.order_by(
-            func.lower(models.ResidentProfile.last_name).asc(),
-            func.lower(models.ResidentProfile.first_name).asc()
-        )
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    # -----------------------------
+    # 🔥 DYNAMIC SORTING
+    # -----------------------------
+    valid_columns = {
+        "last_name": models.ResidentProfile.last_name,
+        "first_name": models.ResidentProfile.first_name,
+        "barangay": models.ResidentProfile.barangay,
+        "purok": models.ResidentProfile.purok,
+        "created_at": models.ResidentProfile.created_at,
+        "birthdate": models.ResidentProfile.birthdate
+    }
+
+    column = valid_columns.get(sort_by, models.ResidentProfile.last_name)
+
+    if sort_order.lower() == "desc":
+        query = query.order_by(func.lower(column).desc())
+    else:
+        query = query.order_by(func.lower(column).asc())
+
+    return query.offset(skip).limit(limit).all()
+
 
 
 
