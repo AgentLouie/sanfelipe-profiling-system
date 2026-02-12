@@ -123,22 +123,29 @@ def process_excel_import(file_content, db: Session):
 
             # -------- FAMILY MEMBERS --------
             for i in range(1, 6):
-                lname_key = f"{i}. LAST NAME"
-                fname_key = f"{i}. FIRST NAME"
-                mname_key = f"{i}. MIDDLE NAME (IF NOT APPLICABLE, LEAVE IT BLANK)"
-                rel_key = f"{i}. RELATIONSHIP"
+                lname = clean_str(row.get(f"{i}. LAST NAME"))
+                fname = clean_str(row.get(f"{i}. FIRST NAME"))
+                mname = clean_str(row.get(f"{i}. MIDDLE NAME (IF NOT APPLICABLE, LEAVE IT BLANK)"))
+                rel   = clean_str(row.get(f"{i}. RELATIONSHIP"))
 
-                fam_last = clean_str(row.get(lname_key))
-                fam_first = clean_str(row.get(fname_key))
-
-                if fam_last or fam_first:
-                    member = FamilyMember(
-                        last_name=fam_last,
-                        first_name=fam_first,
-                        middle_name=clean_str(row.get(mname_key)),
-                        relationship=clean_str(row.get(rel_key))
-                    )
+                if lname == "" and fname != "" and rel != "":
+                    # Probably shifted left
+                    lname = fname
+                    fname = mname
+                    rel   = rel
                     resident.family_members.append(member)
+                if lname == "" and fname == "":
+                    continue
+                
+                member = FamilyMember(
+                last_name=lname,
+                first_name=fname,
+                middle_name=mname,
+                relationship=rel
+                    )
+                
+                resident.family_members.append(member)
+
 
             db.add(resident)
             success_count += 1
