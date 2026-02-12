@@ -10,10 +10,12 @@ import models, schemas
 def apply_barangay_filter(query, barangay: str):
     if barangay:
         query = query.filter(
-            func.lower(func.trim(models.ResidentProfile.barangay)) ==
-            func.lower(func.trim(barangay))
+            func.lower(models.ResidentProfile.barangay)
+            .like(f"%{barangay.lower()}%")
         )
     return query
+
+
 
 
 # =====================================================
