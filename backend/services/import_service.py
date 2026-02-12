@@ -123,6 +123,13 @@ def process_excel_import(file_content, db: Session):
 
             # -------- FAMILY MEMBERS --------
             # FAMILY MEMBERS (AUTO-CORRECTED VERSION)
+            relationship_keywords = {
+                "SON", "DAUGHTER", "FATHER", "MOTHER",
+                "NIECE", "NEPHEW", "BROTHER", "SISTER",
+                "GRANDSON", "GRANDDAUGHTER", "GRANDFATHER", "GRANDMOTHER",
+                "UNCLE", "AUNT", "COUSIN", "HUSBAND", "WIFE", "PARTNER"
+            }
+
             for i in range(1, 6):
 
                 lname = clean_str(row.get(f"{i}. LAST NAME"))
@@ -130,19 +137,13 @@ def process_excel_import(file_content, db: Session):
                 mname = clean_str(row.get(f"{i}. MIDDLE NAME (IF NOT APPLICABLE, LEAVE IT BLANK)"))
                 rel   = clean_str(row.get(f"{i}. RELATIONSHIP"))
 
-                # --- FIX SHIFT CASE 1 ---
-                # Relationship accidentally in LAST NAME column
-                if lname.upper() in ["SON", "DAUGHTER", "FATHER", "MOTHER", "NIECE", "NEPHEW", "GRANDSON", "GRANDDAUGHTER", "GRANDFATHER", "GRANDMOTHER", "SISTER", "BROTHER", "UNCLE", "AUNT"]:
+                # --- DETECT SHIFTED ROW ---
+                if lname.upper() in relationship_keywords and rel == "":
+                    # Relationship is in LAST NAME column
                     rel = lname
                     lname = fname
                     fname = mname
                     mname = ""
-
-                # --- FIX SHIFT CASE 2 ---
-                # If relationship exists but first name empty
-                if rel != "" and fname == "":
-                    fname = lname
-                    lname = ""
 
                 # Skip empty rows
                 if lname == "" and fname == "" and rel == "":
