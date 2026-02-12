@@ -243,7 +243,8 @@ def read_residents(
     skip: int = 0, 
     limit: int = 20, 
     search: str = None, 
-    barangay: str = Query(None), 
+    barangay: str = Query(None),
+    sector: str = Query(None), 
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
@@ -268,10 +269,21 @@ def read_residents(
             filter_barangay = current_user.username.replace("_", " ").title()
 
     # 1. Get total for pagination
-    total = crud.get_resident_count(db, search=search, barangay=filter_barangay)
-    
-    # 2. Get the residents
-    residents = crud.get_residents(db, skip=skip, limit=limit, search=search, barangay=filter_barangay)
+    total = crud.get_resident_count(
+    db,
+    search=search,
+    barangay=filter_barangay,
+    sector=sector
+    )
+
+    residents = crud.get_residents(
+        db,
+        skip=skip,
+        limit=limit,
+        search=search,
+        barangay=filter_barangay,
+        sector=sector
+    )
 
     return {
         "items": residents,
