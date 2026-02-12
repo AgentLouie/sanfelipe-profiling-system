@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, DateTime, Table
+from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, DateTime, Table, UniqueConstraint
 from sqlalchemy.orm import relationship as orm_relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -41,6 +41,16 @@ class Sector(Base):
 # --- MAIN TABLE ---
 class ResidentProfile(Base):
     __tablename__ = "resident_profiles"
+    
+    __table_args__ = (
+        UniqueConstraint(
+            "last_name",
+            "first_name",
+            "birthdate",
+            "barangay",
+            name="uq_resident_identity"
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     
