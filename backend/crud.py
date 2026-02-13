@@ -316,9 +316,9 @@ def get_residents(
 # =====================================================
 def get_dashboard_stats(db: Session):
 
+    # 🔥 Base query: ONLY active residents
     base_query = db.query(models.ResidentProfile).filter(
-        models.ResidentProfile.is_deleted == False,
-        models.ResidentProfile.is_archived == False
+        models.ResidentProfile.is_deleted == False
     )
 
     total_residents = base_query.count() or 0
@@ -332,8 +332,7 @@ def get_dashboard_stats(db: Session):
             )
         )
     ).filter(
-        models.ResidentProfile.is_deleted == False,
-        models.ResidentProfile.is_archived == False
+        models.ResidentProfile.is_deleted == False
     ).scalar() or 0
 
     total_male = base_query.filter(
@@ -343,6 +342,52 @@ def get_dashboard_stats(db: Session):
     total_female = base_query.filter(
         func.lower(models.ResidentProfile.sex).in_(["female", "f"])
     ).count() or 0
+
+    # ------------------------------
+    # POPULATION BY BARANGAY
+    # ------------------------------
+    barangay_counts = db.query(
+        func.upper(func.trim(models.ResidentProfile.barangay)).label("barangay"),
+        func.count(models.ResidentProfile.id)
+    ).filter(
+        models.ResidentProfile.is_deleted == False
+    ).group_by(
+        func.upper(func.trim(models.ResidentProfile.barangay))
+    ).all()
+
+    stats_barangay = {b: count for b, count in barangay_counts if b}
+
+    # ------------------------------
+    # POPULATION BY SECTOR
+    # ------------------------------
+    sector_counts = db.query(
+        models.ResidentProfile.sector_summary,
+        func.count(models.ResidentProfile.id)
+    ).filter(
+        models.ResidentProfile.is_deleted == False
+    ).group_by(
+        models.ResidentProfile.sector_summary
+    ).all()
+
+    stats_sector = {}
+    for sector_summary, count in sector_counts:
+        if not sector_summary or sector_summary.lower() == "none":
+            continue
+
+        sectors = [s.strip() for s in sector_summary.split(",")]
+
+        for s in sectors:
+            stats_sector[s] = stats_sector.get(s, 0) + count
+
+    return {
+        "total_residents": total_residents,
+        "total_households": total_households,
+        "total_male": total_male,
+        "total_female": total_female,
+        "population_by_barangay": stats_barangay,
+        "population_by_sector": stats_sector
+    }
+
 
 
     # ------------------------------
