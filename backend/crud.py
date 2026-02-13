@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func
 import models, schemas
+from datetime import datetime
 
 
 # =====================================================
@@ -114,10 +115,32 @@ def delete_resident(db: Session, resident_id: int):
     if not db_resident:
         return None
 
-    db.delete(db_resident)
+    db_resident.is_deleted = True
+    db_resident.deleted_at = datetime.utcnow()
+
     db.commit()
+    db.refresh(db_resident)
+
     return db_resident
 
+# =====================================================
+# RESTORE RESIDENT
+# =====================================================
+def restore_resident(db: Session, resident_id: int):
+    resident = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.id == resident_id
+    ).first()
+
+    if not resident:
+        return None
+
+    resident.is_deleted = False
+    resident.deleted_at = None
+
+    db.commit()
+    db.refresh(resident)
+
+    return resident
 
 # =====================================================
 # FILTER HELPERS
@@ -164,7 +187,10 @@ def get_resident(db: Session, resident_id: int):
             joinedload(models.ResidentProfile.family_members),
             joinedload(models.ResidentProfile.sectors)
         )
-        .filter(models.ResidentProfile.id == resident_id)
+        .filter(
+        models.ResidentProfile.id == resident_id,
+        models.ResidentProfile.is_deleted == False
+    )
         .first()
     )
 
@@ -179,6 +205,9 @@ def get_resident_count(
     sector: str = None
 ):
     query = db.query(models.ResidentProfile)
+    
+    query = query.filter(models.ResidentProfile.is_deleted == False)
+
 
     if search:
         search_fmt = f"%{search.strip()}%"
@@ -212,6 +241,9 @@ def get_residents(
         joinedload(models.ResidentProfile.family_members),
         joinedload(models.ResidentProfile.sectors)
     )
+    
+    query = query.filter(models.ResidentProfile.is_deleted == False)
+
 
     if search:
         search_fmt = f"%{search.strip()}%"
@@ -249,10 +281,19 @@ def get_residents(
 # =====================================================
 def get_dashboard_stats(db: Session):
 
-    total_residents = db.query(
-        func.count(models.ResidentProfile.id)
-    ).scalar() or 0
+    # 🔥 BASE FILTER (VERY IMPORTANT)
+    base_query = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.is_deleted == False
+    )
 
+    # ------------------------------
+    # TOTAL RESIDENTS
+    # ------------------------------
+    total_residents = base_query.count() or 0
+
+    # ------------------------------
+    # TOTAL HOUSEHOLDS
+    # ------------------------------
     total_households = db.query(
         func.count(
             func.distinct(
@@ -261,24 +302,38 @@ def get_dashboard_stats(db: Session):
                 func.coalesce(func.trim(models.ResidentProfile.house_no), "")
             )
         )
+    ).filter(
+        models.ResidentProfile.is_deleted == False
     ).scalar() or 0
 
+    # ------------------------------
+    # TOTAL MALE
+    # ------------------------------
     total_male = db.query(
         func.count(models.ResidentProfile.id)
     ).filter(
+        models.ResidentProfile.is_deleted == False,
         func.lower(models.ResidentProfile.sex).in_(["male", "m"])
     ).scalar() or 0
 
+    # ------------------------------
+    # TOTAL FEMALE
+    # ------------------------------
     total_female = db.query(
         func.count(models.ResidentProfile.id)
     ).filter(
+        models.ResidentProfile.is_deleted == False,
         func.lower(models.ResidentProfile.sex).in_(["female", "f"])
     ).scalar() or 0
 
+    # ------------------------------
+    # POPULATION BY BARANGAY
+    # ------------------------------
     barangay_counts = db.query(
         func.upper(func.trim(models.ResidentProfile.barangay)).label("barangay"),
         func.count(models.ResidentProfile.id)
     ).filter(
+        models.ResidentProfile.is_deleted == False,
         models.ResidentProfile.barangay.isnot(None)
     ).group_by(
         func.upper(func.trim(models.ResidentProfile.barangay))
@@ -286,16 +341,21 @@ def get_dashboard_stats(db: Session):
 
     stats_barangay = {b: count for b, count in barangay_counts if b}
 
+    # ------------------------------
+    # POPULATION BY SECTOR
+    # ------------------------------
     sector_counts = db.query(
         models.ResidentProfile.sector_summary,
         func.count(models.ResidentProfile.id)
     ).filter(
+        models.ResidentProfile.is_deleted == False,
         models.ResidentProfile.sector_summary.isnot(None)
     ).group_by(
         models.ResidentProfile.sector_summary
     ).all()
 
     stats_sector = {}
+
     for sector_summary, count in sector_counts:
         if not sector_summary or sector_summary.lower() == "none":
             continue

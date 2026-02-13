@@ -339,6 +339,30 @@ def delete_resident(
         raise HTTPException(status_code=404, detail="Resident not found")
     return db_resident
 
+@app.get("/residents/archived")
+def get_archived_residents(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.is_deleted == True
+    ).all()
+    
+@app.put("/residents/{resident_id}/restore")
+def restore_resident(
+    resident_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return crud.restore_resident(db, resident_id)
+
+
 # --- EXCEL EXPORT ENDPOINT ---
 @app.get("/export/excel")
 def export_residents_excel(

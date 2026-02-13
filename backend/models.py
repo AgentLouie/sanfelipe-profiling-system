@@ -54,6 +54,9 @@ class ResidentProfile(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     
+    is_deleted = Column(Boolean, default=False)
+    deleted_at = Column(DateTime, nullable=True)
+    
     # 1. PERSONAL INFO
     last_name = Column(String, index=True)
     first_name = Column(String, index=True)
