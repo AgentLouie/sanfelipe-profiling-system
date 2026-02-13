@@ -67,7 +67,7 @@ class ResidentBase(BaseModel):
     barangay: str
     
     # Personal Info
-    sex: str
+    sex: Optional[str] = None
     birthdate: Optional[date] = None
     civil_status: Optional[str] = None
     religion: Optional[str] = None
