@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Union
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import text, func
@@ -335,29 +335,21 @@ def archive_resident(
 @app.put("/residents/{resident_id}/promote")
 def promote_family_head(
     resident_id: int,
-    new_head_member_id: int,
+    new_head_member_id: str,
     reason: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
     resident = db.query(models.ResidentProfile).filter(
-        models.ResidentProfile.id == resident_id,
-        models.ResidentProfile.is_deleted == False
+        models.ResidentProfile.id == resident_id
     ).first()
 
     if not resident:
         raise HTTPException(status_code=404, detail="Resident not found")
 
-    new_head = db.query(models.FamilyMember).filter(
-        models.FamilyMember.id == new_head_member_id,
-        models.FamilyMember.profile_id == resident_id
-    ).first()
-
-    if not new_head:
-        raise HTTPException(status_code=404, detail="Family member not found")
-
-    # ===============================
-    # 1️⃣ SAVE OLD HEAD DATA FIRST
-    # ===============================
+    # =====================================
+    # 1️⃣ SAVE OLD HEAD FIRST
+    # =====================================
 
     old_head_member = models.FamilyMember(
         profile_id=resident.id,
@@ -365,26 +357,61 @@ def promote_family_head(
         last_name=resident.last_name,
         middle_name=resident.middle_name,
         ext_name=resident.ext_name,
-        relationship="Former Head",
+        relationship=f"Former Head ({reason})",
         birthdate=resident.birthdate,
         occupation=resident.occupation,
-        is_active=False   # MARK AS DECEASED
+        is_active=False
     )
 
     db.add(old_head_member)
 
-    # ===============================
-    # 2️⃣ OVERWRITE PROFILE WITH NEW HEAD
-    # ===============================
+    # =====================================
+    # 2️⃣ DETERMINE NEW HEAD
+    # =====================================
 
-    resident.first_name = new_head.first_name
-    resident.last_name = new_head.last_name
-    resident.middle_name = new_head.middle_name
-    resident.ext_name = new_head.ext_name
-    resident.birthdate = new_head.birthdate
-    resident.occupation = new_head.occupation
+    if new_head_member_id == "spouse":
+        # Promote spouse
 
-    # CLEAR ALL OLD PERSONAL DETAILS
+        if not resident.spouse_first_name:
+            raise HTTPException(status_code=400, detail="No spouse to promote")
+
+        new_first_name = resident.spouse_first_name
+        new_last_name = resident.spouse_last_name
+        new_middle_name = resident.spouse_middle_name
+        new_ext_name = resident.spouse_ext_name
+
+    else:
+        # Promote family member
+
+        member_id = int(new_head_member_id)
+
+        family_member = db.query(models.FamilyMember).filter(
+            models.FamilyMember.id == member_id
+        ).first()
+
+        if not family_member:
+            raise HTTPException(status_code=404, detail="Family member not found")
+
+        new_first_name = family_member.first_name
+        new_last_name = family_member.last_name
+        new_middle_name = family_member.middle_name
+        new_ext_name = family_member.ext_name
+
+        # REMOVE promoted member from family table
+        db.delete(family_member)
+
+    # =====================================
+    # 3️⃣ OVERWRITE RESIDENT PROFILE
+    # =====================================
+
+    resident.first_name = new_first_name
+    resident.last_name = new_last_name
+    resident.middle_name = new_middle_name
+    resident.ext_name = new_ext_name
+
+    # CLEAR ALL PERSONAL DETAILS
+    resident.birthdate = None
+    resident.occupation = None
     resident.civil_status = None
     resident.religion = None
     resident.precinct_no = None
@@ -400,12 +427,6 @@ def promote_family_head(
 
     resident.status = "Active"
     resident.is_archived = False
-
-    # ===============================
-    # 3️⃣ REMOVE PROMOTED MEMBER FROM FAMILY TABLE
-    # ===============================
-
-    db.delete(new_head)
 
     db.commit()
 
