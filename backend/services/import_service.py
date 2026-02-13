@@ -214,23 +214,35 @@ def process_excel_import(file_content, db: Session):
             # ===============================
             for i in range(1, 6):
 
-                # Flexible column matching
-                lname = clean_str(row.get(f"{i}. LAST NAME") or row.get(f"{i}. LAST NAME.1"))
+                lname = ""
+                fname = ""
+                mname = ""
+                rel = ""
 
-                fname = clean_str(row.get(f"{i}. FIRST NAME") or row.get(f"{i}. FIRST NAME.1"))
-
-                # 👇 FIXED MIDDLE NAME HANDLING
-                mname = None
                 for col in df.columns:
-                    if col.startswith(f"{i}. MIDDLE NAME"):
+                    clean_col = col.strip().upper()
+
+                    # LAST NAME
+                    if clean_col.startswith(f"{i}. LAST NAME"):
+                        lname = clean_str(row.get(col))
+
+                    # FIRST NAME
+                    if clean_col.startswith(f"{i}. FIRST NAME"):
+                        fname = clean_str(row.get(col))
+
+                    # MIDDLE NAME
+                    if clean_col.startswith(f"{i}. MIDDLE NAME"):
                         mname = clean_str(row.get(col))
-                        break
 
-                rel = clean_str(row.get(f"{i}. RELATIONSHIP"))
+                    # RELATIONSHIP
+                    if clean_col.startswith(f"{i}. RELATIONSHIP"):
+                        rel = clean_str(row.get(col))
 
+                # Skip empty member
                 if lname == "" and fname == "" and rel == "":
                     continue
 
+                # Prevent duplicate
                 if family_member_exists(db, resident.id, lname, fname, rel):
                     continue
 
