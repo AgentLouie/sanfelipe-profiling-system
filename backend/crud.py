@@ -105,6 +105,52 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
 
 
 # =====================================================
+# PROMOTOE FAMILY MEMBER TO HEAD
+# =====================================================
+def promote_family_member_to_head(db: Session, resident_id: int, new_head_member_id: int, reason: str):
+    
+    current_head = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.id == resident_id
+    ).first()
+
+    if not current_head:
+        return None
+
+    # 1️⃣ Mark old head
+    current_head.status = reason  # "Deceased" or "OFW"
+    current_head.is_deleted = True
+    current_head.is_family_head = False
+
+    # 2️⃣ Get family member
+    member = db.query(models.FamilyMember).filter(
+        models.FamilyMember.id == new_head_member_id
+    ).first()
+
+    if not member:
+        return None
+
+    # 3️⃣ Convert member to new ResidentProfile
+    new_head = models.ResidentProfile(
+        first_name=member.first_name,
+        last_name=member.last_name,
+        barangay=current_head.barangay,
+        house_no=current_head.house_no,
+        purok=current_head.purok,
+        is_family_head=True,
+        status="Active"
+    )
+
+    db.add(new_head)
+
+    # 4️⃣ Remove family member entry
+    db.delete(member)
+
+    db.commit()
+    db.refresh(new_head)
+
+    return new_head
+
+# =====================================================
 # DELETE RESIDENT
 # =====================================================
 def delete_resident(db: Session, resident_id: int):

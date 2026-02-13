@@ -296,6 +296,29 @@ def update_resident(
 
     return db_resident
 
+@app.put("/residents/{resident_id}/promote")
+def promote_family_head(
+    resident_id: int,
+    new_head_member_id: int = Query(...),
+    reason: str = Query(...),  # "Deceased" or "OFW"
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403)
+
+    result = crud.promote_family_member_to_head(
+        db,
+        resident_id,
+        new_head_member_id,
+        reason
+    )
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Promotion failed")
+
+    return {"message": "Family head updated successfully"}
+
 # ------------------------------
 # ARCHIVED ROUTE (MUST BE FIRST)
 # ------------------------------

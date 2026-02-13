@@ -59,6 +59,10 @@ class ResidentProfile(Base):
     
     is_archived = Column(Boolean, default=False)
     
+    is_family_head = Column(Boolean, default=True)
+    
+    status = Column(String, default="Active")
+
     # 1. PERSONAL INFO
     last_name = Column(String, index=True)
     first_name = Column(String, index=True)
@@ -116,4 +120,5 @@ class FamilyMember(Base):
     occupation = Column(String, nullable=True)
     
     is_active = Column(Boolean, default=True)
+    is_family_head = Column(Boolean, default=False)
     head = orm_relationship("ResidentProfile", back_populates="family_members")
