@@ -34,6 +34,7 @@ app = FastAPI(title="San Felipe Residential Profile Form")
 
 origins = [
     "http://localhost:5173",
+    "http://127.0.0.1:5173",
     "https://sanfelipe-profiling-system.vercel.app",
     "https://sanfelipe-profiling-system-production.up.railway.app",
 ]
