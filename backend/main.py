@@ -422,6 +422,114 @@ def get_stats(db: Session = Depends(get_db),
     return crud.get_dashboard_stats(db)
 
 # ---------------------------------------------------
+# Import/Export
+# ---------------------------------------------------
+
+@app.post("/import/excel")
+async def import_residents_excel(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Optional: Restrict to admin only
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can import data")
+
+    # Validate file type
+    if not file.filename.endswith((".xlsx", ".csv")):
+        raise HTTPException(
+            status_code=400,
+            detail="Please upload an Excel (.xlsx) or CSV file."
+        )
+
+    contents = await file.read()
+
+    try:
+        result = process_excel_import(io.BytesIO(contents), db)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/export/excel")
+def export_residents_excel(
+    barangay: str = Query(None),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Restrict barangay automatically for non-admin
+    target_barangay = barangay
+
+    if current_user.role != "admin":
+        official_name = BARANGAY_MAPPING.get(current_user.username.lower())
+
+        if official_name:
+            target_barangay = official_name
+        else:
+            target_barangay = current_user.username.replace("_", " ").title()
+
+    try:
+        excel_file = report_service.generate_household_excel(
+            db,
+            barangay_name=target_barangay
+        )
+
+        clean_name = (
+            target_barangay.replace(" ", "_")
+            if target_barangay else "All"
+        )
+
+        filename = f"SanFelipe_Households_{clean_name}.xlsx"
+
+        return StreamingResponse(
+            iter([excel_file.getvalue()]),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/export/excel")
+def export_residents_excel(
+    barangay: str = Query(None),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Restrict barangay automatically for non-admin
+    target_barangay = barangay
+
+    if current_user.role != "admin":
+        official_name = BARANGAY_MAPPING.get(current_user.username.lower())
+
+        if official_name:
+            target_barangay = official_name
+        else:
+            target_barangay = current_user.username.replace("_", " ").title()
+
+    try:
+        excel_file = report_service.generate_household_excel(
+            db,
+            barangay_name=target_barangay
+        )
+
+        clean_name = (
+            target_barangay.replace(" ", "_")
+            if target_barangay else "All"
+        )
+
+        filename = f"SanFelipe_Households_{clean_name}.xlsx"
+
+        return StreamingResponse(
+            excel_file,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ---------------------------------------------------
 # REFERENCE DATA
 # ---------------------------------------------------
 
