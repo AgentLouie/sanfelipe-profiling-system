@@ -8,6 +8,7 @@ import DashboardStats from './components/DashboardStats';
 import ResidentList from './components/ResidentList';
 import AddResidentForm from './components/AddResidentForm'; 
 import UserManagement from './components/UserManagement';
+import ArchivedResidents from './components/ArchivedResidents';
 
 /**
  * DashboardLayout
@@ -113,6 +114,9 @@ export default function App() {
         <Route path="users" element={<UserManagement />} />
         
         <Route index element={<Navigate to="/dashboard/overview" replace />} />
+
+        <Route path="archived" element={<ArchivedResidents />} />
+
       </Route>
 
       <Route path="*" element={<Navigate to="/login" replace />} />

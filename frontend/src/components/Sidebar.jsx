@@ -10,6 +10,8 @@ import {
   Settings
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { ArchiveRestore } from 'lucide-react';
+
 
 // 1. ACCEPT THE NEW PROP: onLinkClick
 export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
@@ -20,9 +22,10 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
   const logoUrl = '/san_felipe_seal.png';
 
   const allMenuItems = [
-    { label: 'Overview', path: '/dashboard/overview', Icon: LayoutDashboard, role: 'admin' }, 
-    { label: 'Resident Database', path: '/dashboard/residents', Icon: Users, role: 'all' },
-    { label: 'Register Resident', path: '/dashboard/create', Icon: UserPlus, role: 'all' },
+  { label: 'Overview', path: '/dashboard/overview', Icon: LayoutDashboard, role: 'admin' }, 
+  { label: 'Resident Database', path: '/dashboard/residents', Icon: Users, role: 'all' },
+  { label: 'Register Resident', path: '/dashboard/create', Icon: UserPlus, role: 'all' },
+  { label: 'Archived Residents', path: '/dashboard/archived', Icon: ArchiveRestore, role: 'admin' }, // 🔥 NEW
   ];
 
   const menuItems = allMenuItems.filter(item => {

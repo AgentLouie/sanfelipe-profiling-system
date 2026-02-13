@@ -9,6 +9,8 @@ import ExportButton from './ExportButton';
 import toast, { Toaster } from 'react-hot-toast';
 import { createPortal } from "react-dom";
 import ImportButton from './ImportButton';
+import { Archive } from 'lucide-react';
+
 
 export default function ResidentList({ userRole, onEdit }) {
   // --- STATE ---
@@ -151,6 +153,16 @@ export default function ResidentList({ userRole, onEdit }) {
     setCurrentPage(1);
     setSearchTerm('');
     fetchResidents('', selectedBarangay, 1, itemsPerPage);
+  };
+
+  const handleArchive = async (id) => {
+    try {
+      await api.put(`/residents/${id}/archive`);
+      toast.success("Resident archived.");
+      fetchResidents(); // refresh list
+    } catch (err) {
+      toast.error("Archive failed.");
+    }
   };
 
   const confirmDelete = async () => {
@@ -412,8 +424,34 @@ export default function ResidentList({ userRole, onEdit }) {
                       {/* 5. ACTIONS */}
                       <td className="py-4 px-6" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-center gap-2">
-                          <button onClick={() => onEdit(r)} className="p-2 text-stone-400 hover:text-rose-600 transition-colors"><Edit size={16} /></button>
-                          <button onClick={() => setDeleteModal({ isOpen: true, residentId: r.id, name: `${r.first_name} ${r.last_name}` })} className="p-2 text-stone-400 hover:text-red-600 transition-colors"><Trash2 size={16} /></button>
+                          
+                          {/* EDIT BUTTON */}
+                          <button 
+                            onClick={() => onEdit(r)} 
+                            className="p-2 text-stone-400 hover:text-rose-600 transition-colors"
+                            title="Edit"
+                          >
+                            <Edit size={16} />
+                          </button>
+
+                          {/* ARCHIVE BUTTON */}
+                          <button
+                            onClick={() => handleArchive(r.id)}
+                            className="p-2 text-orange-600 hover:text-orange-800 transition-colors"
+                            title="Archive"
+                          >
+                            <Archive size={16} />
+                          </button>
+
+                          {/* DELETE BUTTON */}
+                          <button 
+                            onClick={() => setDeleteModal({ isOpen: true, residentId: r.id, name: `${r.first_name} ${r.last_name}` })} 
+                            className="p-2 text-stone-400 hover:text-red-600 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                          
                         </div>
                       </td>
                     </tr>

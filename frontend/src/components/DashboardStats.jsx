@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts';
-import { UsersRound, Building2, UserRound, ShieldAlert } from 'lucide-react';
+import { UsersRound, Building2, UserRound, ShieldAlert, Loader2 } from 'lucide-react';
 
 export default function DashboardStats({ userRole }) {
   const [stats, setStats] = useState(null);
@@ -22,11 +22,15 @@ export default function DashboardStats({ userRole }) {
       try {
         const res = await api.get('/dashboard/stats');
         setStats(res.data);
+        
+        // Simple minimal delay to prevent layout thrashing/flicker
+        setTimeout(() => {
+            setLoading(false);
+        }, 500);
+
       } catch (err) {
         console.error('Failed to fetch stats:', err);
-      } finally {
-        // slight delay to prevent flicker if API is too fast, adds weight to the load
-        setTimeout(() => setLoading(false), 500); 
+        setLoading(false);
       }
     };
 
@@ -48,8 +52,10 @@ export default function DashboardStats({ userRole }) {
     );
   }
 
-  // --- LOADING SKELETON ---
-  if (loading) return <DashboardSkeleton />;
+  // --- LOADING STATE ---
+  if (loading) {
+    return <BufferingLoader />;
+  }
 
   // --- DATA PROCESSING ---
   const barangayData = Object.entries(stats?.population_by_barangay || {})
@@ -67,7 +73,7 @@ export default function DashboardStats({ userRole }) {
   const GENDER_COLORS = ['#991b1b', '#ef4444']; // Dark Red, Light Red
 
   return (
-    <div className="space-y-8 pb-12 animate-in fade-in duration-500">
+    <div className="space-y-8 pb-12 animate-in fade-in duration-700">
 
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -79,7 +85,11 @@ export default function DashboardStats({ userRole }) {
             Municipality-wide demographic intelligence.
           </p>
         </div>
-        <div className="px-4 py-1.5 bg-stone-100 rounded-full border border-stone-200">
+        <div className="flex items-center gap-2 px-4 py-1.5 bg-stone-100 rounded-full border border-stone-200">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+            </span>
             <span className="text-xs font-semibold text-stone-500 uppercase tracking-widest">
                 Live Data
             </span>
@@ -92,7 +102,6 @@ export default function DashboardStats({ userRole }) {
           title="Total Residents" 
           value={stats?.total_residents} 
           icon={<UsersRound size={22} />} 
-          trend="+2.4%" // Example placeholder for modern feel
         />
         <StatCard 
           title="Total Households" 
@@ -243,12 +252,12 @@ export default function DashboardStats({ userRole }) {
 
 // --- SUBCOMPONENTS ---
 
-function StatCard({ title, value, icon, trend }) {
+function StatCard({ title, value, icon }) {
   return (
     <div className="group relative overflow-hidden bg-white p-6 rounded-3xl border border-stone-100 shadow-lg shadow-stone-200/50 hover:shadow-stone-300/50 hover:-translate-y-1 transition-all duration-300">
       <div className="flex justify-between items-start">
         <div className="space-y-4 relative z-10">
-            <div className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-red-50 to-white border border-red-100 text-red-700 rounded-2xl shadow-sm group-hover:scale-110 transition-transform duration-300">
+            <div className="w-12 h-12 flex items-center justify-center bg-stone-50 border border-stone-100 text-stone-600 rounded-2xl shadow-sm group-hover:bg-red-600 group-hover:text-white group-hover:shadow-red-200 transition-all duration-300">
                 {icon}
             </div>
             <div>
@@ -262,7 +271,7 @@ function StatCard({ title, value, icon, trend }) {
         </div>
         
         {/* Decorative Background Element */}
-        <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-red-50 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        <div className="absolute -top-6 -right-6 w-32 h-32 bg-stone-50 rounded-full group-hover:bg-red-50 transition-colors duration-500 z-0" />
       </div>
     </div>
   );
@@ -282,18 +291,38 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
-function DashboardSkeleton() {
+// --- UPDATED LOADING COMPONENT (MATCHING IMAGE) ---
+function BufferingLoader() {
     return (
-        <div className="space-y-8 animate-pulse">
-            <div className="h-20 bg-stone-200 rounded-3xl w-1/3"></div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[...Array(4)].map((_, i) => (
-                    <div key={i} className="h-40 bg-stone-100 rounded-3xl border border-stone-200"></div>
-                ))}
+        <div className="relative min-h-[80vh] w-full">
+            {/* 1. Background Skeleton (Kept subtle for context) */}
+            <div className="space-y-8 opacity-10 blur-[2px] pointer-events-none select-none transition-all duration-500">
+                <div className="flex justify-between items-end">
+                   <div className="space-y-3">
+                       <div className="h-10 w-48 bg-stone-400 rounded-lg"></div>
+                       <div className="h-4 w-64 bg-stone-300 rounded-lg"></div>
+                   </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {[...Array(4)].map((_, i) => (
+                        <div key={i} className="h-40 bg-stone-200 rounded-3xl"></div>
+                    ))}
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-2 h-80 bg-stone-200 rounded-3xl"></div>
+                    <div className="lg:col-span-1 h-80 bg-stone-200 rounded-3xl"></div>
+                </div>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="h-80 bg-stone-100 rounded-3xl border border-stone-200"></div>
-                <div className="h-80 bg-stone-100 rounded-3xl border border-stone-200"></div>
+
+            {/* 2. Clean Loader Overlay */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
+                {/* Red Spinner */}
+                <Loader2 size={48} className="text-red-500 animate-spin mb-4" strokeWidth={2.5} />
+                
+                {/* Text: SYNCING RECORDS... */}
+                <p className="text-sm font-bold text-stone-500 uppercase tracking-[0.2em] animate-pulse">
+                    Syncing Records...
+                </p>
             </div>
         </div>
     )
