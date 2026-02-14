@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Query, UploadFile, File, Request
+from fastapi import FastAPI, Depends, HTTPException, status, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Union
@@ -16,16 +16,10 @@ from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
 
-from app import models
-from app import schemas
-from app import crud
+import models, schemas, crud
 from app.core.database import engine, get_db
 from services import report_service
-from app.core.audit import log_action
 
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
 # ---------------------------------------------------
 # INITIALIZE APP
 # ---------------------------------------------------
@@ -33,10 +27,6 @@ from slowapi.errors import RateLimitExceeded
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="San Felipe Residential Profile Form")
-
-limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ---------------------------------------------------
 # CORS
@@ -65,8 +55,6 @@ load_dotenv()
 # ---------------------------------------------------
 
 SECRET_KEY = os.getenv("SECRET_KEY", "fallback-secret-key-for-dev-only")
-
-print("SECRET_KEY:", SECRET_KEY)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
@@ -137,12 +125,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme),
 # ---------------------------------------------------
 
 @app.post("/token")
-@limiter.limit("5/minute")
-def login(
-    request: Request,
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
-):
+def login(form_data: OAuth2PasswordRequestForm = Depends(),
+          db: Session = Depends(get_db)):
+
     user = db.query(models.User).filter(
         models.User.username == form_data.username
     ).first()
@@ -159,7 +144,6 @@ def login(
         "token_type": "bearer",
         "role": user.role
     }
-
 
 # ---------------------------------------------------
 # USER MANAGEMENT
@@ -238,14 +222,6 @@ def delete_user(
                 status_code=400,
                 detail="Cannot delete the last administrator"
             )
-            
-    log_action(
-        db,
-        current_user.id,
-        f"Deleted user: {user_to_delete.username}",
-        "user",
-        user_id
-    )
 
     db.delete(user_to_delete)
     db.commit()
@@ -345,7 +321,7 @@ def archive_resident(
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admin can archive")
 
-    result = crud.archive_resident(db, resident_id, current_user.id)
+    result = crud.archive_resident(db, resident_id)
 
     if not result:
         raise HTTPException(status_code=404, detail="Resident not found")
@@ -650,6 +626,45 @@ def export_residents_excel(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    # Restrict barangay automatically for non-admin
+    target_barangay = barangay
+
+    if current_user.role != "admin":
+        official_name = BARANGAY_MAPPING.get(current_user.username.lower())
+
+        if official_name:
+            target_barangay = official_name
+        else:
+            target_barangay = current_user.username.replace("_", " ").title()
+
+    try:
+        excel_file = report_service.generate_household_excel(
+            db,
+            barangay_name=target_barangay
+        )
+
+        clean_name = (
+            target_barangay.replace(" ", "_")
+            if target_barangay else "All"
+        )
+
+        filename = f"SanFelipe_Households_{clean_name}.xlsx"
+
+        return StreamingResponse(
+            iter([excel_file.getvalue()]),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/export/excel")
+def export_residents_excel(
+    barangay: str = Query(None),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Restrict barangay automatically for non-admin
     target_barangay = barangay
 
     if current_user.role != "admin":
@@ -683,7 +698,6 @@ def export_residents_excel(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 # ---------------------------------------------------
 # REFERENCE DATA
