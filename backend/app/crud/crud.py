@@ -172,6 +172,8 @@ def delete_resident(db: Session, resident_id: int):
     return db_resident
 
 def soft_delete_resident(db: Session, resident_id: int):
+    print("DATABASE URL:", db.bind.url)
+
     resident = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.id == resident_id
     ).first()
@@ -181,7 +183,6 @@ def soft_delete_resident(db: Session, resident_id: int):
 
     resident.is_deleted = True
     db.commit()
-    db.refresh(resident)
 
     return resident
 
