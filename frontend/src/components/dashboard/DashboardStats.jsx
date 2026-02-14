@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import api from '../../api/api';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, Legend
+  ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 import { UsersRound, Building2, UserRound, ShieldAlert, Loader2 } from 'lucide-react';
 
@@ -67,7 +67,28 @@ export default function DashboardStats({ userRole }) {
     { name: 'Female', value: stats?.total_female || 0 },
   ];
 
-  const GENDER_COLORS = ['#991b1b', '#ef4444'];
+  const GENDER_COLORS = ['#991b1b', '#ef4444']; // Dark Red (Male), Red (Female)
+
+  // Custom label render function for inside the donut
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  
+    return (
+      <text 
+        x={x} 
+        y={y} 
+        fill="white" 
+        textAnchor="middle" 
+        dominantBaseline="central" 
+        className="text-xs font-bold"
+      >
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
 
   return (
     <div className="space-y-8 pb-12 animate-in fade-in duration-700">
@@ -158,47 +179,71 @@ export default function DashboardStats({ userRole }) {
           </div>
         </div>
 
-        {/* GENDER DONUT CHART */}
+        {/* --- UPDATED GENDER DONUT CHART --- */}
         <div className="lg:col-span-1 bg-white rounded-3xl p-8 border border-stone-100 shadow-xl shadow-stone-200/40 flex flex-col">
           <div className="mb-4">
             <h3 className="text-lg font-bold text-stone-900">Gender Split</h3>
             <p className="text-sm text-stone-400 font-medium">Demographic Ratio</p>
           </div>
-          <div className="flex-1 min-h-[300px] relative">
+          
+          <div className="flex-1 relative min-h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={genderData}
-                  innerRadius={70}
+                  cx="50%"
+                  cy="50%"
+                  // Increased thickness (inner 60 vs 70)
+                  innerRadius={60}
                   outerRadius={100}
                   paddingAngle={4}
                   dataKey="value"
                   stroke="none"
+                  labelLine={false}
+                  label={renderCustomizedLabel} // Adds the % inside
                 >
                   {genderData.map((_, i) => (
                     <Cell key={`cell-${i}`} fill={GENDER_COLORS[i % GENDER_COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
-                <Legend 
-                    verticalAlign="bottom" 
-                    height={36} 
-                    iconType="circle"
-                    formatter={(value) => <span className="text-stone-600 font-semibold ml-1">{value}</span>}
-                />
               </PieChart>
             </ResponsiveContainer>
-            {/* Center Text for Donut */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none pb-8">
+
+            {/* Center Text: Total Count */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="text-center">
-                    <span className="block text-3xl font-bold text-stone-900">
-                        {((stats?.total_male / stats?.total_residents) * 100).toFixed(0)}%
+                    <span className="block text-3xl font-extrabold text-stone-900 tracking-tight">
+                        {(stats?.total_residents || 0).toLocaleString()}
                     </span>
-                    <span className="text-xs text-stone-400 font-bold uppercase tracking-wide">Male</span>
+                    <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">
+                        Total
+                    </span>
                 </div>
             </div>
           </div>
+
+          {/* Custom Clean Legend Below Chart */}
+          <div className="mt-4 flex flex-col gap-3 border-t border-stone-100 pt-6">
+            {genderData.map((entry, index) => (
+              <div key={entry.name} className="flex items-center justify-between group">
+                <div className="flex items-center gap-3">
+                  <div 
+                    className="w-3 h-3 rounded-full ring-2 ring-white shadow-sm"
+                    style={{ backgroundColor: GENDER_COLORS[index] }}
+                  />
+                  <span className="text-sm font-semibold text-stone-600 group-hover:text-stone-900 transition-colors">
+                    {entry.name}
+                  </span>
+                </div>
+                <div className="text-sm font-bold text-stone-900 tabular-nums">
+                  {entry.value.toLocaleString()}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
+        {/* --- END UPDATED CHART --- */}
 
       </div>
 
