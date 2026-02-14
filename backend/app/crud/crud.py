@@ -2,6 +2,8 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func
 from app import models, schemas
 from datetime import datetime
+from app.core.audit import log_action
+
 
 
 # =====================================================
@@ -207,7 +209,7 @@ def restore_resident(db: Session, resident_id: int):
 # ARCHIVE RESIDENT
 # =====================================================
 
-def archive_resident(db: Session, resident_id: int):
+def archive_resident(db: Session, resident_id: int, user_id: int):
     resident = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.id == resident_id
     ).first()
@@ -216,7 +218,16 @@ def archive_resident(db: Session, resident_id: int):
         return None
 
     resident.is_deleted = True
-    resident.is_archived = True  # if you are using archive column
+    resident.is_archived = True
+
+    # 🔥 ADD AUDIT LOG HERE
+    log_action(
+        db,
+        user_id,
+        "Archived resident",
+        "resident",
+        resident_id
+    )
 
     db.commit()
     db.refresh(resident)
