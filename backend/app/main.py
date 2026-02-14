@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Query, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, status, Query, UploadFile, File, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Union
@@ -23,6 +23,9 @@ from app.core.database import engine, get_db
 from services import report_service
 from app.core.audit import log_action
 
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 # ---------------------------------------------------
 # INITIALIZE APP
 # ---------------------------------------------------
@@ -30,6 +33,10 @@ from app.core.audit import log_action
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="San Felipe Residential Profile Form")
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ---------------------------------------------------
 # CORS
@@ -128,9 +135,12 @@ async def get_current_user(token: str = Depends(oauth2_scheme),
 # ---------------------------------------------------
 
 @app.post("/token")
-def login(form_data: OAuth2PasswordRequestForm = Depends(),
-          db: Session = Depends(get_db)):
-
+@limiter.limit("5/minute")
+def login(
+    request: Request,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
     user = db.query(models.User).filter(
         models.User.username == form_data.username
     ).first()
@@ -147,6 +157,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(),
         "token_type": "bearer",
         "role": user.role
     }
+
 
 # ---------------------------------------------------
 # USER MANAGEMENT
