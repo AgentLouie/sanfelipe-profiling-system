@@ -21,6 +21,7 @@ from app import schemas
 from app import crud
 from app.core.database import engine, get_db
 from services import report_service
+from app.core.audit import log_action
 
 # ---------------------------------------------------
 # INITIALIZE APP
@@ -224,6 +225,14 @@ def delete_user(
                 status_code=400,
                 detail="Cannot delete the last administrator"
             )
+            
+    log_action(
+        db,
+        current_user.id,
+        f"Deleted user: {user_to_delete.username}",
+        "user",
+        user_id
+    )
 
     db.delete(user_to_delete)
     db.commit()
