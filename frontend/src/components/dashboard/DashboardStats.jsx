@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import api from '../api';
+import api from '../../api/api';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend
@@ -22,8 +22,6 @@ export default function DashboardStats({ userRole }) {
       try {
         const res = await api.get('/dashboard/stats');
         setStats(res.data);
-        
-        // Simple minimal delay to prevent layout thrashing/flicker
         setTimeout(() => {
             setLoading(false);
         }, 500);
@@ -37,7 +35,6 @@ export default function DashboardStats({ userRole }) {
     fetchStats();
   }, [isAdmin]);
 
-  // --- ACCESS DENIED STATE ---
   if (!isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] bg-white border border-stone-200 rounded-3xl p-12 text-center shadow-lg shadow-stone-200/50">
@@ -70,7 +67,7 @@ export default function DashboardStats({ userRole }) {
     { name: 'Female', value: stats?.total_female || 0 },
   ];
 
-  const GENDER_COLORS = ['#991b1b', '#ef4444']; // Dark Red, Light Red
+  const GENDER_COLORS = ['#991b1b', '#ef4444'];
 
   return (
     <div className="space-y-8 pb-12 animate-in fade-in duration-700">
@@ -123,7 +120,7 @@ export default function DashboardStats({ userRole }) {
       {/* CHARTS GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* BARANGAY CHART (Takes up 2/3) */}
+        {/* BARANGAY CHART */}
         <div className="lg:col-span-2 bg-white rounded-3xl p-8 border border-stone-100 shadow-xl shadow-stone-200/40">
           <div className="mb-8">
             <h3 className="text-lg font-bold text-stone-900">Population Distribution</h3>
@@ -161,7 +158,7 @@ export default function DashboardStats({ userRole }) {
           </div>
         </div>
 
-        {/* GENDER DONUT CHART (Takes up 1/3) */}
+        {/* GENDER DONUT CHART */}
         <div className="lg:col-span-1 bg-white rounded-3xl p-8 border border-stone-100 shadow-xl shadow-stone-200/40 flex flex-col">
           <div className="mb-4">
             <h3 className="text-lg font-bold text-stone-900">Gender Split</h3>
@@ -215,7 +212,6 @@ export default function DashboardStats({ userRole }) {
         </div>
 
         <div className="w-full overflow-hidden">
-             {/* Dynamic height based on data length */}
             <ResponsiveContainer width="100%" height={Math.max(400, sectorData.length * 60)}>
               <BarChart
                 layout="vertical"
@@ -291,7 +287,7 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
-// --- UPDATED LOADING COMPONENT (MATCHING IMAGE) ---
+// --- UPDATED LOADING COMPONENT ---
 function BufferingLoader() {
     return (
         <div className="relative min-h-[80vh] w-full">

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import api from '../api';
+import api from '../../api/api';
 import { X, Plus, Trash2, User, MapPin, Briefcase, Heart, Save, Phone, Fingerprint } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
-// Helper: Enhanced to support disabled state
+// Helper
 const SelectGroup = ({ label, name, value, onChange, options, required = false, disabled = false, placeholder }) => (
   <div className="space-y-1 w-full">
     <label className="text-[10px] font-bold text-stone-500 uppercase">{label}</label>
@@ -31,12 +31,11 @@ const InputGroup = ({ label, name, value, onChange, type = "text", required = fa
   </div>
 );
 
-// --- UPDATED INITIAL STATE ---
 const getInitialFormState = () => ({
   last_name: '', first_name: '', middle_name: '', ext_name: '',
   house_no: '', purok: '', barangay: '',
   birthdate: '', sex: '', civil_status: '',
-  religion: '', // <--- ADDED RELIGION
+  religion: '',
   occupation: '', precinct_no: '', contact_no: '',
   spouse_last_name: '', spouse_first_name: '', spouse_middle_name: '', spouse_ext_name: '',
   sector_ids: [], family_members: [], other_sector_details: '' 
@@ -77,7 +76,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
           const optionValue = (opt.name || opt).toLowerCase().trim();
 
           return (
-            optionValue === cleaned ||                     // exact match
+            optionValue === cleaned ||
             optionValue.replace("purok", "").trim() === cleaned.replace("purok", "").trim()
           );
         });
@@ -227,7 +226,6 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
             <InputGroup label="Birthdate *" name="birthdate" type="date" value={formData.birthdate} onChange={handleChange} required />
             <SelectGroup label="Sex *" name="sex" value={formData.sex} onChange={handleChange} options={['Male', 'Female']} required placeholder="Choose gender" />
             <SelectGroup label="Civil Status *" name="civil_status" value={formData.civil_status} onChange={handleChange} options={['Single', 'Married', 'Widowed', 'Live-in Partner']} required placeholder="Choose status" />
-            {/* --- NEW RELIGION FIELD --- */}
             <InputGroup label="Religion" name="religion" value={formData.religion} onChange={handleChange} placeholder="e.g. Catholic" />
           </div>
 

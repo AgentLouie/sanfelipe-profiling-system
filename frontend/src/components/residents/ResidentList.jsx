@@ -1,9 +1,9 @@
 import { useEffect, useState, Fragment, useMemo } from 'react';
-import api from '../api';
+import api from '../../api/api';
 import {
   Trash2, Edit, Search, ChevronDown, ChevronUp,
   Loader2, Filter, Phone, Fingerprint, Heart, User,
-  ChevronLeft, ChevronRight, Briefcase, Calendar
+  ChevronLeft, ChevronRight, Briefcase, Calendar, X
 } from 'lucide-react';
 import ExportButton from './ExportButton';
 import toast, { Toaster } from 'react-hot-toast';
@@ -13,7 +13,6 @@ import { Archive } from 'lucide-react';
 
 
 export default function ResidentList({ userRole, onEdit }) {
-  // --- STATE ---
   const [residents, setResidents] = useState([]);
   const [barangayList, setBarangayList] = useState([]);
   const [selectedBarangay, setSelectedBarangay] = useState('');
@@ -159,7 +158,7 @@ export default function ResidentList({ userRole, onEdit }) {
     try {
       await api.put(`/residents/${id}/archive`);
       toast.success("Resident archived.");
-      fetchResidents(); // refresh list
+      fetchResidents();
     } catch (err) {
       toast.error("Archive failed.");
     }
@@ -259,7 +258,7 @@ export default function ResidentList({ userRole, onEdit }) {
                     reason: "Deceased"
                   })
                 }
-                className="text-green-600 hover:text-green-800 text-xs"
+                className="text-red-600 hover:text-green-800 text-xs"
               >
                 Make Family Head
               </button>
@@ -312,7 +311,7 @@ export default function ResidentList({ userRole, onEdit }) {
                         reason: "Deceased"
                       });
                     }}
-                    className="text-green-600 hover:text-green-800 text-[10px]"
+                    className="text-red-600 hover:text-green-800 text-[10px]"
                   >
                     Make Family Head
                   </button>
@@ -358,7 +357,6 @@ export default function ResidentList({ userRole, onEdit }) {
         </div>,
         document.body
       )}
-      {/* ✅ ADD PROMOTION MODAL HERE */}
       {promotionModal.isOpen && createPortal(
         <div className="fixed inset-0 z-[99999]">
           
@@ -392,7 +390,6 @@ export default function ResidentList({ userRole, onEdit }) {
                 }
               >
                 <option value="Deceased">Deceased</option>
-                <option value="OFW">OFW</option>
                 <option value="Transferred">Transferred</option>
                 <option value="Inactive">Inactive</option>
               </select>
@@ -445,8 +442,27 @@ export default function ResidentList({ userRole, onEdit }) {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="relative group">
-            <input type="text" placeholder="Search by name..." value={searchTerm} onChange={handleSearchChange} className="w-full pl-10 pr-4 py-3 bg-stone-50 border border-stone-100 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none text-sm" />
+            <input 
+              type="text" 
+              placeholder="Search by name..." 
+              value={searchTerm} 
+              onChange={handleSearchChange} 
+              className="w-full pl-10 pr-10 py-3 bg-stone-50 border border-stone-100 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none text-sm transition-all" 
+            />
+            
+            {/* Left Search Icon */}
             <Search className="absolute left-3 top-3.5 text-stone-400 group-focus-within:text-rose-500" size={18} />
+            {searchTerm && (
+              <button 
+                onClick={() => {
+                  setSearchTerm('');
+                  setCurrentPage(1);
+                }}
+                className="absolute right-3 top-3.5 text-stone-400 hover:text-rose-500 hover:bg-stone-200 rounded-full p-0.5 transition-colors"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
           <div className="relative">
             <select

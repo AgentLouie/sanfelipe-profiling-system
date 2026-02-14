@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import api from '../api';
+import api from '../../api/api';
 import toast, { Toaster } from 'react-hot-toast';
 import { RotateCcw, Archive, Loader2, UserX, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -7,8 +7,6 @@ export default function ArchivedResidents() {
   const [residents, setResidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [restoringId, setRestoringId] = useState(null);
-
-  // --- PAGINATION STATE ---
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 

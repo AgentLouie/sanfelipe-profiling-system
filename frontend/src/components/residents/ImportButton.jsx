@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Upload, Loader2, FileSpreadsheet } from 'lucide-react';
-import api from '../api';
+import api from '../../api/api';
 import toast from 'react-hot-toast';
 
 export default function ImportButton({ onSuccess }) {
@@ -37,14 +37,14 @@ export default function ImportButton({ onSuccess }) {
         toast.success(`Successfully imported ${added} residents!`);
       }
 
-      if (onSuccess) onSuccess(); // Refresh list
+      if (onSuccess) onSuccess();
       
     } catch (error) {
       toast.dismiss(loadingToast);
       toast.error(error.response?.data?.detail || "Import failed.");
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = ''; // Reset input
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 

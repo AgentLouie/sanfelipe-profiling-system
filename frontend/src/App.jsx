@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 
 // --- REAL COMPONENT IMPORTS ---
-import Login from './components/Login';
-import Sidebar from './components/Sidebar';
-import DashboardStats from './components/DashboardStats';
-import ResidentList from './components/ResidentList';
-import AddResidentForm from './components/AddResidentForm'; 
-import UserManagement from './components/UserManagement';
-import ArchivedResidents from './components/ArchivedResidents';
+import Login from './components/auth/Login';
+import Sidebar from './components/common/Sidebar';
+import DashboardStats from './components/dashboard/DashboardStats';
+import ResidentList from './components/residents/ResidentList';
+import AddResidentForm from './components/residents/AddResidentForm';
+import UserManagement from './components/users/UserManagement';
+import ArchivedResidents from './components/residents/ArchivedResidents';
 
 /**
  * DashboardLayout

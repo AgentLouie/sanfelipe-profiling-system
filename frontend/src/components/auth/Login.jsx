@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
-import api from '../api';
+import api from "../../api/api";
 import { Lock, User, Eye, EyeOff, ArrowRight } from 'lucide-react';
 
 export default function Login({ onLogin }) {

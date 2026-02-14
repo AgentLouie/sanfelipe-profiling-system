@@ -13,7 +13,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ArchiveRestore } from 'lucide-react';
 
 
-// 1. ACCEPT THE NEW PROP: onLinkClick
 export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -37,7 +36,6 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
   const isActive = (path) => location.pathname === path;
 
   const handleNavigate = (path) => {
-    // 2. CRITICAL FIX: RESET THE PARENT VIEW
     if (onLinkClick) {
       onLinkClick();
     }

@@ -2,7 +2,6 @@ import { Download, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 
-// 1. Get API URL
 const API_URL = import.meta.env.VITE_API_URL || "https://sanfelipe-profiling-system-production.up.railway.app";
 
 export default function ExportButton({ barangay }) {
@@ -11,7 +10,6 @@ export default function ExportButton({ barangay }) {
   const handleExport = async () => {
     setLoading(true);
 
-    // 2. Get Token
     const token = localStorage.getItem('token') || localStorage.getItem('access_token');
     if (!token) {
         toast.error("Please log in again.");
@@ -20,21 +18,17 @@ export default function ExportButton({ barangay }) {
     }
 
     try {
-      // 3. Prepare URL Parameters
       const params = new URLSearchParams();
       if (barangay && barangay !== "All Barangays") {
         params.append('barangay', barangay);
       }
 
-      // 4. FETCH REQUEST
       const response = await fetch(`${API_URL}/export/excel?${params.toString()}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
-
-      // 5. CHECK FOR ERRORS (JSON vs File)
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
         const errorData = await response.json();
@@ -43,7 +37,6 @@ export default function ExportButton({ barangay }) {
 
       if (!response.ok) throw new Error("Server error.");
 
-      // 6. GET FILENAME
       const disposition = response.headers.get('Content-Disposition');
       let filename = "SanFelipe_Report.xlsx"; 
 
@@ -54,15 +47,12 @@ export default function ExportButton({ barangay }) {
         filename = `SanFelipe_Households_${safeName}.xlsx`;
       }
 
-      // 7. GET BLOB
       const blob = await response.blob(); 
       
-      // Safety Check
       if (!blob || blob.size === 0) {
           throw new Error("File is empty or failed to download.");
       }
 
-      // 8. DOWNLOAD
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
