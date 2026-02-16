@@ -96,7 +96,7 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
     if resident_data.family_members:
         for fm_data in resident_data.family_members:
             new_fm = models.FamilyMember(
-                **fm_data,
+                **fm_data.model_dump(),
                 profile_id=resident_id
             )
             db.add(new_fm)
