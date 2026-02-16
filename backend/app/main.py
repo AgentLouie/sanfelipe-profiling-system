@@ -188,7 +188,7 @@ def get_users(db: Session = Depends(get_db),
     if current_user.role != "admin":
         raise HTTPException(status_code=403)
 
-    return db.query(models.User).all()
+    return db.query(models.User).filter(models.User.is_archived == False).all()
 
 @app.delete("/users/{user_id}", status_code=200)
 def delete_user(

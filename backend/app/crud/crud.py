@@ -42,7 +42,7 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
     # Add family members
     for member_data in family_members_data:
         db_member = models.FamilyMember(
-            **member_data.model_dump(),
+            **member_data,
             profile_id=db_resident.id
         )
         db.add(db_member)
@@ -96,7 +96,7 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
     if resident_data.family_members:
         for fm_data in resident_data.family_members:
             new_fm = models.FamilyMember(
-                **fm_data.model_dump(),
+                **fm_data,
                 profile_id=resident_id
             )
             db.add(new_fm)
