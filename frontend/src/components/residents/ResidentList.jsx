@@ -379,9 +379,13 @@ export default function ResidentList({ userRole, onEdit }) {
                 <option>Gas Subsidy</option>
                 <option>Food Assistance</option>
               </select>
-
+              
+              <label className="block text-sm mb-1">Date Processed</label>
               <input type="date" name="processed" className="w-full border p-2 mb-3 text-sm" />
+
+              <label className="block text-sm mb-1">Date Claimed</label>
               <input type="date" name="claimed" className="w-full border p-2 mb-3 text-sm" />
+
               <input type="number" name="amount" placeholder="Amount" className="w-full border p-2 mb-3 text-sm" />
               <input type="text" name="office" placeholder="Implementing Office" className="w-full border p-2 mb-4 text-sm" />
 
