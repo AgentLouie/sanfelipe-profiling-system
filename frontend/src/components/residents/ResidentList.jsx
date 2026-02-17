@@ -28,6 +28,9 @@ export default function ResidentList({ userRole, onEdit }) {
   const [totalItems, setTotalItems] = useState(0);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
+  const [assistanceModal, setAssistanceModal] = useState({ isOpen: false, resident: null });
+
+
   // --- HELPERS ---
   const calculateAge = (dob) => {
     if (!dob) return null;
@@ -212,23 +215,38 @@ export default function ResidentList({ userRole, onEdit }) {
               </div>
             </div>
           </div>
+          {r.assistances?.length > 0 && (
+            <div className="bg-white border border-stone-300 rounded-sm p-4 mt-6">
+              <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3">
+                Assistance Records
+              </h4>
 
-          {(r.spouse_first_name || r.spouse_last_name) && (
-            <div className="bg-white border border-stone-300 rounded-sm p-4">
-              <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">Legal Spouse</h4>
-                    <p className="text-sm font-bold text-stone-800 uppercase">
-                      {r.spouse_last_name}, {r.spouse_first_name} {r.spouse_middle_name || ''}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setPromotionModal({ isOpen: true, memberId: "spouse", reason: "Deceased" })}
-                    className="text-[10px] font-bold text-rose-700 hover:underline border border-rose-200 bg-rose-50 px-2 py-1 rounded-sm"
-                  >
-                    ASSIGN AS HEAD
-                  </button>
-              </div>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-stone-200 text-stone-500 text-left">
+                    <th className="pb-2 font-normal">Type</th>
+                    <th className="pb-2 font-normal">Processed</th>
+                    <th className="pb-2 font-normal">Claimed</th>
+                    <th className="pb-2 font-normal">Amount</th>
+                    <th className="pb-2 font-normal">Office</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100">
+                  {r.assistances.map((a) => (
+                    <tr key={a.id}>
+                      <td className="py-2 font-bold text-stone-700 uppercase">
+                        {a.type_of_assistance}
+                      </td>
+                      <td className="py-2">{a.date_processed || "-"}</td>
+                      <td className="py-2">{a.date_claimed || "-"}</td>
+                      <td className="py-2">
+                        {a.amount ? `₱${a.amount.toLocaleString()}` : "-"}
+                      </td>
+                      <td className="py-2">{a.implementing_office || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -243,6 +261,28 @@ export default function ResidentList({ userRole, onEdit }) {
               </p>
             </div>
           </div>
+          {(r.spouse_first_name || r.spouse_last_name) && (
+              <div className="bg-white border border-stone-300 rounded-sm p-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">
+                      Legal Spouse
+                    </h4>
+                    <p className="text-sm font-bold text-stone-800 uppercase">
+                      {r.spouse_last_name}, {r.spouse_first_name} {r.spouse_middle_name || ''}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() =>
+                      setPromotionModal({ isOpen: true, memberId: "spouse", reason: "Deceased" })
+                    }
+                    className="text-[10px] font-bold text-rose-700 hover:underline border border-rose-200 bg-rose-50 px-2 py-1 rounded-sm"
+                  >
+                    ASSIGN AS HEAD
+                  </button>
+                </div>
+              </div>
+            )}
 
           <div className="bg-white border border-stone-300 rounded-sm p-4">
             <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3">Household Composition</h4>
@@ -289,6 +329,84 @@ export default function ResidentList({ userRole, onEdit }) {
   return (
     <div className="font-sans text-stone-800 animate-in fade-in duration-300">
       <Toaster position="top-right" toastOptions={{ style: { background: '#333', color: '#fff', borderRadius: '4px' } }} />
+
+      {/* --- ASSISTANCE MODAL --- */}
+      {assistanceModal.isOpen && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setAssistanceModal({ isOpen: false, resident: null })}
+          />
+
+          <div className="relative bg-white w-[500px] rounded-sm border shadow-2xl p-6">
+
+            <h3 className="text-sm font-bold uppercase mb-4">
+              Add Assistance – {assistanceModal.resident?.last_name}
+            </h3>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+
+                try {
+                  await api.post(
+                    `/residents/${assistanceModal.resident.id}/assistance`,
+                    {
+                      type_of_assistance: formData.get("type"),
+                      date_processed: formData.get("processed"),
+                      date_claimed: formData.get("claimed"),
+                      amount: formData.get("amount"),
+                      implementing_office: formData.get("office")
+                    }
+                  );
+
+                  toast.success("Assistance recorded.");
+                  setAssistanceModal({ isOpen: false, resident: null });
+                  fetchResidents();
+
+                } catch {
+                  toast.error("Failed to add assistance.");
+                }
+              }}
+            >
+
+              <select name="type" className="w-full border p-2 mb-3 text-sm">
+                <option>Burial Assistance</option>
+                <option>Financial</option>
+                <option>Educational</option>
+                <option>Medical</option>
+                <option>Gas Subsidy</option>
+                <option>Food Assistance</option>
+              </select>
+
+              <input type="date" name="processed" className="w-full border p-2 mb-3 text-sm" />
+              <input type="date" name="claimed" className="w-full border p-2 mb-3 text-sm" />
+              <input type="number" name="amount" placeholder="Amount" className="w-full border p-2 mb-3 text-sm" />
+              <input type="text" name="office" placeholder="Implementing Office" className="w-full border p-2 mb-4 text-sm" />
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAssistanceModal({ isOpen: false, resident: null })}
+                  className="px-4 py-2 border text-xs uppercase"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-indigo-700 text-white text-xs uppercase"
+                >
+                  Save
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* --- MODALS --- */}
       {deleteModal.isOpen && createPortal(
@@ -507,6 +625,15 @@ export default function ResidentList({ userRole, onEdit }) {
                           <button onClick={() => onEdit(r)} className="p-1.5 text-stone-500 hover:text-white hover:bg-stone-700 rounded-sm transition-all" title="Edit File">
                              <Edit size={14} />
                           </button>
+                          {userRole === "admin" && (
+                            <button
+                              onClick={() => setAssistanceModal({ isOpen: true, resident: r })}
+                              className="p-1.5 text-stone-500 hover:text-white hover:bg-indigo-700 rounded-sm transition-all"
+                              title="Add Assistance"
+                            >
+                              <FileText size={14} />
+                            </button>
+                          )}
                           <button onClick={() => handleArchive(r.id)} className="p-1.5 text-stone-500 hover:text-white hover:bg-orange-600 rounded-sm transition-all" title="Archive File">
                              <Archive size={14} />
                           </button>

@@ -9,6 +9,7 @@ export default function ArchivedResidents() {
   const [restoringId, setRestoringId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8; 
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, resident: null });
 
   const fetchArchived = async () => {
     try {
@@ -43,6 +44,27 @@ export default function ArchivedResidents() {
     }
   };
 
+  const [deletingId, setDeletingId] = useState(null);
+
+const handlePermanentDelete = async (id) => {
+  setDeletingId(id);
+
+  try {
+    await api.delete(`/residents/${id}/permanent`);
+    toast.success("Record permanently deleted.");
+
+    setResidents(prev => prev.filter(r => r.id !== id));
+    setDeleteModal({ isOpen: false, resident: null });
+
+  } catch (err) {
+    toast.error("Permanent deletion failed.");
+  } finally {
+    setDeletingId(null);
+  }
+};
+
+
+
   // --- PAGINATION LOGIC ---
   const totalPages = Math.ceil(residents.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -74,7 +96,59 @@ export default function ArchivedResidents() {
           }
         }} 
       />
+      {deleteModal.isOpen && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+          
+          {/* BACKDROP */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setDeleteModal({ isOpen: false, resident: null })}
+          />
 
+          {/* MODAL CARD */}
+          <div className="relative bg-white w-[420px] rounded-sm border shadow-2xl overflow-hidden">
+
+            {/* HEADER */}
+            <div className="bg-red-700 text-white px-5 py-4 flex items-center gap-3">
+              <FileX size={18} />
+              <h3 className="text-sm font-bold uppercase tracking-wider">
+                Permanent Deletion
+              </h3>
+            </div>
+
+            {/* BODY */}
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-stone-700 leading-relaxed">
+                You are about to permanently delete the archived record of
+              </p>
+
+              <p className="text-sm font-bold text-red-700 uppercase">
+                {deleteModal.resident?.last_name}, {deleteModal.resident?.first_name}
+              </p>
+
+              <p className="text-xs text-stone-500">
+                This action cannot be undone and will permanently remove all related records from the system.
+              </p>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={() => setDeleteModal({ isOpen: false, resident: null })}
+                  className="px-4 py-2 border border-stone-300 text-xs font-bold uppercase rounded-sm hover:bg-stone-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={() => handlePermanentDelete(deleteModal.resident.id)}
+                  className="px-4 py-2 bg-red-700 text-white text-xs font-bold uppercase rounded-sm hover:bg-red-800"
+                >
+                  Confirm Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* --- ADMINISTRATIVE HEADER --- */}
       <div className="mb-6 border-b-2 border-stone-200 pb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div className="flex items-start gap-4">
@@ -156,18 +230,18 @@ export default function ArchivedResidents() {
                         Archived
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right space-x-2">
+                      {/* RESTORE BUTTON */}
                       <button
                         onClick={() => handleRestore(r.id)}
                         disabled={restoringId === r.id}
                         className="
-                          relative overflow-hidden inline-flex items-center gap-2 px-4 py-1.5 
-                          text-xs font-bold text-rose-700 
-                          bg-white border border-rose-200 
+                          inline-flex items-center gap-2 px-3 py-1.5
+                          text-xs font-bold text-rose-700
+                          bg-white border border-rose-200
                           hover:bg-rose-600 hover:text-white hover:border-rose-600
-                          rounded-sm transition-all duration-200
-                          disabled:opacity-50 disabled:cursor-not-allowed
-                          shadow-sm
+                          rounded-sm transition-all
+                          disabled:opacity-50
                         "
                       >
                         {restoringId === r.id ? (
@@ -175,7 +249,28 @@ export default function ArchivedResidents() {
                         ) : (
                           <RotateCcw size={12} />
                         )}
-                        {restoringId === r.id ? "PROCESSING" : "RESTORE"}
+                        RESTORE
+                      </button>
+
+                      {/* PERMANENT DELETE BUTTON */}
+                      <button
+                        onClick={() => setDeleteModal({ isOpen: true, resident: r })}
+                        disabled={deletingId === r.id}
+                        className="
+                          inline-flex items-center gap-2 px-3 py-1.5
+                          text-xs font-bold text-white
+                          bg-red-700 border border-red-700
+                          hover:bg-red-800 hover:border-red-800
+                          rounded-sm transition-all
+                          disabled:opacity-50
+                        "
+                      >
+                        {deletingId === r.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <FileX size={12} />
+                        )}
+                        DELETE
                       </button>
                     </td>
                   </tr>
