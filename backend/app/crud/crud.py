@@ -446,7 +446,15 @@ def get_dashboard_stats(db: Session):
         "population_by_sector": stats_sector
     }
 
-
+def add_assistance(db: Session, resident_id: int, assistance: schemas.AssistanceCreate):
+    new_assistance = models.ResidentAssistance(
+        resident_id=resident_id,
+        **assistance.model_dump()
+    )
+    db.add(new_assistance)
+    db.commit()
+    db.refresh(new_assistance)
+    return new_assistance
 
     # ------------------------------
     # TOTAL RESIDENTS

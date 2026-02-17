@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, DateTime, Table, UniqueConstraint
-from sqlalchemy.orm import relationship as orm_relationship
+from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, DateTime, Table, UniqueConstraint, Float
+from sqlalchemy.orm import relationship as orm_relationship, relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
+from datetime import datetime
 
 # --- ASSOCIATION TABLE (Many-to-Many) ---
 resident_sectors = Table(
@@ -106,6 +107,12 @@ class ResidentProfile(Base):
     # --- RELATIONSHIPS ---
     family_members = orm_relationship("FamilyMember", back_populates="head", cascade="all, delete-orphan")
     sectors = orm_relationship("Sector", secondary=resident_sectors, backref="residents")
+    
+    assistances = relationship(
+    "ResidentAssistance",
+    back_populates="resident",
+    cascade="all, delete"
+)
 
 class FamilyMember(Base):
     __tablename__ = "family_members"
@@ -125,6 +132,22 @@ class FamilyMember(Base):
     is_active = Column(Boolean, default=True)
     is_family_head = Column(Boolean, default=False)
     head = orm_relationship("ResidentProfile", back_populates="family_members")
+    
+class ResidentAssistance(Base):
+    __tablename__ = "resident_assistance"
+
+    id = Column(Integer, primary_key=True, index=True)
+    resident_id = Column(Integer, ForeignKey("resident_profiles.id"))
+    
+    type_of_assistance = Column(String, nullable=False)
+    date_processed = Column(Date, nullable=True)
+    date_claimed = Column(Date, nullable=True)
+    amount = Column(Float, nullable=True)
+    implementing_office = Column(String, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    resident = relationship("ResidentProfile", back_populates="assistances")
 
 # Audit Log Table
 class AuditLog(Base):
