@@ -24,15 +24,21 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
     for field in ["first_name", "last_name", "barangay"]:
         if field in filtered_data and filtered_data[field]:
             filtered_data[field] = filtered_data[field].strip().upper()
+    
+    print("CHECKING DUPLICATE:")
+    print(filtered_data.get("first_name"))
+    print(filtered_data.get("last_name"))
+    print(filtered_data.get("birthdate"))
+    print(filtered_data.get("barangay"))
 
     # 🔎 CHECK IF ALREADY EXISTS (excluding deleted)
     existing = db.query(models.ResidentProfile).filter(
-        func.upper(models.ResidentProfile.first_name) == filtered_data.get("first_name"),
-        func.upper(models.ResidentProfile.last_name) == filtered_data.get("last_name"),
+        models.ResidentProfile.first_name.ilike(filtered_data.get("first_name")),
+        models.ResidentProfile.last_name.ilike(filtered_data.get("last_name")),
         models.ResidentProfile.birthdate == filtered_data.get("birthdate"),
-        func.upper(models.ResidentProfile.barangay) == filtered_data.get("barangay"),
-        models.ResidentProfile.is_deleted == False
-    ).first()
+        models.ResidentProfile.barangay.ilike(filtered_data.get("barangay")),
+    models.ResidentProfile.is_deleted == False
+).first()
 
     if existing:
         raise ValueError("Resident already registered.")
