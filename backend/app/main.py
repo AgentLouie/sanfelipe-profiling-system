@@ -54,9 +54,15 @@ load_dotenv()
 # SECURITY
 # ---------------------------------------------------
 
-SECRET_KEY = os.getenv("SECRET_KEY", "fallback-secret-key-for-dev-only")
+SECRET_KEY = os.getenv("SECRET_KEY")
+
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY is not set. Configure it in environment variables.")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
