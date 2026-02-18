@@ -90,6 +90,9 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
     if not db_resident:
         return None
 
+    # ------------------------------
+    # 1️⃣ Update basic fields
+    # ------------------------------
     update_data = resident_data.model_dump(
         exclude={"sector_ids", "family_members"}
     )
@@ -97,37 +100,9 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
     for key, value in update_data.items():
         setattr(db_resident, key, value)
 
-    # Update sectors
-    db_resident.sectors.clear()
-
-    if resident_data.sector_ids:
-        new_sectors = db.query(models.Sector).filter(
-            models.Sector.id.in_(resident_data.sector_ids)
-        ).all()
-
-        db_resident.sectors = new_sectors
-
-        # 🔥 AUTO GENERATE sector_summary
-        sector_names = [s.name for s in new_sectors]
-        db_resident.sector_summary = ", ".join(sector_names)
-
-    else:
-        db_resident.sector_summary = "None"
-
-    # Update family members
-    db.query(models.FamilyMember).filter(
-        models.FamilyMember.profile_id == resident_id
-    ).delete(synchronize_session=False)
-
-    if resident_data.family_members:
-        for fm_data in resident_data.family_members:
-            new_fm = models.FamilyMember(
-                **fm_data.model_dump(),
-                profile_id=resident_id
-            )
-            db.add(new_fm)
-    
-    # 🔥 Normalize identity fields
+    # ------------------------------
+    # 2️⃣ Normalize identity fields
+    # ------------------------------
     for field in ["first_name", "middle_name", "last_name"]:
         value = getattr(db_resident, field)
         if value:
@@ -135,11 +110,15 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
         else:
             setattr(db_resident, field, "")
 
-    # 🔥 Ensure birthdate exists
+    # ------------------------------
+    # 3️⃣ Ensure birthdate exists
+    # ------------------------------
     if not db_resident.birthdate:
         raise ValueError("Birthdate is required.")
 
-    # 🔎 Duplicate check (exclude self)
+    # ------------------------------
+    # 4️⃣ Check duplicate (exclude self)
+    # ------------------------------
     existing = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.id != resident_id,
         func.upper(func.coalesce(models.ResidentProfile.first_name, "")) == db_resident.first_name,
@@ -153,6 +132,36 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
         db.rollback()
         raise ValueError("Resident already registered.")
 
+    # ------------------------------
+    # 5️⃣ Update sectors
+    # ------------------------------
+    db_resident.sectors.clear()
+
+    if resident_data.sector_ids:
+        new_sectors = db.query(models.Sector).filter(
+            models.Sector.id.in_(resident_data.sector_ids)
+        ).all()
+
+        db_resident.sectors = new_sectors
+        sector_names = [s.name for s in new_sectors]
+        db_resident.sector_summary = ", ".join(sector_names)
+    else:
+        db_resident.sector_summary = "None"
+
+    # ------------------------------
+    # 6️⃣ Update family members
+    # ------------------------------
+    db.query(models.FamilyMember).filter(
+        models.FamilyMember.profile_id == resident_id
+    ).delete(synchronize_session=False)
+
+    if resident_data.family_members:
+        for fm_data in resident_data.family_members:
+            new_fm = models.FamilyMember(
+                **fm_data.model_dump(),
+                profile_id=resident_id
+            )
+            db.add(new_fm)
 
     db.commit()
     db.refresh(db_resident)
