@@ -217,6 +217,17 @@ def get_users(db: Session = Depends(get_db),
 
     return db.query(models.User).filter(models.User.is_archived == False).all()
 
+def require_role(required_roles: list[str]):
+    def role_checker(current_user: models.User = Depends(get_current_user)):
+        if current_user.role not in required_roles:
+            raise HTTPException(
+                status_code=403,
+                detail="You do not have permission to perform this action"
+            )
+        return current_user
+    return role_checker
+
+
 @app.delete("/users/{user_id}", status_code=200)
 def delete_user(
     user_id: int,
@@ -643,10 +654,8 @@ def soft_delete_resident(resident_id: int,
 def permanently_delete_resident(
     resident_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    _: models.User = Depends(require_role(["admin"]))
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
 
     result = crud.permanently_delete_resident(db, resident_id)
 
