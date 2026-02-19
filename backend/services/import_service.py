@@ -214,43 +214,49 @@ def process_excel_import(file_content, db: Session):
             # --------------------------------------------------
             # FAMILY MEMBERS (ROBUST MATCHING)
             # --------------------------------------------------
-            for i in range(1, 6):
+            fname1_col = next((c for c in df.columns if c.startswith("1. FIRST NAME")), None)
+            mname1_col = next((c for c in df.columns if c.startswith("1. MIDDLE NAME")), None)
+            rel1_col = next((c for c in df.columns if c.startswith("1. RELATIONSHIP")), None)
 
-                lname = ""
-                fname = ""
-                mname = ""
-                rel = ""
+            fname1 = clean_str(row.get(fname1_col)) if fname1_col else ""
+            mname1 = clean_str(row.get(mname1_col)) if mname1_col else ""
+            rel1 = clean_str(row.get(rel1_col)) if rel1_col else ""
+
+            # Only create if relationship is valid (prevents SON misread)
+            if fname1 and rel1:
+
+                db.add(FamilyMember(
+                    profile_id=resident.id,
+                    last_name=resident.last_name,  # inherit household surname
+                    first_name=fname1,
+                    middle_name=mname1,
+                    relationship=rel1
+                ))
+
+
+            # ----- MEMBERS 2 to 5 (normal structure)
+            for i in range(2, 6):
 
                 lname_col = next((c for c in df.columns if c.startswith(f"{i}. LAST NAME")), None)
                 fname_col = next((c for c in df.columns if c.startswith(f"{i}. FIRST NAME")), None)
                 mname_col = next((c for c in df.columns if c.startswith(f"{i}. MIDDLE NAME")), None)
                 rel_col = next((c for c in df.columns if c.startswith(f"{i}. RELATIONSHIP")), None)
 
-                # Some Excel templates skip LAST NAME for #1
-                if fname_col:
-                    fname = clean_str(row.get(fname_col))
-                if mname_col:
-                    mname = clean_str(row.get(mname_col))
-                if rel_col:
-                    rel = clean_str(row.get(rel_col))
-                if lname_col:
-                    lname = clean_str(row.get(lname_col))
+                lname = clean_str(row.get(lname_col)) if lname_col else ""
+                fname = clean_str(row.get(fname_col)) if fname_col else ""
+                mname = clean_str(row.get(mname_col)) if mname_col else ""
+                rel = clean_str(row.get(rel_col)) if rel_col else ""
 
-                # If no last name provided, inherit household head last name
-                if lname == "":
-                    lname = resident.last_name
+                # Only create if relationship exists (this prevents SON being treated as name)
+                if fname and rel:
 
-                # Skip empty
-                if fname == "" and rel == "":
-                    continue
-
-                db.add(FamilyMember(
-                    profile_id=resident.id,
-                    last_name=lname,
-                    first_name=fname,
-                    middle_name=mname,
-                    relationship=rel
-                ))
+                    db.add(FamilyMember(
+                        profile_id=resident.id,
+                        last_name=lname if lname else resident.last_name,
+                        first_name=fname,
+                        middle_name=mname,
+                        relationship=rel
+                    ))
 
 
             success_count += 1
