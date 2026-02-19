@@ -2,6 +2,7 @@ import pandas as pd
 import re
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
+from sqlalchemy.exc import IntegrityError
 from app.models.models import ResidentProfile, FamilyMember
 
 
@@ -42,13 +43,12 @@ def parse_date(date_val):
 # ===============================
 # CHECK IF RESIDENT EXISTS
 # ===============================
-def resident_exists(db: Session, last_name, first_name, middle_name, birthdate, barangay):
+def resident_exists(db: Session, last_name, first_name, middle_name, barangay):
     return db.query(ResidentProfile).filter(
         and_(
             func.upper(ResidentProfile.last_name) == last_name.upper(),
             func.upper(ResidentProfile.first_name) == first_name.upper(),
             func.upper(func.coalesce(ResidentProfile.middle_name, "")) == middle_name.upper(),
-            ResidentProfile.birthdate == birthdate,
             ResidentProfile.barangay == barangay,
             ResidentProfile.is_deleted == False
         )
@@ -155,7 +155,7 @@ def process_excel_import(file_content, db: Session):
                 continue
 
             # Duplicate check
-            if resident_exists(db, last_name, first_name, middle_name, birthdate, barangay):
+            if resident_exists(db, last_name, first_name, middle_name, barangay):
                 skipped_duplicates += 1
                 continue
 
@@ -204,7 +204,12 @@ def process_excel_import(file_content, db: Session):
             )
 
             db.add(resident)
-            db.flush()
+            try:
+                db.flush()
+            except IntegrityError:
+                db.rollback()
+                skipped_duplicates += 1
+                continue
 
             # --------------------------------------------------
             # FAMILY MEMBERS (ROBUST MATCHING)
