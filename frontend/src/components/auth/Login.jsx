@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from "../../api/api";
 import { Lock, User, Eye, EyeOff, ArrowRight, ShieldCheck } from 'lucide-react';
@@ -9,11 +9,35 @@ export default function Login({ onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
+  // 🔒 Security States
+  const [attempts, setAttempts] = useState(0);
+  const [lockTime, setLockTime] = useState(0);
+
   const navigate = useNavigate();
+
+  // ⏳ Countdown timer effect
+  useEffect(() => {
+    let timer;
+
+    if (lockTime > 0) {
+      timer = setInterval(() => {
+        setLockTime(prev => prev - 1);
+      }, 1000);
+    }
+
+    return () => clearInterval(timer);
+  }, [lockTime]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // 🔒 Prevent login if locked
+    if (lockTime > 0) {
+      setError(`Too many attempts. Try again in ${lockTime}s.`);
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -23,16 +47,38 @@ export default function Login({ onLogin }) {
       formData.append('password', password);
 
       const response = await api.post('/token', formData);
-      
+
+      // ✅ Success → Reset attempts
+      setAttempts(0);
+      setLockTime(0);
+
       localStorage.setItem('token', response.data.access_token);
       localStorage.setItem('role', response.data.role);
 
       onLogin(response.data.role);
       navigate('/dashboard/overview', { replace: true });
-      
+
     } catch (err) {
       console.error(err);
-      setError('Invalid username or password. Please try again.');
+
+      const newAttempts = attempts + 1;
+      setAttempts(newAttempts);
+
+      if (err.response?.status === 401) {
+        setError("Invalid username or password.");
+      } else if (err.response?.status === 403) {
+        setError("Access temporarily blocked. Please wait.");
+      } else {
+        setError("Login failed. Please try again.");
+      }
+
+      // 🔒 Lock after 5 failed attempts
+      if (newAttempts >= 5) {
+        setLockTime(30);      // 30 seconds lock
+        setAttempts(0);       // reset attempts
+        setError("Too many failed attempts. Locked for 30 seconds.");
+      }
+
     } finally {
       setLoading(false);
     }
@@ -40,10 +86,10 @@ export default function Login({ onLogin }) {
 
   return (
     <div className="relative min-h-[100dvh] w-full flex items-center justify-center p-4 sm:p-6 lg:p-8 overflow-hidden font-sans bg-stone-900">
-      
-      {/* Background Image & Overlay */}
+
+      {/* Background */}
       <div 
-        className="absolute inset-0 z-0 scale-105 animate-[pulse_20s_ease-in-out_infinite_alternate]"
+        className="absolute inset-0 z-0 scale-105"
         style={{
           backgroundImage: "url('/hero.jpg')", 
           backgroundSize: 'cover',
@@ -53,134 +99,124 @@ export default function Login({ onLogin }) {
         <div className="absolute inset-0 bg-gradient-to-br from-red-950/95 via-stone-900/90 to-black/80 backdrop-blur-[4px]"></div>
       </div>
 
-      {/* Decorative Orbs */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
-        <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-rose-600/20 blur-[120px] rounded-full animate-pulse"></div>
-        <div className="absolute bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-red-900/20 blur-[100px] rounded-full"></div>
-      </div>
-
       {/* Main Card */}
-      <div className="relative z-10 w-full max-w-5xl bg-stone-900/40 rounded-[2rem] shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] overflow-hidden backdrop-blur-xl border border-white/10 flex flex-col lg:flex-row transform transition-all duration-500">
-        
-        {/* Left Side (Brand) */}
-        <div className="lg:w-5/12 p-10 lg:p-14 flex flex-col justify-between text-white relative overflow-hidden bg-gradient-to-b from-white/5 to-black/20">
-          <div className="relative z-10">
+      <div className="relative z-10 w-full max-w-5xl bg-stone-900/40 rounded-[2rem] shadow-xl overflow-hidden backdrop-blur-xl border border-white/10 flex flex-col lg:flex-row">
+
+        {/* Left Side */}
+        <div className="lg:w-5/12 p-10 flex flex-col justify-between text-white bg-gradient-to-b from-white/5 to-black/20">
+          <div>
             <div className="flex items-center gap-5 mb-12">
-              <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-inner border border-white/20 p-2">
-                <img src="/san_felipe_seal.png" alt="San Felipe Seal" className="w-full h-full object-contain drop-shadow-md" />
+              <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20 p-2">
+                <img src="/san_felipe_seal.png" alt="San Felipe Seal" className="w-full h-full object-contain" />
               </div>
               <div>
-                <h1 className="text-2xl font-black tracking-tight text-white drop-shadow-sm leading-none">LGU San Felipe</h1>
+                <h1 className="text-2xl font-black">LGU San Felipe</h1>
                 <p className="text-rose-300 text-xs font-bold uppercase tracking-[0.2em] mt-1.5">Zambales</p>
               </div>
             </div>
-            
-            <div className="space-y-6">
-              <h2 className="text-4xl lg:text-5xl font-black leading-tight tracking-tight text-white">
-                Resident <br/>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-rose-600">
-                  Profiling System
-                </span>
-              </h2>
-            </div>
+
+            <h2 className="text-4xl font-black leading-tight">
+              Resident <br/>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-rose-600">
+                Profiling System
+              </span>
+            </h2>
           </div>
-          
-          <div className="relative z-10 mt-16 flex items-center gap-2 text-stone-400/80">
+
+          <div className="mt-16 flex items-center gap-2 text-stone-400">
             <ShieldCheck size={16} />
             <p className="text-xs font-medium tracking-wide">Authorized Personnel Only</p>
           </div>
         </div>
 
-        {/* Right Side (Form) */}
-        <div className="lg:w-7/12 bg-white p-8 sm:p-12 lg:p-16 flex flex-col justify-center relative">
+        {/* Right Side */}
+        <div className="lg:w-7/12 bg-white p-12 flex flex-col justify-center">
           <div className="max-w-md w-full mx-auto">
-            <div className="mb-10">
-              <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Sign In</h2>
-              <p className="text-gray-500 mt-2 text-base">Enter your credentials to access the registry.</p>
+
+            <div className="mb-8">
+              <h2 className="text-3xl font-bold text-gray-900">Sign In</h2>
+              <p className="text-gray-500 mt-2">Enter your credentials to access the registry.</p>
             </div>
 
-            {error && (
-              <div className="mb-8 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                <div className="p-1 rounded-full mt-0.5">
-                  <Lock size={16} className="text-red-600" />
-                </div>
+            {/* 🔒 Lock Countdown Message */}
+            {lockTime > 0 && (
+              <div className="mb-6 p-3 bg-red-100 border border-red-300 rounded-lg text-red-700 text-sm font-bold">
+                Account locked. Try again in {lockTime} seconds.
+              </div>
+            )}
+
+            {error && lockTime === 0 && (
+              <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-xl flex items-start gap-3">
+                <Lock size={16} className="text-red-600 mt-0.5" />
                 <p className="text-sm text-red-800 font-bold">{error}</p>
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              
+
               {/* Username */}
-              <div className="space-y-2 group">
-                <label htmlFor="username" className="text-xs font-bold uppercase text-gray-500 ml-1 tracking-wider">Username</label>
-                <div className="relative flex items-center">
-                  <User className="absolute left-4 h-5 w-5 text-gray-400 transition-colors group-focus-within:text-rose-600" />
+              <div>
+                <label className="text-xs font-bold uppercase text-gray-500 ml-1 tracking-wider">Username</label>
+                <div className="relative flex items-center mt-1">
+                  <User className="absolute left-4 h-5 w-5 text-gray-400" />
                   <input 
-                    id="username"
                     type="text" 
                     required
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="block w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-500 focus:border-rose-500 transition-all duration-200 outline-none font-medium"
+                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none"
                     placeholder="Enter username"
                   />
                 </div>
               </div>
 
               {/* Password */}
-              <div className="space-y-2 group">
-                <div className="flex justify-between items-center ml-1">
-                  <label htmlFor="password" className="text-xs font-bold uppercase text-gray-500 tracking-wider">Password</label>
-                </div>
-                <div className="relative flex items-center">
-                  <Lock className="absolute left-4 h-5 w-5 text-gray-400 transition-colors group-focus-within:text-rose-600" />
+              <div>
+                <label className="text-xs font-bold uppercase text-gray-500 ml-1 tracking-wider">Password</label>
+                <div className="relative flex items-center mt-1">
+                  <Lock className="absolute left-4 h-5 w-5 text-gray-400" />
                   <input 
-                    id="password"
                     type={showPassword ? "text" : "password"}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full pl-12 pr-12 py-3.5 bg-gray-50 border border-gray-200 text-gray-900 rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-500 focus:border-rose-500 transition-all duration-200 outline-none font-medium"
+                    className="w-full pl-12 pr-12 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none"
                     placeholder="••••••••"
                   />
                   <button 
-                    type="button" 
-                    onClick={() => setShowPassword(!showPassword)} 
-                    className="absolute right-4 p-1 text-gray-400 hover:text-rose-600 transition-colors"
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 text-gray-400 hover:text-rose-600"
                   >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
                   </button>
                 </div>
               </div>
 
-              {/* Submit Button */}
+              {/* Submit */}
               <button 
-                type="submit" 
-                disabled={loading}
-                className="w-full mt-6 bg-stone-900 hover:bg-stone-800 text-white font-bold py-4 px-4 rounded-xl shadow-lg shadow-stone-900/20 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 active:scale-[0.98] disabled:opacity-70 flex items-center justify-center gap-2 group overflow-hidden relative"
+                type="submit"
+                disabled={loading || lockTime > 0}
+                className="w-full mt-6 bg-stone-900 hover:bg-stone-800 text-white font-bold py-4 rounded-xl disabled:opacity-60 flex items-center justify-center gap-2 transition-all"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-rose-600 to-red-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="relative flex items-center gap-2">
-                  {loading ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      <span>Verifying...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Secure Login</span>
-                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                    </>
-                  )}
-                </div>
+                {loading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>Verifying...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{lockTime > 0 ? `Locked (${lockTime}s)` : "Secure Login"}</span>
+                    {lockTime === 0 && <ArrowRight size={18} />}
+                  </>
+                )}
               </button>
+
             </form>
-          </div>
-          
-          <div className="mt-10 text-center">
-             <p className="text-xs text-gray-400 font-medium">LGU San Felipe • Residential Profile Form</p>
+
           </div>
         </div>
+
       </div>
     </div>
   );
