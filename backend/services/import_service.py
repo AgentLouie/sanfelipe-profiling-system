@@ -242,6 +242,7 @@ def process_excel_import(file_content, db: Session):
                     relationship=rel
                 ))
 
+
             success_count += 1
 
         except Exception as e:
