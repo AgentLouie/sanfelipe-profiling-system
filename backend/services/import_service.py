@@ -1,4 +1,5 @@
 import pandas as pd
+import re
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 from app.models.models import ResidentProfile, FamilyMember
@@ -55,20 +56,6 @@ def resident_exists(db: Session, last_name, first_name, middle_name, birthdate, 
 
 
 # ===============================
-# CHECK IF FAMILY MEMBER EXISTS
-# ===============================
-def family_member_exists(db: Session, profile_id, lname, fname, rel):
-    return db.query(FamilyMember).filter(
-        and_(
-            FamilyMember.profile_id == profile_id,
-            FamilyMember.last_name == lname,
-            FamilyMember.first_name == fname,
-            FamilyMember.relationship == rel
-        )
-    ).first()
-
-
-# ===============================
 # SECTOR CHECK
 # ===============================
 def is_checked(value):
@@ -89,43 +76,45 @@ def process_excel_import(file_content, db: Session):
     df = df.replace({pd.NaT: None})
     df = df.where(pd.notnull(df), None)
 
-    # Normalize headers
-    df.columns = [col.strip().upper() for col in df.columns]
+    # --------------------------------------------------
+    # CLEAN & NORMALIZE HEADERS
+    # --------------------------------------------------
+    df.columns = [
+        re.sub(r'\s+', ' ', col.strip().upper())
+        for col in df.columns
+    ]
 
-    print("=== COLUMNS DETECTED ===")
+    print("=== CLEANED COLUMNS ===")
     print(df.columns.tolist())
 
     success_count = 0
     skipped_duplicates = 0
     errors = []
 
-    # ------------------------------------
-    # IDENTIFY SPOUSE COLUMN GROUP
-    # ------------------------------------
+    # --------------------------------------------------
+    # IDENTIFY SPOUSE BLOCK
+    # --------------------------------------------------
     spouse_index = None
     for i, col in enumerate(df.columns):
         if col == "SPOUSE/PARTNER":
             spouse_index = i
             break
 
-    # Head columns (fixed positions)
-    main_last_col = df.columns[0]
-    main_first_col = df.columns[1]
-    main_middle_col = df.columns[2]
-    main_ext_col = df.columns[3]
+    # Main head columns (fixed order)
+    main_last_col = "LAST NAME"
+    main_first_col = "FIRST NAME"
+    main_middle_col = "MIDDLE NAME"
+    main_ext_col = "EXT NAME"
 
-    # Spouse columns (after SPOUSE/PARTNER)
-    if spouse_index is not None:
-        spouse_last_col = df.columns[spouse_index + 1]
-        spouse_first_col = df.columns[spouse_index + 2]
-        spouse_middle_col = df.columns[spouse_index + 3]
-        spouse_ext_col = df.columns[spouse_index + 4]
-    else:
-        spouse_last_col = spouse_first_col = spouse_middle_col = spouse_ext_col = None
+    # Spouse columns (auto-detected)
+    spouse_last_col = "LAST NAME.1" if "LAST NAME.1" in df.columns else None
+    spouse_first_col = "FIRST NAME.1" if "FIRST NAME.1" in df.columns else None
+    spouse_middle_col = "MIDDLE NAME.1" if "MIDDLE NAME.1" in df.columns else None
+    spouse_ext_col = "EXT NAME.1" if "EXT NAME.1" in df.columns else None
 
-    # ------------------------------------
+    # --------------------------------------------------
     # SECTOR COLUMNS
-    # ------------------------------------
+    # --------------------------------------------------
     possible_sectors = [
         "INDIGENOUS PEOPLE",
         "SENIOR CITIZEN",
@@ -136,7 +125,7 @@ def process_excel_import(file_content, db: Session):
         "BRGY TANOD",
         "OFW",
         "SOLO PARENT",
-        "FARMERS",
+        "FARMER",
         "FISHERFOLK",
         "FISHERMAN/BANCA OWNER",
         "LGU EMPLOYEE",
@@ -148,9 +137,9 @@ def process_excel_import(file_content, db: Session):
 
     sector_columns = [col for col in possible_sectors if col in df.columns]
 
-    # ------------------------------------
-    # LOOP THROUGH ROWS
-    # ------------------------------------
+    # --------------------------------------------------
+    # PROCESS ROWS
+    # --------------------------------------------------
     for index, row in df.iterrows():
         try:
 
@@ -216,6 +205,37 @@ def process_excel_import(file_content, db: Session):
 
             db.add(resident)
             db.flush()
+
+            # --------------------------------------------------
+            # FAMILY MEMBERS (ROBUST MATCHING)
+            # --------------------------------------------------
+            for i in range(1, 6):
+
+                lname = ""
+                fname = ""
+                mname = ""
+                rel = ""
+
+                for col in df.columns:
+                    if col.startswith(f"{i}. LAST NAME"):
+                        lname = clean_str(row.get(col))
+                    if col.startswith(f"{i}. FIRST NAME"):
+                        fname = clean_str(row.get(col))
+                    if col.startswith(f"{i}. MIDDLE NAME"):
+                        mname = clean_str(row.get(col))
+                    if col.startswith(f"{i}. RELATIONSHIP"):
+                        rel = clean_str(row.get(col))
+
+                if lname == "" and fname == "" and rel == "":
+                    continue
+
+                db.add(FamilyMember(
+                    profile_id=resident.id,
+                    last_name=lname,
+                    first_name=fname,
+                    middle_name=mname,
+                    relationship=rel
+                ))
 
             success_count += 1
 
