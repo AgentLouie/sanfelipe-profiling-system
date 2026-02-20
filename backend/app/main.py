@@ -691,6 +691,22 @@ def generate_resident_qr(
 
     return StreamingResponse(buffer, media_type="image/png")
 
+@app.get("/residents/code/{resident_code}", response_model=schemas.Resident)
+def get_resident_by_code(
+    resident_code: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    resident = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.resident_code == resident_code,
+        models.ResidentProfile.is_deleted == False
+    ).first()
+
+    if not resident:
+        raise HTTPException(status_code=404, detail="Resident not found")
+
+    return resident
+
 @app.delete("/residents/{resident_id}")
 def soft_delete_resident(resident_id: int,
                          db: Session = Depends(get_db),
