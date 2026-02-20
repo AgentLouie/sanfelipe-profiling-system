@@ -13,51 +13,43 @@ export default function QRScanner() {
 
     const startScanner = async () => {
       try {
-        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-
-        const backCamera = devices.find(device =>
-        device.label.toLowerCase().includes("back")
-        );
-
-        const selectedDeviceId = backCamera
-        ? backCamera.deviceId
-        : devices[0]?.deviceId;
-
-        if (!selectedDeviceId) {
-          setError("No camera found");
-          return;
-        }
-
-        const controls = await codeReader.decodeFromVideoDevice(
-          selectedDeviceId,
-          videoRef.current,
-          async (result) => {
+        const controls = await codeReader.decodeFromConstraints(
+            {
+            video: {
+                facingMode: { ideal: "environment" } // force back camera
+            }
+            },
+            videoRef.current,
+            async (result) => {
             if (result) {
-              const scannedCode = result.getText();
+                const scannedCode = result.getText();
 
-              try {
+                try {
                 const response = await api.get(
-                  `/residents/code/${scannedCode}`
+                    `/residents/code/${scannedCode}`
                 );
+
                 setResident(response.data);
 
-                // ✅ STOP CAMERA SAFELY
+                // ✅ STOP CAMERA
                 if (controlsRef.current) {
-                  controlsRef.current.stop();
+                    controlsRef.current.stop();
                 }
 
-              } catch (e) {
+                } catch (e) {
                 setError("Resident not found or unauthorized");
-              }
+                }
             }
-          }
+            }
         );
 
+        // 🔥 THIS LINE IS IMPORTANT
         controlsRef.current = controls;
 
-      } catch (err) {
-        setError("Camera access denied");
-      }
+        } catch (err) {
+        console.error(err);
+        setError("Camera error. Please allow camera access.");
+        }
     };
 
     startScanner();
@@ -75,8 +67,10 @@ export default function QRScanner() {
 
       <video
         ref={videoRef}
-        className="w-full max-w-md rounded-lg shadow"
-      />
+        className="w-full rounded-lg"
+        muted
+        playsInline
+        />
 
       {error && <p className="text-red-500 mt-4">{error}</p>}
 
