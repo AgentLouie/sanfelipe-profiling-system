@@ -675,6 +675,10 @@ def generate_resident_qr(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    # ✅ Restrict to admin only
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access only")
+
     resident = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.resident_code == resident_code,
         models.ResidentProfile.is_deleted == False
@@ -697,6 +701,9 @@ def get_resident_by_code(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access only")
+
     resident = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.resident_code == resident_code,
         models.ResidentProfile.is_deleted == False
