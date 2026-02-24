@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 # CREATE RESIDENT
 # =====================================================
 def create_resident(db: Session, resident: schemas.ResidentCreate):
+    print("DATABASE URL:", db.bind.url)
     resident_data = resident.model_dump()
 
     family_members_data = resident_data.pop("family_members", [])

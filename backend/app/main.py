@@ -334,7 +334,7 @@ def reset_password(
 def create_resident(resident: schemas.ResidentCreate,
                     db: Session = Depends(get_db),
                     current_user: models.User = Depends(get_current_user)):
-
+    
     if current_user.role != "admin":
         username_lower = current_user.username.lower()
         official_name = None
