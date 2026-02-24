@@ -48,10 +48,14 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
 
     try:
         db_resident = models.ResidentProfile(**filtered_data)
+        
+        # ✅ Set a temporary placeholder so NOT NULL constraint doesn't fire
+        db_resident.resident_code = "TEMP"
+        
         db.add(db_resident)
-
         db.flush()  # get ID
 
+        # ✅ Now set the real resident_code using the generated ID
         db_resident.resident_code = f"SF-{db_resident.id:06d}"
 
         if sector_ids:
@@ -64,8 +68,10 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
             db_resident.sector_summary = "None"
 
         for member_data in family_members_data:
+            valid_fm_columns = {c.name for c in models.FamilyMember.__table__.columns}
+            filtered_member = {k: v for k, v in member_data.items() if k in valid_fm_columns}
             db_member = models.FamilyMember(
-                **member_data,
+                **filtered_member,
                 profile_id=db_resident.id
             )
             db.add(db_member)
@@ -79,7 +85,7 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
         db.rollback()
         print("REAL DB ERROR:", str(e))
         print("ORIG:", e.orig)
-        raise ValueError(f"Database constraint error: {str(e.orig)}") 
+        raise ValueError("Database constraint error.")
 
 # =====================================================
 # UPDATE RESIDENT
