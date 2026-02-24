@@ -73,13 +73,28 @@ export default function ResidentQRPage() {
       <div className="qr-print-area bg-white border-4 border-red-800 max-w-sm w-full shadow-md">
         
         {/* Card Header */}
-        <div className="bg-red-800 text-white text-center py-4 border-b-4 border-red-900">
-          <h1 className="text-sm font-black uppercase tracking-widest">
-            Municipality of San Felipe
-          </h1>
-          <p className="text-[10px] font-bold tracking-widest text-red-200 uppercase mt-1">
-            Official Resident Registry
-          </p>
+        <div className="bg-red-800 text-white py-4 px-4 border-b-4 border-red-900 flex items-center justify-center gap-4">
+          
+          {/* Logo */}
+          <img 
+            src="/san_felipe_seal.png" 
+            alt="San Felipe Seal" 
+            className="w-12 h-12 object-contain drop-shadow-md rounded-full"
+          />
+
+          {/* Header Text */}
+          <div className="text-left">
+            <h1 className="text-sm font-black uppercase tracking-widest">
+              Municipality of San Felipe
+            </h1>
+            <p className="text-[10px] font-bold tracking-widest text-red-200 uppercase mt-1">
+              Province of Zambales
+            </p>
+            <p className="text-[10px] font-bold tracking-widest text-red-200 uppercase mt-1">
+              Official Resident Registry
+            </p>
+          </div>
+          
         </div>
 
         {/* Card Body */}
