@@ -109,14 +109,12 @@ export default function ResidentList({ userRole, onEdit }) {
   };
 
   const handleSort = (field) => {
-  if (sortBy === field) {
-    setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-  } else {
-    setSortBy(field);
-    setSortOrder("asc");
-  }
-  setCurrentPage(1);
+  const newOrder = sortBy === field && sortOrder === "asc" ? "desc" : "asc";
+  setSortBy(field);
+  setSortOrder(newOrder);
+  setCurrentPage(1); // ✅ already there, good
 };
+
 
   useEffect(() => {
     const fetchBarangays = async () => {
@@ -129,7 +127,7 @@ export default function ResidentList({ userRole, onEdit }) {
   }, []);
 
   useEffect(() => {
-    fetchResidents();
+    fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
   }, [
     userRole,
     currentPage,
@@ -159,7 +157,7 @@ export default function ResidentList({ userRole, onEdit }) {
     try {
       await api.put(`/residents/${id}/archive`);
       toast.success("Record moved to archive.");
-      fetchResidents();
+      fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
     } catch (err) {
       toast.error("Action failed.");
     }
@@ -171,7 +169,7 @@ export default function ResidentList({ userRole, onEdit }) {
       await api.delete(`/residents/${deleteModal.residentId}`);
       toast.success('Record permanently deleted.');
       setDeleteModal({ isOpen: false, residentId: null, name: '' });
-      fetchResidents();
+      fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
     } catch (err) {
       toast.error('Error deleting record.');
     } finally {
@@ -201,7 +199,7 @@ export default function ResidentList({ userRole, onEdit }) {
         memberId: null,
         reason: "Deceased"
       });
-      fetchResidents();
+      fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
     } catch {
       toast.error("Promotion failed.");
     }
@@ -217,7 +215,7 @@ export default function ResidentList({ userRole, onEdit }) {
       assistance: null
     });
 
-    fetchResidents();
+    fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
 
   } catch {
     toast.error("Failed to delete assistance.");
@@ -460,7 +458,7 @@ export default function ResidentList({ userRole, onEdit }) {
                     assistance: null
                   });
 
-                  fetchResidents();
+                  fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
 
                 } catch {
                   toast.error("Operation failed.");
@@ -763,11 +761,8 @@ export default function ResidentList({ userRole, onEdit }) {
                     {/* IDENTITY */}
                     <td className="py-3 px-4 border-r border-stone-200">
                        <div className="flex flex-col">
-                          <span className="font-bold text-stone-800 uppercase text-[13px]">{[
-                            r.last_name,
-                            r.first_name,
-                            r.middle_name
-                          ].filter(Boolean).join(", ")} {r.ext_name || ""}
+                          <span className="font-bold text-stone-800 uppercase text-[13px]">
+                            {r.last_name}{r.last_name && ","} {r.first_name} {r.middle_name || ""} {r.ext_name || ""}
                           </span>
                           <div className="flex items-center gap-2 mt-0.5">
                              <span className="text-[10px] bg-stone-100 border border-stone-200 px-1 rounded text-stone-500 font-mono">{r.sex}</span>
