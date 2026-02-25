@@ -4,6 +4,7 @@ from app import models, schemas
 from datetime import datetime
 from app.core.audit import log_action
 from sqlalchemy.exc import IntegrityError
+import re
 
 
 # =====================================================
@@ -297,7 +298,9 @@ def get_resident_count(
     )
 
     if search:
-        words = search.strip().upper().split()
+    # Remove commas and extra symbols
+        cleaned = re.sub(r"[^\w\s]", " ", search.upper())
+        words = cleaned.split()
 
         for word in words:
             word_fmt = f"%{word}%"
