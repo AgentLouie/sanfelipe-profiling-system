@@ -101,13 +101,13 @@ def process_excel_import(file_content, filename: str, db: Session):
         (
             r.last_name.upper(),
             r.first_name.upper(),
-            r.birthdate,
+            (r.middle_name or "").upper(),
             r.barangay
         )
         for r in db.query(
             ResidentProfile.last_name,
             ResidentProfile.first_name,
-            ResidentProfile.birthdate,
+            ResidentProfile.middle_name,
             ResidentProfile.barangay
         ).filter(ResidentProfile.is_deleted == False).all()
     }
@@ -129,7 +129,7 @@ def process_excel_import(file_content, filename: str, db: Session):
             if not last_name or not first_name:
                 continue
 
-            key = (last_name, first_name, birthdate, barangay)
+            key = (last_name, first_name, middle_name, birthdate, barangay)
 
             if key in existing_residents:
                 skipped_duplicates += 1
