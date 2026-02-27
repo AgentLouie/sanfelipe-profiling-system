@@ -841,7 +841,6 @@ async def import_residents_excel(
     try:
         result = process_excel_import(
             io.BytesIO(contents),
-            file.filename,
             db
         )
         return result
