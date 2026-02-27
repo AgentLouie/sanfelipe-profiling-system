@@ -2,6 +2,7 @@ import pandas as pd
 import re
 import uuid
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from app.models.models import ResidentProfile
 
 
@@ -40,23 +41,15 @@ def parse_date(date_val):
 # Normalize Column Names (OLD + NEW FORMAT)
 # ============================================
 def normalize_columns(df: pd.DataFrame):
-
     new_columns = []
-
     for col in df.columns:
         col = col.strip().upper()
-
-        # Remove extra Google Form text
-        col = re.sub(r"\s*\(.*\)", "", col)
-        col = col.replace("\n", " ").strip()
-
-        # Standardize variations
+        col = re.sub(r"\s*\(.*\)", "", col)   # remove (...)
+        col = col.replace("\n", " ").strip()   # flatten newlines
         col = col.replace("EXT NAME", "EXTENSION NAME")
         col = col.replace("PRECINT NO", "PRECINCT NUMBER")
         col = col.replace("CONTACT", "PHONE NUMBER")
-
         new_columns.append(col)
-
     df.columns = new_columns
     return df
 
@@ -66,7 +59,7 @@ def normalize_columns(df: pd.DataFrame):
 # ============================================
 def get_column(row, possible_names):
     for name in possible_names:
-        if name in row:
+        if name in row.index:
             return row.get(name)
     return None
 
@@ -94,8 +87,6 @@ def process_excel_import(file_content, filename: str, db: Session):
 
     # ============================================
     # Fetch Existing Residents (1 Query Only)
-    # UniqueConstraint:
-    # last_name + first_name + birthdate + barangay
     # ============================================
     existing_residents = {
         (
@@ -112,28 +103,36 @@ def process_excel_import(file_content, filename: str, db: Session):
         ).filter(ResidentProfile.is_deleted == False).all()
     }
 
-    residents_to_add = []
+    # Track duplicates within this file
+    file_duplicates: set = set()
 
     # ============================================
     # PROCESS ROWS
     # ============================================
     for index, row in df.iterrows():
         try:
-            last_name = clean_str(get_column(row, ["LAST NAME"])).upper()
+            last_name  = clean_str(get_column(row, ["LAST NAME"])).upper()
             first_name = clean_str(get_column(row, ["FIRST NAME"])).upper()
             middle_name = clean_str(get_column(row, ["MIDDLE NAME"])).upper()
-
-            barangay = clean_str(get_column(row, ["BARANGAY"]))
-            birthdate = parse_date(get_column(row, ["BIRTHDATE"]))
+            barangay   = clean_str(get_column(row, ["BARANGAY"]))
+            birthdate  = parse_date(get_column(row, ["BIRTHDATE"]))
 
             if not last_name or not first_name:
                 continue
 
-            key = (last_name, first_name, middle_name, birthdate, barangay)
+            key = (last_name, first_name, middle_name, barangay)
 
+            # Skip if already in DB
             if key in existing_residents:
                 skipped_duplicates += 1
                 continue
+
+            # Skip if duplicate within this file
+            if key in file_duplicates:
+                skipped_duplicates += 1
+                continue
+
+            file_duplicates.add(key)
 
             resident = ResidentProfile(
                 resident_code=generate_resident_code(),
@@ -156,7 +155,7 @@ def process_excel_import(file_content, filename: str, db: Session):
                 purok=clean_str(get_column(row, ["PUROK/SITIO"])),
                 barangay=barangay,
 
-                # Spouse (optional)
+                # Spouse
                 spouse_last_name=None,
                 spouse_first_name=None,
                 spouse_middle_name=None,
@@ -178,25 +177,36 @@ def process_excel_import(file_content, filename: str, db: Session):
                 other_sector_details=None,
 
                 # Photo
-                photo_url=None
+                photo_url=None,
             )
 
-            residents_to_add.append(resident)
-            existing_residents.add(key)
-            success_count += 1
+            db.add(resident)
+
+            # ── Flush row-by-row so a single duplicate doesn't
+            #    kill the entire batch (unlike bulk_save_objects).
+            try:
+                db.flush()
+                # Only add to the in-memory set AFTER a successful flush
+                existing_residents.add(key)
+                success_count += 1
+            except IntegrityError:
+                db.rollback()          # rolls back only this row
+                skipped_duplicates += 1
 
         except Exception as e:
             errors.append(f"Row {index + 2}: {str(e)}")
 
     # ============================================
-    # BULK INSERT
+    # FINAL COMMIT
     # ============================================
-    if residents_to_add:
-        db.bulk_save_objects(residents_to_add)
+    try:
         db.commit()
+    except Exception as e:
+        db.rollback()
+        return {"added": 0, "skipped_duplicates": 0, "errors": [str(e)]}
 
     return {
         "added": success_count,
         "skipped_duplicates": skipped_duplicates,
-        "errors": errors
+        "errors": errors,
     }
