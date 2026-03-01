@@ -2,6 +2,7 @@ import pandas as pd
 import re
 import uuid
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import tuple_
 from app.models.models import ResidentProfile, FamilyMember
@@ -319,12 +320,14 @@ def process_excel_import(file_content, db: Session, sheet_name=None):
                 rel = clean_str(row.get(cols.get("RELATIONSHIP", ""))).upper()
 
                 # skip blank member slots
-                if fname == "" and rel == "":
+                if fname == "":
+                    # optional: log for debugging
+                    # errors.append(f"Row {index+2} member {member_no}: relationship='{rel}' but missing first name")
                     continue
 
-                # default lname to household last name if empty
-                if lname == "":
-                    lname = last_name
+                # also skip if everything else is blank (extra safe)
+                if lname == "" and mname == "" and ext == "" and rel == "":
+                    continue
 
                 family_to_insert.append({
                     "profile_id": resident_id,
@@ -342,11 +345,13 @@ def process_excel_import(file_content, db: Session, sheet_name=None):
 
     # Insert family members (no conflict rule needed unless you add a unique constraint there)
     if family_to_insert:
-        try:
-            db.execute(insert(FamilyMember).values(family_to_insert))
-            db.commit()
-        except Exception as e:
-            db.rollback()
-            errors.append(f"Family insert error: {str(e)}")
+        for fm in family_to_insert:
+            try:
+                db.execute(insert(FamilyMember).values([fm]))
+                db.flush()  # validate now
+            except IntegrityError as e:
+                db.rollback()
+                errors.append(f"Family insert failed for profile_id={fm['profile_id']}: {str(e.orig)}")
+        db.commit()
 
     return {"added": success_count, "skipped_duplicates": skipped_duplicates, "errors": errors}
