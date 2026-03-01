@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from "../../api/api";
-import { Lock, User, Eye, EyeOff, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
 
 export default function Login({ onLogin }) {
   const [username, setUsername] = useState('');
@@ -85,7 +85,7 @@ export default function Login({ onLogin }) {
   };
 
   return (
-    <div className="relative min-h-[100dvh] w-full flex items-center justify-center p-4 sm:p-6 lg:p-8 overflow-hidden font-sans bg-stone-900">
+    <div className="relative min-h-[100dvh] w-full flex items-center justify-center p-4 sm:p-6 lg:p-8 overflow-hidden font-sans bg-stone-950">
 
       {/* Background */}
       <div 
@@ -96,75 +96,77 @@ export default function Login({ onLogin }) {
           backgroundPosition: 'center',
         }}
       >
-        <div className="absolute inset-0 bg-gradient-to-br from-red-950/95 via-stone-900/90 to-black/80 backdrop-blur-[4px]"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-red-950/95 via-stone-900/90 to-black/80 backdrop-blur-sm"></div>
       </div>
 
       {/* Main Card */}
-      <div className="relative z-10 w-full max-w-5xl bg-stone-900/40 rounded-[2rem] shadow-xl overflow-hidden backdrop-blur-xl border border-white/10 flex flex-col lg:flex-row">
+      <div className="relative z-10 w-full max-w-5xl bg-stone-900/40 rounded-[2rem] shadow-2xl overflow-hidden backdrop-blur-xl border border-white/10 flex flex-col lg:flex-row">
 
-        {/* Left Side */}
-        <div className="lg:w-5/12 p-10 flex flex-col justify-between text-white bg-gradient-to-b from-white/5 to-black/20">
+        {/* Left Side (Branding) */}
+        <div className="lg:w-5/12 p-10 lg:p-12 flex flex-col justify-between text-white bg-gradient-to-b from-white/5 to-black/40">
           <div>
-            <div className="flex items-center gap-5 mb-12">
-              <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20 p-2">
+            <div className="flex items-center gap-4 mb-12">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center border-4 border-white/20 p-1 shadow-lg">
                 <img src="/san_felipe_seal.png" alt="San Felipe Seal" className="w-full h-full object-contain" />
               </div>
               <div>
-                <h1 className="text-2xl font-black">LGU San Felipe</h1>
-                <p className="text-rose-300 text-xs font-bold uppercase tracking-[0.2em] mt-1.5">Zambales</p>
+                <h1 className="text-2xl font-black tracking-tight">LGU San Felipe</h1>
+                <p className="text-red-300 text-[11px] font-black uppercase tracking-[0.25em] mt-1">Zambales</p>
               </div>
             </div>
 
-            <h2 className="text-4xl font-black leading-tight">
-              Resident <br/>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-rose-600">
-                Profiling System
+            <h2 className="text-4xl font-black leading-tight tracking-tight">
+              San Felipe <br/>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-red-600 drop-shadow-sm">
+                AS ONE
               </span>
             </h2>
           </div>
 
-          <div className="mt-16 flex items-center gap-2 text-stone-400">
-            <ShieldCheck size={16} />
-            <p className="text-xs font-medium tracking-wide">Authorized Personnel Only</p>
+          <div className="mt-16 flex items-center gap-2.5 text-stone-300 bg-stone-900/50 w-max px-4 py-2 rounded-xl border border-white/10">
+            <ShieldCheck size={18} className="text-red-500" />
+            <p className="text-xs font-bold uppercase tracking-widest">Authorized Personnel Only</p>
           </div>
         </div>
 
-        {/* Right Side */}
-        <div className="lg:w-7/12 bg-white p-12 flex flex-col justify-center">
+        {/* Right Side (Login Form) */}
+        <div className="lg:w-7/12 bg-white p-10 lg:p-16 flex flex-col justify-center">
           <div className="max-w-md w-full mx-auto">
 
-            <div className="mb-8">
-              <h2 className="text-3xl font-bold text-gray-900">Sign In</h2>
-              <p className="text-gray-500 mt-2">Enter your credentials to access the registry.</p>
+            <div className="mb-10">
+              <h2 className="text-3xl font-black text-stone-900 tracking-tight">System Login</h2>
+              <p className="text-stone-500 font-bold text-sm mt-2">Enter your secure credentials to continue.</p>
             </div>
 
             {/* 🔒 Lock Countdown Message */}
             {lockTime > 0 && (
-              <div className="mb-6 p-3 bg-red-100 border border-red-300 rounded-lg text-red-700 text-sm font-bold">
-                Account locked. Try again in {lockTime} seconds.
+              <div className="mb-6 p-4 bg-orange-50 border-2 border-orange-200 rounded-xl flex items-center gap-3 text-orange-800 shadow-sm animate-in zoom-in-95">
+                <Lock size={20} />
+                <p className="text-sm font-bold tracking-wide">Account locked. Try again in {lockTime}s.</p>
               </div>
             )}
 
+            {/* Error Message */}
             {error && lockTime === 0 && (
-              <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-xl flex items-start gap-3">
-                <Lock size={16} className="text-red-600 mt-0.5" />
-                <p className="text-sm text-red-800 font-bold">{error}</p>
+              <div className="mb-6 p-4 bg-red-50 border-2 border-red-200 rounded-xl flex items-center gap-3 text-red-800 shadow-sm animate-in zoom-in-95">
+                <AlertCircle size={20} className="text-red-600" />
+                <p className="text-sm font-bold tracking-wide">{error}</p>
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-6">
 
               {/* Username */}
               <div>
-                <label className="text-xs font-bold uppercase text-gray-500 ml-1 tracking-wider">Username</label>
-                <div className="relative flex items-center mt-1">
-                  <User className="absolute left-4 h-5 w-5 text-gray-400" />
+                <label className="text-[11px] font-black uppercase text-stone-500 ml-1 tracking-widest">Username</label>
+                <div className="relative flex items-center mt-2">
+                  <User className="absolute left-4 h-5 w-5 text-stone-400" strokeWidth={2.5} />
                   <input 
                     type="text" 
                     required
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none"
+                    className="w-full pl-12 pr-4 py-4 bg-stone-100 border-2 border-stone-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-red-100 focus:border-red-600 outline-none transition-all font-bold text-stone-900 placeholder:text-stone-400 placeholder:font-semibold text-sm shadow-sm"
                     placeholder="Enter username"
                   />
                 </div>
@@ -172,23 +174,23 @@ export default function Login({ onLogin }) {
 
               {/* Password */}
               <div>
-                <label className="text-xs font-bold uppercase text-gray-500 ml-1 tracking-wider">Password</label>
-                <div className="relative flex items-center mt-1">
-                  <Lock className="absolute left-4 h-5 w-5 text-gray-400" />
+                <label className="text-[11px] font-black uppercase text-stone-500 ml-1 tracking-widest">Password</label>
+                <div className="relative flex items-center mt-2">
+                  <Lock className="absolute left-4 h-5 w-5 text-stone-400" strokeWidth={2.5} />
                   <input 
                     type={showPassword ? "text" : "password"}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-12 pr-12 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none"
+                    className="w-full pl-12 pr-12 py-4 bg-stone-100 border-2 border-stone-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-red-100 focus:border-red-600 outline-none transition-all font-bold text-stone-900 placeholder:text-stone-400 placeholder:font-semibold text-sm shadow-sm"
                     placeholder="••••••••"
                   />
                   <button 
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 text-gray-400 hover:text-rose-600"
+                    className="absolute right-4 text-stone-400 hover:text-red-600 transition-colors p-1"
                   >
-                    {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
+                    {showPassword ? <EyeOff size={20} strokeWidth={2.5} /> : <Eye size={20} strokeWidth={2.5} />}
                   </button>
                 </div>
               </div>
@@ -197,17 +199,17 @@ export default function Login({ onLogin }) {
               <button 
                 type="submit"
                 disabled={loading || lockTime > 0}
-                className="w-full mt-6 bg-stone-900 hover:bg-stone-800 text-white font-bold py-4 rounded-xl disabled:opacity-60 flex items-center justify-center gap-2 transition-all"
+                className="w-full mt-8 bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-widest py-4 rounded-xl disabled:opacity-60 flex items-center justify-center gap-3 transition-all shadow-md hover:shadow-red-600/20 active:scale-[0.98]"
               >
                 {loading ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <div className="w-5 h-5 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
                     <span>Verifying...</span>
                   </>
                 ) : (
                   <>
                     <span>{lockTime > 0 ? `Locked (${lockTime}s)` : "Secure Login"}</span>
-                    {lockTime === 0 && <ArrowRight size={18} />}
+                    {lockTime === 0 && <ArrowRight size={18} strokeWidth={3} />}
                   </>
                 )}
               </button>

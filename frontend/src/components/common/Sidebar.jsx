@@ -8,11 +8,10 @@ import {
   X,
   ChevronRight,
   Settings,
-  QrCode
+  QrCode,
+  ArchiveRestore
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArchiveRestore } from 'lucide-react';
-
 
 export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
   const navigate = useNavigate();
@@ -22,11 +21,11 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
   const logoUrl = '/san_felipe_seal.png';
 
   const allMenuItems = [
-  { label: 'Overview', path: '/dashboard/overview', Icon: LayoutDashboard, role: 'admin' }, 
-  { label: 'Resident Database', path: '/dashboard/residents', Icon: Users, role: 'all' },
-  { label: 'Register Resident', path: '/dashboard/create', Icon: UserPlus, role: 'all' },
-  { label: 'Scan QR', path: '/dashboard/scan', Icon: QrCode, role: 'admin' },
-  { label: 'Archived Residents', path: '/dashboard/archived', Icon: ArchiveRestore, role: 'admin' }, // 🔥 NEW
+    { label: 'Overview', path: '/dashboard/overview', Icon: LayoutDashboard, role: 'admin' }, 
+    { label: 'Resident Database', path: '/dashboard/residents', Icon: Users, role: 'all' },
+    { label: 'Register Resident', path: '/dashboard/create', Icon: UserPlus, role: 'all' },
+    { label: 'Scan QR', path: '/dashboard/scan', Icon: QrCode, role: 'admin' },
+    { label: 'Archived Residents', path: '/dashboard/archived', Icon: ArchiveRestore, role: 'admin' },
   ];
 
   const menuItems = allMenuItems.filter(item => {
@@ -41,7 +40,6 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
     if (onLinkClick) {
       onLinkClick();
     }
-
     navigate(path);
     setIsOpen(false);
   };
@@ -52,76 +50,112 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
     return (
       <button
         onClick={() => handleNavigate(path)}
-        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all duration-200
+        className={`w-full group flex items-center gap-3 px-3 py-2.5 text-sm transition-all duration-200 rounded-xl
           ${
             active
-              ? 'bg-red-50 text-red-700 border-l-4 border-red-700 shadow-sm'
-              : 'text-gray-600 hover:bg-gray-50 border-l-4 border-transparent'
+              ? 'bg-red-50 text-red-700 shadow-sm ring-1 ring-red-100/50'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
           }`}
       >
-        <Icon size={18} className={active ? 'text-red-700' : 'text-gray-400'} />
-        <span className={`font-medium ${active ? 'text-red-800' : 'text-gray-700'}`}>{label}</span>
-        {active && <ChevronRight size={14} className="ml-auto text-red-600 animate-in slide-in-from-left-1" />}
+        <div className={`p-1.5 rounded-lg transition-colors duration-200 ${active ? 'bg-red-100 text-red-700' : 'bg-transparent text-slate-400 group-hover:text-slate-600 group-hover:bg-slate-200/50'}`}>
+          <Icon size={18} strokeWidth={active ? 2.5 : 2} />
+        </div>
+        <span className={`font-medium tracking-tight ${active ? 'text-red-800 font-semibold' : ''}`}>
+          {label}
+        </span>
+        {active && (
+          <ChevronRight 
+            size={16} 
+            className="ml-auto text-red-500 opacity-70 animate-in fade-in slide-in-from-left-2" 
+          />
+        )}
       </button>
     );
   };
 
   return (
     <>
-      {/* MOBILE HEADER */}
-      <div className="lg:hidden fixed top-0 left-0 w-full h-14 bg-white border-b border-gray-100 flex items-center justify-between px-4 z-40">
-        <div className="flex items-center gap-2">
-          <img src={logoUrl} alt="San Felipe Seal" className="w-7 h-7 object-contain" onError={(e) => (e.target.style.display = 'none')} />
-          <span className="text-sm font-bold text-gray-800 tracking-tight">San Felipe</span>
+      {/* MOBILE HEADER - Added Glassmorphism */}
+      <div className="lg:hidden fixed top-0 left-0 w-full h-16 bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-4 z-40 supports-[backdrop-filter]:bg-white/60">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shadow-sm border border-red-100/50">
+            <img src={logoUrl} alt="San Felipe Seal" className="w-6 h-6 object-contain" onError={(e) => (e.target.style.display = 'none')} />
+          </div>
+          <span className="text-sm font-bold text-slate-800 tracking-tight">San Felipe</span>
         </div>
-        <button onClick={() => setIsOpen(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">
+        <button 
+          onClick={() => setIsOpen(true)} 
+          className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all active:scale-95"
+        >
           <Menu size={20} />
         </button>
       </div>
 
-      {isOpen && <div onClick={() => setIsOpen(false)} className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden" />}
+      {/* MOBILE OVERLAY */}
+      {isOpen && (
+        <div 
+          onClick={() => setIsOpen(false)} 
+          className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 lg:hidden transition-opacity" 
+        />
+      )}
 
       {/* SIDEBAR CONTAINER */}
-      <aside className={`fixed top-0 left-0 h-full w-[260px] bg-white border-r border-gray-100 z-50 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 flex flex-col shadow-xl lg:shadow-none`}>
-        <div className="h-20 flex items-center px-6 border-b border-gray-50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center border border-red-100">
-                <img src={logoUrl} alt="San Felipe Seal" className="w-7 h-7 object-contain" onError={(e) => (e.target.style.display = 'none')} />
+      <aside className={`fixed top-0 left-0 h-full w-[280px] bg-white border-r border-slate-100 z-50 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 flex flex-col shadow-2xl lg:shadow-none`}>
+        
+        {/* BRANDING HEADER */}
+        <div className="h-20 flex items-center px-6 mt-2 lg:mt-0">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 bg-gradient-to-br from-red-50 to-white rounded-2xl flex items-center justify-center border border-red-100 shadow-sm">
+                <img src={logoUrl} alt="San Felipe Seal" className="w-7 h-7 object-contain drop-shadow-sm" onError={(e) => (e.target.style.display = 'none')} />
             </div>
             <div>
-              <h1 className="text-sm font-bold text-gray-900 leading-none">LGU San Felipe</h1>
-              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mt-1">Province of Zambales</p>
+              <h1 className="text-[15px] font-bold text-slate-900 leading-tight tracking-tight">LGU San Felipe</h1>
+              <p className="text-[10px] text-slate-400 font-semibold tracking-widest uppercase mt-0.5">Zambales</p>
             </div>
           </div>
-          <button onClick={() => setIsOpen(false)} className="ml-auto lg:hidden text-gray-400 hover:text-gray-600"><X size={18} /></button>
+          <button onClick={() => setIsOpen(false)} className="ml-auto lg:hidden p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+            <X size={18} />
+          </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-6">
-          <div className="px-6 mb-4 text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Main Menu</div>
+        {/* NAVIGATION */}
+        <nav className="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar">
+          <div className="mb-3 px-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Main Menu</div>
           <div className="space-y-1">
             {menuItems.map((item) => <NavItem key={item.path} label={item.label} path={item.path} Icon={item.Icon} />)}
           </div>
+          
           {userRole?.toLowerCase() === 'admin' && (
             <div className="mt-8">
-              <div className="px-6 mb-4 text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Administration</div>
+              <div className="mb-3 px-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Administration</div>
               <NavItem label="User Management" path="/dashboard/users" Icon={Settings} />
             </div>
           )}
         </nav>
 
-        <div className="p-4 bg-gray-50/50 border-t border-gray-100">
-          <div className="flex items-center gap-3 mb-4 px-2">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-red-800 text-white flex items-center justify-center text-sm font-bold shadow-md shadow-red-200 uppercase">{userRole?.charAt(0)}</div>
+        {/* USER PROFILE & LOGOUT */}
+        <div className="p-4 m-4 mt-0 bg-slate-50 rounded-2xl border border-slate-100">
+          <div className="flex items-center gap-3 mb-4 px-1">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-red-700 text-white flex items-center justify-center text-sm font-bold shadow-md shadow-red-600/20 uppercase ring-2 ring-white">
+              {userRole?.charAt(0)}
+            </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-gray-800 capitalize truncate">{userRole} Account</p>
-              <div className="flex items-center gap-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">Online</p>
+              <p className="text-sm font-bold text-slate-800 capitalize truncate">{userRole} Account</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <p className="text-[10px] text-slate-500 font-medium tracking-wide">System Online</p>
               </div>
             </div>
           </div>
-          <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-red-600 bg-white border border-red-100 rounded-xl hover:bg-red-600 hover:text-white hover:border-red-600 transition-all duration-200 shadow-sm">
-            <LogOut size={15} /> Sign Out
+          <button 
+            onClick={onLogout} 
+            className="w-full group flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all duration-200 shadow-sm"
+          >
+            <LogOut size={16} className="text-slate-400 group-hover:text-red-500 transition-colors" /> 
+            Sign Out
           </button>
         </div>
       </aside>

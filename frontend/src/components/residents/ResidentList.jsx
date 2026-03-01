@@ -1,17 +1,14 @@
-import { useEffect, useState, Fragment, useMemo } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 import api from '../../api/api';
 import {
   Trash2, Edit, Search, ChevronDown, ChevronUp,
-  Loader2, Filter, Phone, Fingerprint, Heart, User,
-  ChevronLeft, ChevronRight, Briefcase, Calendar, X,
-  FileText, Users, AlertCircle
+  Loader2, Filter, FileText, Users, AlertCircle,
+  ChevronLeft, ChevronRight, X, Archive, QrCode, ShieldAlert
 } from 'lucide-react';
 import ExportButton from './ExportButton';
+import ImportButton from './ImportButton';
 import toast, { Toaster } from 'react-hot-toast';
 import { createPortal } from "react-dom";
-import ImportButton from './ImportButton';
-import { Archive } from 'lucide-react';
-import { QrCode } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function ResidentList({ userRole, onEdit }) {
@@ -32,11 +29,12 @@ export default function ResidentList({ userRole, onEdit }) {
 
   const [assistanceModal, setAssistanceModal] = useState({ isOpen: false, resident: null, assistance: null });
   const [deleteAssistanceModal, setDeleteAssistanceModal] = useState({ isOpen: false, assistance: null });
+  const [promotionModal, setPromotionModal] = useState({ isOpen: false, memberId: null, reason: "Deceased" });
+  
   const navigate = useNavigate();
 
   const [sortBy, setSortBy] = useState("last_name");
   const [sortOrder, setSortOrder] = useState("asc");
-
 
   // --- HELPERS ---
   const calculateAge = (dob) => {
@@ -50,9 +48,7 @@ export default function ResidentList({ userRole, onEdit }) {
   const formatDate = (dateString) => {
     if (!dateString) return "-";
     return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
+      year: 'numeric', month: 'short', day: 'numeric'
     });
   };
 
@@ -68,7 +64,6 @@ export default function ResidentList({ userRole, onEdit }) {
     return text;
   };
 
-  // --- PAGINATION LOGIC ---
   const totalPages = Math.ceil(totalItems / itemsPerPage);
 
   // --- DATA FETCHING ---
@@ -78,34 +73,34 @@ export default function ResidentList({ userRole, onEdit }) {
     sector = selectedSector,
     page = currentPage,
     limit = itemsPerPage,
-    currentSortBy = sortBy,        // ← ADD
-    currentSortOrder = sortOrder   // ← ADD
-) => {
+    currentSortBy = sortBy,        
+    currentSortOrder = sortOrder   
+  ) => {
     setLoading(true);
     const skip = (page - 1) * limit;
     try {
-        const params = new URLSearchParams();
-        if (search) params.append('search', search);
-        if (userRole === 'admin' && barangay) params.append('barangay', barangay);
-        if (sector) params.append('sector', sector);
-        params.append('skip', skip);
-        params.append('limit', limit);
-        params.append('sort_by', currentSortBy);      // ← CHANGE
-        params.append('sort_order', currentSortOrder);
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (userRole === 'admin' && barangay) params.append('barangay', barangay);
+      if (sector) params.append('sector', sector);
+      params.append('skip', skip);
+      params.append('limit', limit);
+      params.append('sort_by', currentSortBy);      
+      params.append('sort_order', currentSortOrder);
 
       const response = await api.get(`/residents/?${params.toString()}`);
       const data = response.data;
 
-    if (Array.isArray(data)) {
-      setResidents(data);
-      setTotalItems(data.length);
-    } else if (Array.isArray(data.items)) {
-      setResidents(data.items);
-      setTotalItems(data.total || data.items.length);
-    } else {
-      setResidents([]);
-      setTotalItems(0);
-    }
+      if (Array.isArray(data)) {
+        setResidents(data);
+        setTotalItems(data.length);
+      } else if (Array.isArray(data.items)) {
+        setResidents(data.items);
+        setTotalItems(data.total || data.items.length);
+      } else {
+        setResidents([]);
+        setTotalItems(0);
+      }
     } catch (error) {
       toast.error("System Error: Unable to retrieve records.");
     } finally {
@@ -114,39 +109,28 @@ export default function ResidentList({ userRole, onEdit }) {
   };
 
   const handleSort = (field) => {
-  const newOrder = sortBy === field && sortOrder === "asc" ? "desc" : "asc";
-  setSortBy(field);
-  setSortOrder(newOrder);
-  setCurrentPage(1); // ✅ already there, good
-};
-
-
-  useEffect(() => {
-  const fetchBarangays = async () => {
-    try {
-      const res = await api.get("/barangays/");
-      setBarangayList(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.error("Failed to fetch barangays", err);
-      setBarangayList([]);
-    }
+    const newOrder = sortBy === field && sortOrder === "asc" ? "desc" : "asc";
+    setSortBy(field);
+    setSortOrder(newOrder);
+    setCurrentPage(1); 
   };
 
-  fetchBarangays();
-}, []);
+  useEffect(() => {
+    const fetchBarangays = async () => {
+      try {
+        const res = await api.get("/barangays/");
+        setBarangayList(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        console.error("Failed to fetch barangays", err);
+        setBarangayList([]);
+      }
+    };
+    fetchBarangays();
+  }, []);
 
   useEffect(() => {
     fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
-  }, [
-    userRole,
-    currentPage,
-    itemsPerPage,
-    selectedBarangay,
-    selectedSector,
-    searchTerm,
-    sortBy,
-    sortOrder
-  ]);
+  }, [userRole, currentPage, itemsPerPage, selectedBarangay, selectedSector, searchTerm, sortBy, sortOrder]);
 
 
   // --- HANDLERS ---
@@ -186,28 +170,13 @@ export default function ResidentList({ userRole, onEdit }) {
     }
   };
 
-  const [promotionModal, setPromotionModal] = useState({
-    isOpen: false,
-    memberId: null,
-    reason: "Deceased"
-  });
-
-
   const handlePromote = async (memberId, reason) => {
     try {
       await api.put(`/residents/${expandedRow}/promote`, null, {
-        params: {
-          new_head_member_id: memberId,
-          reason: reason
-        }
+        params: { new_head_member_id: memberId, reason: reason }
       });
-
       toast.success("Head of family updated.");
-      setPromotionModal({
-        isOpen: false,
-        memberId: null,
-        reason: "Deceased"
-      });
+      setPromotionModal({ isOpen: false, memberId: null, reason: "Deceased" });
       fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
     } catch {
       toast.error("Promotion failed.");
@@ -215,196 +184,141 @@ export default function ResidentList({ userRole, onEdit }) {
   };
 
   const handleDeleteAssistance = async (id) => {
-  try {
-    await api.delete(`/assistances/${id}`);
-    toast.success("Assistance record deleted.");
+    try {
+      await api.delete(`/assistances/${id}`);
+      toast.success("Assistance record deleted.");
+      setDeleteAssistanceModal({ isOpen: false, assistance: null });
+      fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
+    } catch {
+      toast.error("Failed to delete assistance.");
+    }
+  };
 
-    setDeleteAssistanceModal({
-      isOpen: false,
-      assistance: null
-    });
-
-    fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
-
-  } catch {
-    toast.error("Failed to delete assistance.");
-  }
-};
-
-
-  // --- DETAILS SUB-COMPONENT ---
-  const ResidentDetails = ({ r }) => (
-    <div className="bg-stone-50 border-y border-stone-200 p-6 shadow-inner">
-      <div className="flex items-center gap-2 mb-6 border-b border-stone-200 pb-2">
-         <FileText size={16} className="text-rose-700"/>
-         <h3 className="text-sm font-bold text-stone-800 uppercase tracking-wide">Information Background</h3>
-         {r.photo_url && (
-          <div className="mb-4">
-            <img
-              src={r.photo_url}
-              alt="Resident"
-              className="w-32 h-32 object-cover rounded-md border border-stone-300"
-            />
-          </div>
-        )}
+  // --- DETAILS SUB-RENDER FUNCTION ---
+  const renderResidentDetails = (r) => (
+    <div className="bg-stone-100 p-6 md:p-8 shadow-inner rounded-b-xl border-t-2 border-stone-200">
+      <div className="flex items-center gap-3 mb-6 border-b border-stone-300 pb-4">
+         <div className="p-2 bg-rose-700 text-white rounded-lg shadow-sm"><FileText size={18} /></div>
+         <h3 className="text-lg font-medium text-stone-900 tracking-tight">Information Background</h3>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Left Column */}
         <div className="space-y-6">
-          <div className="bg-white border border-stone-300 rounded-sm p-4">
-            <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-4">Personal Information</h4>
-            <div className="grid grid-cols-2 gap-y-4 gap-x-2">
+          <div className="bg-white border border-stone-300 rounded-xl p-5 shadow-sm">
+            <h4 className="text-xs font-medium text-stone-700 uppercase tracking-wider mb-5 flex justify-between items-center border-b border-stone-100 pb-3">
+              Personal Information
+              {r.photo_url && (
+                <img src={r.photo_url} alt="Resident" className="w-14 h-14 object-cover rounded-full border-2 border-stone-200 shadow-sm" />
+              )}
+            </h4>
+            <div className="grid grid-cols-2 gap-y-6 gap-x-4">
               <div>
-                <p className="text-[10px] text-stone-500 uppercase">Civil Status</p>
-                <p className="text-sm font-bold text-stone-800">{r.civil_status || '-'}</p>
+                <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Civil Status</p>
+                <p className="text-sm font-normal text-stone-800">{r.civil_status || '-'}</p>
               </div>
               <div>
-                <p className="text-[10px] text-stone-500 uppercase">Religion</p>
-                <p className="text-sm font-bold text-stone-800">{r.religion || '-'}</p>
+                <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Religion</p>
+                <p className="text-sm font-normal text-stone-800">{r.religion || '-'}</p>
               </div>
               <div>
-                <p className="text-[10px] text-stone-500 uppercase">Contact</p>
-                <p className="text-sm font-bold text-stone-800 flex items-center gap-2">
-                   {r.contact_no || '-'}
-                </p>
+                <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Contact</p>
+                <p className="text-sm font-normal text-stone-800">{r.contact_no || '-'}</p>
               </div>
               <div>
-                <p className="text-[10px] text-stone-500 uppercase">Precinct ID</p>
-                <p className="text-sm font-bold text-stone-800 font-mono">{r.precinct_no || '-'}</p>
+                <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Precinct ID</p>
+                <p className="text-sm font-mono font-normal text-stone-800 bg-stone-100 px-2 py-1 rounded border border-stone-200 inline-block">{r.precinct_no || '-'}</p>
               </div>
             </div>
           </div>
+
           {r.assistances?.length > 0 && (
-            <div className="bg-white border border-stone-300 rounded-sm p-4 mt-6">
-              <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3">
-                Assistance Records
-              </h4>
-
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-stone-200 text-stone-500 text-left">
-                    <th className="pb-2 font-normal">Type</th>
-                    <th className="pb-2 font-normal">Processed</th>
-                    <th className="pb-2 font-normal">Claimed</th>
-                    <th className="pb-2 font-normal">Amount</th>
-                    <th className="pb-2 font-normal">Office</th>
-                    <th className="pb-2 font-normal text-right">Actions</th> {/* ADD THIS */}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100">
-                  {r.assistances.map((a) => (
-                    <tr key={a.id}>
-                      <td className="py-2 font-bold text-stone-700 uppercase">
-                        {a.type_of_assistance}
-                      </td>
-
-                      <td className="py-2">{a.date_processed || "-"}</td>
-                      <td className="py-2">{a.date_claimed || "-"}</td>
-
-                      <td className="py-2">
-                        {a.amount ? `₱${a.amount.toLocaleString()}` : "-"}
-                      </td>
-
-                      <td className="py-2">{a.implementing_office || "-"}</td>
-
-                      {/* ACTIONS COLUMN */}
-                      <td className="py-2 text-right">
-                        {userRole === "admin" && (
-                        <div className="flex justify-end gap-2">
-
-                          {/* EDIT */}
-                          <button
-                            onClick={() =>
-                              setAssistanceModal({
-                                isOpen: true,
-                                resident: r,
-                                assistance: a
-                              })
-                            }
-                            className="text-indigo-600 hover:text-indigo-800"
-                          >
-                            <Edit size={14} />
-                          </button>
-
-                          {/* DELETE */}
-                          <button
-                            onClick={() => handleDeleteAssistance(a.id)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-
-                        </div>
-                        )}
-                      </td>
+            <div className="bg-white border border-stone-300 rounded-xl p-5 shadow-sm">
+              <h4 className="text-xs font-medium text-stone-700 uppercase tracking-wider mb-4 border-b border-stone-100 pb-3">Assistance Records</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-stone-50 text-stone-600 text-left text-[11px] uppercase tracking-wider border-y border-stone-200">
+                      <th className="py-3 px-2 font-medium">Type</th>
+                      <th className="py-3 px-2 font-medium">Processed</th>
+                      <th className="py-3 px-2 font-medium">Claimed</th>
+                      <th className="py-3 px-2 font-medium">Amount</th>
+                      <th className="py-3 px-2 font-medium text-right">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100">
+                    {r.assistances.map((a) => (
+                      <tr key={a.id} className="hover:bg-stone-50 transition-colors">
+                        <td className="py-3 px-2 font-medium text-stone-800">{a.type_of_assistance}</td>
+                        <td className="py-3 px-2 font-normal text-stone-600">{formatDate(a.date_processed)}</td>
+                        <td className="py-3 px-2 font-normal text-stone-600">{formatDate(a.date_claimed)}</td>
+                        <td className="py-3 px-2 font-medium text-rose-700">
+                          {a.amount ? `₱${a.amount.toLocaleString()}` : "-"}
+                        </td>
+                        <td className="py-3 px-2 text-right">
+                          {userRole === "admin" && (
+                            <div className="flex justify-end gap-2">
+                              <button onClick={() => setAssistanceModal({ isOpen: true, resident: r, assistance: a })} className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-600 hover:text-white rounded-md transition-colors border border-rose-100">
+                                <Edit size={14} />
+                              </button>
+                              <button onClick={() => setDeleteAssistanceModal({ isOpen: true, assistance: a })} className="p-1.5 text-red-600 bg-red-50 hover:bg-red-600 hover:text-white rounded-md transition-colors border border-red-100">
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
 
         {/* Right Column */}
         <div className="space-y-6">
-          <div className="bg-white border border-stone-300 rounded-sm p-4">
-            <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-2">Registered Sector</h4>
-            <div className="inline-block bg-stone-100 border border-stone-200 px-3 py-1.5 rounded-sm">
-              <p className="text-sm font-bold text-stone-800">
+          <div className="bg-white border border-stone-300 rounded-xl p-5 shadow-sm">
+            <h4 className="text-xs font-medium text-stone-700 uppercase tracking-wider mb-3 border-b border-stone-100 pb-3">Registered Sector</h4>
+            <div className="inline-flex items-center px-4 py-2 bg-stone-100 rounded-lg border border-stone-300 shadow-sm">
+              <span className="text-sm font-normal text-stone-800 tracking-tight uppercase">
                 {formatSectors(r.sector_summary, r.other_sector_details)}
-              </p>
+              </span>
             </div>
           </div>
-          {(r.spouse_first_name || r.spouse_last_name) && (
-              <div className="bg-white border border-stone-300 rounded-sm p-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">
-                      Legal Spouse
-                    </h4>
-                    <p className="text-sm font-bold text-stone-800 uppercase">
-                      {r.spouse_last_name}, {r.spouse_first_name} {r.spouse_middle_name || ''}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() =>
-                      setPromotionModal({ isOpen: true, memberId: "spouse", reason: "Deceased" })
-                    }
-                    className="text-[10px] font-bold text-rose-700 hover:underline border border-rose-200 bg-rose-50 px-2 py-1 rounded-sm"
-                  >
-                    ASSIGN AS HEAD
-                  </button>
-                </div>
-              </div>
-            )}
 
-          <div className="bg-white border border-stone-300 rounded-sm p-4">
-            <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3">Household Composition</h4>
+          {(r.spouse_first_name || r.spouse_last_name) && (
+            <div className="bg-white border border-stone-300 rounded-xl p-5 shadow-sm flex items-center justify-between">
+              <div>
+                <h4 className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Legal Spouse</h4>
+                <p className="text-base font-normal text-stone-800 uppercase">
+                  {r.spouse_last_name}, {r.spouse_first_name} {r.spouse_middle_name || ''}
+                </p>
+              </div>
+              <button onClick={() => setPromotionModal({ isOpen: true, memberId: "spouse", reason: "Deceased" })} className="text-[11px] font-medium text-white bg-rose-700 hover:bg-rose-800 px-4 py-2 rounded-lg transition-colors shadow-sm">
+                ASSIGN AS HEAD
+              </button>
+            </div>
+          )}
+
+          <div className="bg-white border border-stone-300 rounded-xl p-5 shadow-sm">
+            <h4 className="text-xs font-medium text-stone-700 uppercase tracking-wider mb-4 border-b border-stone-100 pb-3">Household Composition</h4>
             {r.family_members?.length > 0 ? (
-              <table className="w-full text-xs">
+              <table className="w-full text-sm">
                 <thead>
-                    <tr className="border-b border-stone-200 text-stone-500 text-left">
-                        <th className="pb-2 font-normal">Name</th>
-                        <th className="pb-2 font-normal">Relation</th>
-                        <th className="pb-2 font-normal text-right">Action</th>
-                    </tr>
+                  <tr className="bg-stone-50 text-stone-600 text-left text-[11px] uppercase tracking-wider border-y border-stone-200">
+                    <th className="py-3 px-3 font-medium">Name</th>
+                    <th className="py-3 px-3 font-medium">Relation</th>
+                    <th className="py-3 px-3 font-medium text-right">Action</th>
+                  </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {r.family_members.filter(fm => fm.first_name).map((fm, i) => (
-                    <tr key={i}>
-                      <td className="py-2 font-bold text-stone-700 uppercase">
-                        {fm.last_name}, {fm.first_name}
-                      </td>
-                      <td className="py-2 text-stone-500 italic">{fm.relationship}</td>
-                      <td className="py-2 text-right">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPromotionModal({ isOpen: true, memberId: fm.id, reason: "Deceased" });
-                          }}
-                          className="text-[10px] text-rose-700 hover:text-rose-900 font-bold"
-                        >
+                    <tr key={i} className="hover:bg-stone-50 transition-colors">
+                      <td className="py-3 px-3 font-medium text-stone-800 uppercase">{fm.last_name}, {fm.first_name}</td>
+                      <td className="py-3 px-3 font-normal text-stone-600 italic">{fm.relationship}</td>
+                      <td className="py-3 px-3 text-right">
+                        <button onClick={(e) => { e.stopPropagation(); setPromotionModal({ isOpen: true, memberId: fm.id, reason: "Deceased" }); }} className="text-[11px] text-stone-600 font-medium bg-stone-200 hover:bg-rose-700 hover:text-white px-3 py-1.5 rounded-md transition-colors border border-stone-300 hover:border-rose-700 shadow-sm">
                           PROMOTE
                         </button>
                       </td>
@@ -413,7 +327,9 @@ export default function ResidentList({ userRole, onEdit }) {
                 </tbody>
               </table>
             ) : (
-              <p className="text-xs text-stone-400 italic">Single Occupant / No listed members.</p>
+              <div className="py-6 text-center border-2 border-dashed border-stone-200 rounded-xl bg-stone-50">
+                <p className="text-sm font-normal text-stone-500">Single Occupant / No listed members.</p>
+              </div>
             )}
           </div>
         </div>
@@ -422,157 +338,108 @@ export default function ResidentList({ userRole, onEdit }) {
   );
 
   return (
-    <div className="font-sans text-stone-800 animate-in fade-in duration-300">
-      <Toaster position="top-right" toastOptions={{ style: { background: '#333', color: '#fff', borderRadius: '4px' } }} />
+    <div className="font-sans text-stone-900 animate-in fade-in duration-300">
+      <Toaster position="top-right" toastOptions={{ style: { background: '#1c1917', color: '#fff', borderRadius: '12px', fontSize: '14px', fontWeight: '500' } }} />
 
-      {/*  ASSISTANCE MODAL */}
+      {/* ASSISTANCE MODAL */}
       {assistanceModal.isOpen && createPortal(
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setAssistanceModal({ isOpen: false, resident: null })}
-          />
-
-          <div className="relative bg-white w-[500px] rounded-sm border shadow-2xl p-6">
-
-            <h3 className="text-sm font-bold uppercase mb-4">
-              {assistanceModal.assistance ? "Edit Assistance" : "Add Assistance"} – {assistanceModal.resident?.last_name}
+          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setAssistanceModal({ isOpen: false, resident: null })} />
+          <div className="relative bg-white w-[480px] rounded-2xl border border-stone-200 shadow-2xl p-6 animate-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-medium tracking-tight text-stone-900 mb-6 border-b border-stone-200 pb-4">
+              {assistanceModal.assistance ? "Edit Assistance" : "Add Assistance"}
+              <span className="block text-sm font-normal text-stone-500 mt-1 uppercase tracking-widest">For {assistanceModal.resident?.last_name}, {assistanceModal.resident?.first_name}</span>
             </h3>
 
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                const formData = new FormData(e.target);
-
-                const payload = {
-                  type_of_assistance: formData.get("type"),
-                  date_processed: formData.get("processed") || null,
-                  date_claimed: formData.get("claimed") || null,
-                  amount: formData.get("amount") || null,
-                  implementing_office: formData.get("office") || null,
-                };
-
-                try {
-
-                  if (assistanceModal.assistance) {
-                    await api.put(
-                      `/assistances/${assistanceModal.assistance.id}`,
-                      payload
-                    );
-                    toast.success("Assistance updated.");
-                  } else {
-                    await api.post(
-                      `/residents/${assistanceModal.resident.id}/assistance`,
-                      payload
-                    );
-                    toast.success("Assistance recorded.");
-                  }
-
-                  setAssistanceModal({
-                    isOpen: false,
-                    resident: null,
-                    assistance: null
-                  });
-
-                  fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
-
-                } catch {
-                  toast.error("Operation failed.");
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              const payload = {
+                type_of_assistance: formData.get("type"),
+                date_processed: formData.get("processed") || null,
+                date_claimed: formData.get("claimed") || null,
+                amount: formData.get("amount") || null,
+                implementing_office: formData.get("office") || null,
+              };
+              try {
+                if (assistanceModal.assistance) {
+                  await api.put(`/assistances/${assistanceModal.assistance.id}`, payload);
+                  toast.success("Assistance updated.");
+                } else {
+                  await api.post(`/residents/${assistanceModal.resident.id}/assistance`, payload);
+                  toast.success("Assistance recorded.");
                 }
-              }}
-            >
-
-              <select name="type" className="w-full border p-2 mb-3 text-sm" defaultValue={assistanceModal.assistance?.type_of_assistance}>
-                <option>Burial Assistance</option>
-                <option>Financial</option>
-                <option>Educational</option>
-                <option>Medical</option>
-                <option>Gas Subsidy</option>
-                <option>Food Assistance</option>
-              </select>
-              
-              <label className="block text-sm mb-1">Date Processed</label>
-              <input type="date" name="processed" className="w-full border p-2 mb-3 text-sm" defaultValue={assistanceModal.assistance?.date_processed} />
-
-              <label className="block text-sm mb-1">Date Claimed</label>
-              <input type="date" name="claimed" className="w-full border p-2 mb-3 text-sm" defaultValue={assistanceModal.assistance?.date_claimed} />
-
-              <input type="number" name="amount" placeholder="Amount" className="w-full border p-2 mb-3 text-sm" defaultValue={assistanceModal.assistance?.amount} />
-              <input type="text" name="office" placeholder="Implementing Office" className="w-full border p-2 mb-4 text-sm" defaultValue={assistanceModal.assistance?.implementing_office} />
-
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAssistanceModal({ isOpen: false, resident: null })}
-                  className="px-4 py-2 border text-xs uppercase"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-indigo-700 text-white text-xs uppercase"
-                >
-                  Save
-                </button>
+                setAssistanceModal({ isOpen: false, resident: null, assistance: null });
+                fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
+              } catch {
+                toast.error("Operation failed.");
+              }
+            }}>
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-xs font-medium text-stone-600 uppercase tracking-wider mb-2">Assistance Type</label>
+                  <select name="type" className="w-full border-2 border-stone-200 bg-stone-50 rounded-xl p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all cursor-pointer" defaultValue={assistanceModal.assistance?.type_of_assistance}>
+                    <option>Burial Assistance</option>
+                    <option>Financial</option>
+                    <option>Educational</option>
+                    <option>Medical</option>
+                    <option>Gas Subsidy</option>
+                    <option>Food Assistance</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-stone-600 uppercase tracking-wider mb-2">Date Processed</label>
+                    <input type="date" name="processed" className="w-full border-2 border-stone-200 bg-stone-50 rounded-xl p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all uppercase" defaultValue={assistanceModal.assistance?.date_processed} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-stone-600 uppercase tracking-wider mb-2">Date Claimed</label>
+                    <input type="date" name="claimed" className="w-full border-2 border-stone-200 bg-stone-50 rounded-xl p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all uppercase" defaultValue={assistanceModal.assistance?.date_claimed} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-stone-600 uppercase tracking-wider mb-2">Amount (Optional)</label>
+                  <input type="number" name="amount" placeholder="0.00" className="w-full border-2 border-stone-200 bg-stone-50 rounded-xl p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all" defaultValue={assistanceModal.assistance?.amount} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-stone-600 uppercase tracking-wider mb-2">Implementing Office</label>
+                  <input type="text" name="office" placeholder="e.g. MSWDO" className="w-full border-2 border-stone-200 bg-stone-50 rounded-xl p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all uppercase" defaultValue={assistanceModal.assistance?.implementing_office} />
+                </div>
               </div>
 
+              <div className="flex justify-end gap-3 mt-8 pt-5 border-t border-stone-200">
+                <button type="button" onClick={() => setAssistanceModal({ isOpen: false, resident: null })} className="px-6 py-3 text-sm font-medium text-stone-700 bg-stone-100 border border-stone-300 hover:bg-stone-200 rounded-xl transition-colors shadow-sm">
+                  Cancel
+                </button>
+                <button type="submit" className="px-6 py-3 bg-rose-700 text-white text-sm font-medium rounded-xl hover:bg-rose-800 transition-colors shadow-md">
+                  Save Assistance
+                </button>
+              </div>
             </form>
           </div>
         </div>,
         document.body
       )}
-      {deleteAssistanceModal.isOpen && createPortal(
+
+      {/* DELETE ASSISTANCE & RECORD MODALS */}
+      {(deleteModal.isOpen || deleteAssistanceModal.isOpen) && createPortal(
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
-
-          {/* BACKDROP */}
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setDeleteAssistanceModal({ isOpen: false, assistance: null })}
-          />
-
-          {/* MODAL */}
-          <div className="relative bg-white w-[420px] rounded-sm border shadow-2xl overflow-hidden">
-
-            {/* HEADER */}
-            <div className="bg-red-700 text-white px-5 py-4 flex items-center gap-3">
-              <Trash2 size={18} />
-              <h3 className="text-sm font-bold uppercase tracking-wider">
-                Delete Assistance Record
-              </h3>
-            </div>
-
-            {/* BODY */}
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-stone-700">
-                You are about to permanently remove this assistance record:
+          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => { setDeleteModal({ isOpen: false }); setDeleteAssistanceModal({ isOpen: false }); }} />
+          <div className="relative bg-white w-[420px] rounded-2xl shadow-2xl border border-stone-200 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-8">
+              <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-5 border-4 border-red-50">
+                <ShieldAlert size={32} />
+              </div>
+              <h3 className="text-xl font-medium text-stone-900 tracking-tight mb-2">Confirm Deletion</h3>
+              <p className="text-sm font-normal text-stone-600 leading-relaxed mb-8">
+                You are about to permanently remove {deleteModal.isOpen ? `the record for ${deleteModal.name}` : 'this assistance record'}. <span className="font-medium text-stone-900">This action cannot be undone.</span>
               </p>
-
-              <p className="text-xs font-bold text-red-700 uppercase">
-                {deleteAssistanceModal.assistance?.type_of_assistance}
-              </p>
-
-              <p className="text-xs text-stone-500">
-                This action cannot be undone.
-              </p>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  onClick={() =>
-                    setDeleteAssistanceModal({ isOpen: false, assistance: null })
-                  }
-                  className="px-4 py-2 border border-stone-300 text-xs font-bold uppercase rounded-sm hover:bg-stone-50"
-                >
+              <div className="flex gap-3">
+                <button onClick={() => { setDeleteModal({ isOpen: false }); setDeleteAssistanceModal({ isOpen: false }); }} className="flex-1 px-4 py-3 border-2 border-stone-200 text-stone-600 text-sm font-medium rounded-xl hover:bg-stone-50 hover:border-stone-300 transition-colors">
                   Cancel
                 </button>
-
-                <button
-                  onClick={() =>
-                    handleDeleteAssistance(deleteAssistanceModal.assistance.id)
-                  }
-                  className="px-4 py-2 bg-red-700 text-white text-xs font-bold uppercase rounded-sm hover:bg-red-800"
-                >
-                  Confirm Delete
+                <button onClick={() => deleteModal.isOpen ? confirmDelete() : handleDeleteAssistance(deleteAssistanceModal.assistance.id)} className="flex-1 px-4 py-3 bg-red-600 text-white text-sm font-medium rounded-xl hover:bg-red-700 transition-colors shadow-md flex items-center justify-center gap-2" disabled={isDeleting}>
+                  {isDeleting ? <Loader2 size={18} className="animate-spin" /> : "Delete Permanently"}
                 </button>
               </div>
             </div>
@@ -581,61 +448,28 @@ export default function ResidentList({ userRole, onEdit }) {
         document.body
       )}
 
-      {/* --- MODALS --- */}
-      {deleteModal.isOpen && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-stone-900/70 backdrop-blur-sm" onClick={() => setDeleteModal({ isOpen: false, residentId: null, name: '' })} />
-          <div className="relative z-10 bg-white border border-stone-300 rounded-sm shadow-2xl max-w-md w-full overflow-hidden">
-            <div className="bg-red-700 px-6 py-4 flex items-center gap-3">
-               <AlertCircle className="text-white" size={24} />
-               <h3 className="text-lg font-bold text-white uppercase tracking-wide">Confirm Deletion</h3>
-            </div>
-            <div className="p-6">
-              <p className="text-sm text-stone-600 mb-6 leading-relaxed">
-                You are about to permanently remove the record for <span className="font-bold text-stone-900 uppercase">{deleteModal.name}</span>. 
-                This action cannot be undone and will be logged in the system audit trail.
-              </p>
-              <div className="flex justify-end gap-3">
-                <button onClick={() => setDeleteModal({ isOpen: false, residentId: null, name: '' })} className="px-5 py-2 border border-stone-300 text-stone-700 text-sm font-bold uppercase hover:bg-stone-50 rounded-sm">
-                  Cancel
-                </button>
-                <button onClick={confirmDelete} className="px-5 py-2 bg-red-700 text-white text-sm font-bold uppercase hover:bg-red-800 rounded-sm flex items-center gap-2" disabled={isDeleting}>
-                  {isDeleting ? <Loader2 size={16} className="animate-spin" /> : "Delete Record"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
+      {/* PROMOTION MODAL */}
       {promotionModal.isOpen && createPortal(
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-stone-900/70 backdrop-blur-sm" onClick={() => setPromotionModal({ isOpen: false, memberId: null, reason: "Deceased" })} />
-          <div className="relative z-10 bg-white border border-stone-300 rounded-sm shadow-2xl w-96">
-            <div className="bg-stone-800 text-white px-4 py-3 border-b border-stone-700">
-                <h3 className="font-bold text-sm uppercase">Update Household Head</h3>
+          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setPromotionModal({ isOpen: false, memberId: null, reason: "Deceased" })} />
+          <div className="relative z-10 bg-white rounded-2xl shadow-2xl border border-stone-200 w-[420px] p-8 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-4 mb-6 border-b border-stone-200 pb-4">
+               <div className="p-3 bg-rose-100 text-rose-800 rounded-xl"><Users size={24} /></div>
+               <h3 className="text-xl font-medium text-stone-900 tracking-tight">Update Head of Family</h3>
             </div>
-            <div className="p-5">
-                <label className="block text-xs font-bold text-stone-500 uppercase mb-2">Reason for Replacement</label>
-                <select
-                  className="w-full border border-stone-300 bg-stone-50 p-2 text-sm outline-none focus:border-rose-500 mb-6 rounded-sm"
-                  value={promotionModal.reason}
-                  onChange={(e) => setPromotionModal({ ...promotionModal, reason: e.target.value })}
-                >
-                  <option value="Deceased">Principal Deceased</option>
-                  <option value="Transferred">Transferred Residence</option>
-                  <option value="Inactive">Status Inactive</option>
-                </select>
-
-                <div className="flex gap-2">
-                  <button onClick={() => handlePromote(promotionModal.memberId, promotionModal.reason)} className="flex-1 bg-rose-700 hover:bg-rose-800 text-white py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
-                    Confirm Update
-                  </button>
-                  <button onClick={() => setPromotionModal({ isOpen: false, memberId: null, reason: "Deceased" })} className="flex-1 bg-white border border-stone-300 hover:bg-stone-50 text-stone-700 py-2 rounded-sm text-xs font-bold uppercase">
-                    Cancel
-                  </button>
-                </div>
+            <label className="block text-xs font-medium text-stone-600 uppercase tracking-wider mb-2">Reason for Replacement</label>
+            <select className="w-full border-2 border-stone-200 bg-stone-50 rounded-xl p-3 text-sm font-normal text-stone-800 focus:bg-white focus:border-rose-600 outline-none transition-all mb-8 cursor-pointer" value={promotionModal.reason} onChange={(e) => setPromotionModal({ ...promotionModal, reason: e.target.value })}>
+              <option value="Deceased">Principal Deceased</option>
+              <option value="Transferred">Transferred Residence</option>
+              <option value="Inactive">Status Inactive</option>
+            </select>
+            <div className="flex gap-3">
+              <button onClick={() => setPromotionModal({ isOpen: false, memberId: null, reason: "Deceased" })} className="flex-1 px-4 py-3 border-2 border-stone-200 text-stone-600 text-sm font-medium rounded-xl hover:bg-stone-50 hover:border-stone-300 transition-colors">
+                Cancel
+              </button>
+              <button onClick={() => handlePromote(promotionModal.memberId, promotionModal.reason)} className="flex-1 px-4 py-3 bg-rose-700 text-white text-sm font-medium rounded-xl hover:bg-rose-800 transition-colors shadow-md">
+                Confirm Update
+              </button>
             </div>
           </div>
         </div>,
@@ -643,49 +477,45 @@ export default function ResidentList({ userRole, onEdit }) {
       )}
 
       {/* --- HEADER --- */}
-      <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-5">
         <div>
-           <div className="flex items-center gap-2 text-rose-700 mb-1">
-              <Users size={20} />
-              <span className="text-xs font-bold uppercase tracking-widest">Municipality of San Felipe</span>
+           <div className="flex items-center gap-2 text-rose-700 mb-2">
+              <div className="p-2 bg-rose-100 rounded-lg border border-rose-200 shadow-sm"><Users size={18} strokeWidth={2} /></div>
+              <span className="text-xs font-medium tracking-widest uppercase">Municipality of San Felipe</span>
            </div>
-           <h1 className="text-2xl font-black text-stone-900 uppercase tracking-tight">Registered Residents Database</h1>
+           <h1 className="text-3xl font-medium text-stone-900 tracking-tight">Registered Residents</h1>
         </div>
-        <div className="flex items-center gap-2">
-           <ImportButton onSuccess={handleImportSuccess} className="bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 rounded-sm" />
-           <ExportButton barangay={selectedBarangay} className="bg-stone-800 text-white hover:bg-stone-900 rounded-sm" />
+        <div className="flex flex-wrap items-center gap-3">
+           <ImportButton onSuccess={handleImportSuccess} className="bg-white border-2 border-stone-300 text-stone-700 font-medium hover:bg-stone-100 rounded-xl shadow-sm transition-all" />
+           <ExportButton barangay={selectedBarangay} className="bg-stone-900 text-white font-medium hover:bg-stone-800 rounded-xl shadow-md transition-all" />
         </div>
       </div>
 
       {/* --- TOOLBAR --- */}
-      <div className="bg-stone-100 border border-stone-300 border-b-0 rounded-t-sm p-3 flex flex-col lg:flex-row gap-3 items-center justify-between">
-         <div className="flex flex-1 gap-3 w-full">
+      <div className="bg-stone-100 border border-stone-300 rounded-t-2xl p-5 flex flex-col lg:flex-row gap-4 items-center justify-between shadow-sm">
+         <div className="flex flex-1 gap-4 w-full">
             {/* Search */}
             <div className="relative flex-1 max-w-md group">
-               <div className="absolute left-3 top-2.5 text-stone-400 group-focus-within:text-rose-700">
-                  <Search size={16} />
+               <div className="absolute left-4 top-3.5 text-stone-400 group-focus-within:text-rose-600 transition-colors">
+                  <Search size={18} strokeWidth={2} />
                </div>
                <input 
                   type="text" 
-                  placeholder="SEARCH DATABASE (NAME/ID)..." 
+                  placeholder="Search by name or ID..." 
                   value={searchTerm} 
                   onChange={handleSearchChange} 
-                  className="w-full pl-9 pr-8 py-2 bg-white border border-stone-300 rounded-sm text-xs font-bold placeholder:font-normal focus:outline-none focus:border-rose-600 focus:ring-1 focus:ring-rose-600 uppercase"
+                  className="w-full pl-11 pr-10 py-3 bg-white border border-stone-300 rounded-xl text-sm font-normal text-stone-800 placeholder:text-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all shadow-sm"
                />
                {searchTerm && (
-                 <button onClick={() => { setSearchTerm(''); setCurrentPage(1); }} className="absolute right-2 top-2.5 text-stone-400 hover:text-rose-600">
-                   <X size={14} />
+                 <button onClick={() => { setSearchTerm(''); setCurrentPage(1); }} className="absolute right-3 top-3 text-stone-400 hover:text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-lg p-1 transition-colors">
+                   <X size={16} strokeWidth={2} />
                  </button>
                )}
             </div>
 
             {/* Sector Filter */}
             <div className="relative w-48 hidden md:block">
-               <select
-                 value={selectedSector}
-                 onChange={handleSectorFilter}
-                 className="w-full appearance-none pl-3 pr-8 py-2 bg-white border border-stone-300 rounded-sm text-xs font-bold text-stone-700 outline-none focus:border-rose-600 uppercase"
-               >
+               <select value={selectedSector} onChange={handleSectorFilter} className="w-full appearance-none pl-4 pr-10 py-3 bg-white border border-stone-300 rounded-xl text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all cursor-pointer shadow-sm uppercase">
                  <option value="">ALL SECTORS</option>
                  <option value="Fisherman/Banca Owner">FISHERFOLK</option>
                  <option value="Senior Citizen">SENIOR CITIZEN</option>
@@ -697,25 +527,25 @@ export default function ResidentList({ userRole, onEdit }) {
                  <option value="LGU Employee">GOV EMPLOYEE</option>
                  <option value="OTHERS">OTHERS</option>
                </select>
-               <ChevronDown className="absolute right-2 top-2.5 text-stone-400 pointer-events-none" size={14} />
+               <ChevronDown className="absolute right-4 top-3.5 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
             </div>
 
             {/* Admin Filter */}
             {userRole === 'admin' && (
               <div className="relative w-48 hidden md:block">
-                 <select value={selectedBarangay} onChange={handleBarangayFilter} className="w-full appearance-none pl-3 pr-8 py-2 bg-white border border-stone-300 rounded-sm text-xs font-bold text-stone-700 outline-none focus:border-rose-600 uppercase">
+                 <select value={selectedBarangay} onChange={handleBarangayFilter} className="w-full appearance-none pl-4 pr-10 py-3 bg-white border border-stone-300 rounded-xl text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all cursor-pointer shadow-sm uppercase">
                    <option value="">ALL BARANGAYS</option>
                    {barangayList.map((b) => <option key={b.id} value={b.name}>{b.name}</option>)}
                  </select>
-                 <Filter className="absolute right-2 top-2.5 text-stone-400 pointer-events-none" size={14} />
+                 <Filter className="absolute right-4 top-3.5 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
               </div>
             )}
          </div>
 
          {/* Pagination Controls (Top) */}
-         <div className="flex items-center gap-2 text-xs font-bold text-stone-600 bg-white px-3 py-1.5 border border-stone-300 rounded-sm">
-             <span>SHOWING:</span>
-             <select value={itemsPerPage} onChange={handleLimitChange} className="bg-transparent outline-none border-b border-stone-300 text-rose-700 cursor-pointer">
+         <div className="flex items-center gap-3 text-sm font-normal text-stone-600 bg-white px-4 py-2 rounded-xl border border-stone-300 shadow-sm">
+             <span className="uppercase tracking-widest text-[10px]">Show:</span>
+             <select value={itemsPerPage} onChange={handleLimitChange} className="bg-transparent font-medium text-stone-800 outline-none cursor-pointer hover:text-rose-700 transition-colors">
                <option value={10}>10</option>
                <option value={20}>20</option>
                <option value={50}>50</option>
@@ -724,152 +554,128 @@ export default function ResidentList({ userRole, onEdit }) {
       </div>
 
       {/* --- TABLE --- */}
-      <div className="bg-white border border-stone-300 border-t-0 shadow-sm overflow-x-auto min-h-[500px]">
+      <div className="bg-white border-x border-b border-stone-300 shadow-sm overflow-x-auto min-h-[500px] rounded-b-2xl">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-stone-200 border-b-2 border-stone-300 text-[11px] uppercase font-black text-stone-600 tracking-wider">
-              <th className="py-3 px-4 w-10 text-center border-r border-stone-300">#</th>
-              <th
-                onClick={() => handleSort("last_name")}
-                className="py-3 px-4 border-r border-stone-300 w-1/4 cursor-pointer hover:text-rose-700 select-none"
-              >
-                <div className="flex items-center gap-1">
+            <tr className="bg-red-50 text-stone-600 text-[11px] uppercase font-medium tracking-widest border-b-2 border-red-200">
+              <th className="py-4 px-5 w-12 text-center">#</th>
+              <th onClick={() => handleSort("last_name")} className="py-4 px-5 w-1/4 cursor-pointer hover:text-red-700 select-none group transition-colors">
+                <div className="flex items-center gap-2">
                   RESIDENT IDENTITY
-                  {sortBy === "last_name" ? (
-                    sortOrder === "asc" ? <ChevronUp size={12} /> : <ChevronDown size={12} />
-                  ) : (
-                    <ChevronDown size={12} className="opacity-30" />
-                  )}
+                  <div className="p-1 rounded bg-red-100 group-hover:bg-red-200 transition-colors text-red-700 group-hover:text-red-900">
+                    {sortBy === "last_name" ? (sortOrder === "asc" ? <ChevronUp size={14} strokeWidth={2}/> : <ChevronDown size={14} strokeWidth={2}/>) : <ChevronDown size={14} strokeWidth={2} className="opacity-0 group-hover:opacity-100" />}
+                  </div>
                 </div>
               </th>
-              <th className="py-3 px-4 border-r border-stone-300">Birthdate</th>
-              <th className="py-3 px-4 border-r border-stone-300">Residency</th>
-              <th className="py-3 px-4 border-r border-stone-300">Class/Sector</th>
-              <th className="py-3 px-4 text-center">Admin</th>
+              <th className="py-4 px-5">BIRTHDATE</th>
+              <th className="py-4 px-5">BARANGAY/STREETS/PUROK</th>
+              <th className="py-4 px-5">CLASS/SECTOR</th>
+              <th className="py-4 px-5 text-right">ADMIN ACTIONS</th>
             </tr>
           </thead>
           <tbody className="text-sm">
             {loading ? (
                <tr>
-                 <td colSpan="6" className="py-20 text-center">
-                    <div className="flex flex-col items-center gap-2">
-                       <Loader2 className="animate-spin text-rose-700" size={32}/>
-                       <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Accessing Database...</span>
+                 <td colSpan="6" className="py-32 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                       <Loader2 className="animate-spin text-rose-700" size={40} strokeWidth={2}/>
+                       <span className="text-xs font-normal text-stone-400 uppercase tracking-widest">Accessing Database...</span>
                     </div>
                  </td>
                </tr>
             ) : residents.length === 0 ? (
-               <tr><td colSpan="6" className="py-12 text-center text-stone-400 font-bold uppercase italic">No records found matching criteria.</td></tr>
+               <tr>
+                 <td colSpan="6" className="py-24 text-center">
+                   <div className="inline-flex flex-col items-center justify-center text-stone-400">
+                     <Search size={40} strokeWidth={1.5} className="mb-4 opacity-30" />
+                     <span className="font-medium text-stone-500 text-lg">No records found.</span>
+                     <span className="font-normal text-stone-400 text-sm mt-1">Try adjusting your search or filters.</span>
+                   </div>
+                 </td>
+               </tr>
             ) : (
-              residents.map((r) => (
+              residents.map((r, index) => (
                 <Fragment key={r.id}>
-                  <tr 
-                    onClick={() => toggleRow(r.id)}
-                    className={`
-                      border-b border-stone-200 cursor-pointer transition-colors group
-                      ${expandedRow === r.id ? 'bg-stone-100' : 'hover:bg-rose-50/30'}
-                    `}
-                  >
-                    <td className="py-3 px-4 text-center border-r border-stone-200">
-                       {expandedRow === r.id ? <ChevronUp size={16} className="text-rose-700"/> : <ChevronDown size={16} className="text-stone-400 group-hover:text-rose-700"/>}
+                  <tr onClick={() => toggleRow(r.id)} className={`border-b border-stone-200 cursor-pointer transition-colors ${expandedRow === r.id ? 'bg-rose-50/70' : 'hover:bg-stone-50'}`}>
+                    <td className="py-4 px-5 text-center">
+                       <div className={`mx-auto flex items-center justify-center w-7 h-7 rounded-lg transition-all ${expandedRow === r.id ? 'bg-rose-700 text-white shadow-sm' : 'bg-stone-100 text-stone-400 hover:bg-stone-200 hover:text-stone-700'}`}>
+                         {expandedRow === r.id ? <ChevronUp size={16} strokeWidth={2}/> : <ChevronDown size={16} strokeWidth={2}/>}
+                       </div>
                     </td>
 
                     {/* IDENTITY */}
-                    <td className="py-3 px-4 border-r border-stone-200">
-                      <div className="flex items-center gap-3">
-
-                        {/* PHOTO */}
+                    <td className="py-4 px-5">
+                      <div className="flex items-center gap-4">
                         {r.photo_url ? (
-                          <img
-                            src={r.photo_url}
-                            alt="Resident"
-                            className="w-10 h-10 rounded-full object-cover border border-stone-300"
-                          />
+                          <img src={r.photo_url} alt="Resident" className="w-12 h-12 rounded-full object-cover border-2 border-stone-200 shadow-sm" />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-stone-200 flex items-center justify-center text-xs text-stone-500">
+                          <div className="w-12 h-12 rounded-full bg-stone-100 border-2 border-stone-200 flex items-center justify-center text-[10px] font-normal text-stone-400 uppercase tracking-wider">
                             N/A
                           </div>
                         )}
-
-                        {/* NAME */}
                         <div className="flex flex-col">
-                          <span className="font-bold text-stone-800 uppercase text-[13px]">
-                            {r.last_name},{' '}
-                            {r.first_name} {r.middle_name || ''} {r.ext_name || ''}
+                          <span className="font-medium text-stone-800 text-[15px] tracking-tight uppercase">
+                            {r.last_name}, {r.first_name} {r.middle_name || ''} {r.ext_name || ''}
                           </span>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[10px] bg-stone-100 border border-stone-200 px-1 rounded text-stone-500 font-mono">
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded text-[10px] font-normal uppercase tracking-wider">
                               {r.sex}
                             </span>
-                            <span className="text-[10px] text-rose-700 font-bold uppercase">
-                              {r.occupation || "N/A"}
+                            <span className="text-xs font-normal text-stone-400 uppercase truncate max-w-[120px]">
+                              {r.occupation || "Unspecified"}
                             </span>
                           </div>
                         </div>
-
                       </div>
                     </td>
+
                     {/* BIRTH INFO */}
-                    <td className="py-3 px-4 border-r border-stone-200 font-mono text-xs text-stone-600">
-                       {formatDate(r.birthdate)}
-                       <span className="ml-2 text-stone-400">({calculateAge(r.birthdate)}y)</span>
+                    <td className="py-4 px-5">
+                       <span className="block font-medium text-stone-700 uppercase tracking-wide">{formatDate(r.birthdate)}</span>
+                       <span className="text-xs font-normal text-stone-400">{calculateAge(r.birthdate)} years old</span>
                     </td>
 
                     {/* ADDRESS */}
-                    <td className="py-3 px-4 border-r border-stone-200 text-xs">
-                       <span className="block font-bold text-stone-700 uppercase">{r.barangay}</span>
-                       <span className="block text-stone-500">Purok {r.purok} {r.house_no ? `#${r.house_no}` : ''}</span>
+                    <td className="py-4 px-5">
+                       <span className="block font-medium text-stone-700 uppercase tracking-wide">{r.barangay}</span>
+                       <span className="block text-xs font-normal text-stone-400 uppercase">PUROK {r.purok} {r.house_no ? `#${r.house_no}` : ''}</span>
                     </td>
 
                     {/* SECTOR */}
-                    <td className="py-3 px-4 border-r border-stone-200">
-                       <span className="inline-block border border-stone-200 bg-stone-50 px-2 py-0.5 text-[10px] font-bold text-stone-600 uppercase tracking-tight truncate max-w-[150px]">
+                    <td className="py-4 px-5">
+                       <span className="inline-flex items-center bg-stone-100 border border-stone-200 px-3 py-1.5 rounded-lg text-[11px] font-normal text-stone-600 tracking-tight uppercase max-w-[150px] truncate shadow-sm">
                           {formatSectors(r.sector_summary, r.other_sector_details)}
                        </span>
                     </td>
 
                     {/* ACTIONS */}
-                    <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
-                       <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => onEdit(r)} className="p-1.5 text-stone-500 hover:text-white hover:bg-stone-700 rounded-sm transition-all" title="Edit Residents">
-                             <Edit size={14} />
+                    <td className="py-4 px-5 text-right" onClick={(e) => e.stopPropagation()}>
+                       <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => onEdit(r)} className="p-2.5 bg-stone-100 text-stone-500 hover:bg-rose-600 hover:text-white rounded-lg transition-all shadow-sm border border-stone-200 hover:border-rose-600" title="Edit Resident">
+                              <Edit size={16} strokeWidth={2} />
                           </button>
-                          {userRole === "admin" && (
-                            <button
-                              onClick={() => setAssistanceModal({ isOpen: true, resident: r })}
-                              className="p-1.5 text-stone-500 hover:text-white hover:bg-indigo-700 rounded-sm transition-all"
-                              title="Add Assistance"
-                            >
-                              <FileText size={14} />
-                            </button>
-                          )}
-                          {userRole === "admin" && (
-                          <button
-                            onClick={() => navigate(`/dashboard/residents/${r.resident_code}/qr`)}
-                            className="p-1.5 text-stone-500 hover:text-white hover:bg-emerald-700 rounded-sm transition-all"
-                            title="Generate QR"
-                          >
-                            <QrCode size={14} />
-                          </button>
-                        )}
                           {userRole === "admin" && (
                             <>
-                              {/* ARCHIVE */}
-                              <button
-                                onClick={() => handleArchive(r.id)}
-                                className="text-amber-600 hover:text-amber-800" title="Archive Residents"
-                              >
-                                <Archive size={14} />
+                              <button onClick={() => setAssistanceModal({ isOpen: true, resident: r })} className="p-2.5 bg-stone-100 text-stone-500 hover:bg-rose-700 hover:text-white rounded-lg transition-all shadow-sm border border-stone-200 hover:border-rose-700" title="Add Assistance">
+                                <FileText size={16} strokeWidth={2} />
+                              </button>
+                              <button onClick={() => navigate(`/dashboard/residents/${r.resident_code}/qr`)} className="p-2.5 bg-stone-100 text-stone-500 hover:bg-stone-800 hover:text-white rounded-lg transition-all shadow-sm border border-stone-200 hover:border-stone-800" title="Generate QR">
+                                <QrCode size={16} strokeWidth={2} />
+                              </button>
+                              <button onClick={() => handleArchive(r.id)} className="p-2.5 bg-stone-100 text-stone-500 hover:bg-orange-700 hover:text-white rounded-lg transition-all shadow-sm border border-stone-200 hover:border-orange-700" title="Archive Resident">
+                                <Archive size={16} strokeWidth={2} />
                               </button>
                             </>
                           )}
                        </div>
                     </td>
                   </tr>
+                  
+                  {/* EXPANDED DETAILS */}
                   {expandedRow === r.id && (
                     <tr>
-                      <td colSpan="6" className="p-0 border-b border-stone-300">
-                        <ResidentDetails r={r} />
+                      <td colSpan="6" className="p-0">
+                        {renderResidentDetails(r)}
                       </td>
                     </tr>
                   )}
@@ -881,28 +687,20 @@ export default function ResidentList({ userRole, onEdit }) {
       </div>
 
       {/* --- PAGINATION FOOTER --- */}
-      <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-         <p className="text-xs text-stone-500 font-medium">
-            Total Registry Count: <span className="font-bold text-stone-900">{totalItems}</span>
+      <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-5 px-2">
+         <p className="text-sm font-normal text-stone-500 uppercase tracking-wide">
+            Total Valid Records: <span className="font-medium text-stone-800 text-base">{totalItems}</span>
          </p>
          
-         <div className="flex items-center bg-white border border-stone-300 rounded-sm shadow-sm">
-            <button 
-               disabled={currentPage === 1} 
-               onClick={() => setCurrentPage(prev => prev - 1)}
-               className="px-3 py-2 border-r border-stone-300 text-stone-600 hover:bg-stone-100 disabled:opacity-30 disabled:hover:bg-white"
-            >
-               <ChevronLeft size={16} />
+         <div className="flex items-center bg-white border border-stone-300 rounded-xl shadow-sm p-1.5">
+            <button disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)} className="p-2.5 rounded-lg font-normal text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+               <ChevronLeft size={18} strokeWidth={2} />
             </button>
-            <div className="px-4 py-2 text-xs font-bold text-stone-700">
-               PAGE {currentPage} OF {totalPages || 1}
+            <div className="px-5 py-1.5 text-sm font-normal text-stone-700 min-w-[120px] text-center uppercase tracking-widest">
+               Page {currentPage} of {totalPages || 1}
             </div>
-            <button 
-               disabled={currentPage === totalPages} 
-               onClick={() => setCurrentPage(prev => prev + 1)}
-               className="px-3 py-2 border-l border-stone-300 text-stone-600 hover:bg-stone-100 disabled:opacity-30 disabled:hover:bg-white"
-            >
-               <ChevronRight size={16} />
+            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => prev + 1)} className="p-2.5 rounded-lg font-normal text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+               <ChevronRight size={18} strokeWidth={2} />
             </button>
          </div>
       </div>

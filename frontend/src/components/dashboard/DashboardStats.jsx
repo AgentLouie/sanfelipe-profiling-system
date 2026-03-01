@@ -4,9 +4,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
-import { UsersRound, Building2, UserRound, ShieldAlert, Loader2, Activity } from 'lucide-react';
+import { UsersRound, Building2, UserRound, ShieldAlert, Loader2, MapPin, Activity } from 'lucide-react';
 
-// --- STYLE INJECTION FOR PUBLIC SANS (USWDS Standard) ---
 const govFontStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800&display=swap');
   .font-gov { font-family: 'Public Sans', system-ui, -apple-system, sans-serif; }
@@ -15,6 +14,8 @@ const govFontStyles = `
 export default function DashboardStats({ userRole }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const logoUrl = '/san_felipe_seal.png';
 
   const isAdmin = userRole?.toLowerCase() === 'admin';
 
@@ -31,7 +32,6 @@ export default function DashboardStats({ userRole }) {
         setTimeout(() => {
             setLoading(false);
         }, 500);
-
       } catch (err) {
         console.error('Failed to fetch stats:', err);
         setLoading(false);
@@ -43,20 +43,19 @@ export default function DashboardStats({ userRole }) {
 
   if (!isAdmin) {
     return (
-      <div className="font-gov flex flex-col items-center justify-center min-h-[60vh] bg-stone-50 border border-stone-200 rounded-lg p-12 text-center">
+      <div className="font-gov flex flex-col items-center justify-center min-h-[60vh] bg-slate-50/50 border border-slate-200 rounded-3xl p-12 text-center shadow-sm animate-in fade-in zoom-in-95 duration-300">
         <style>{govFontStyles}</style>
-        <div className="bg-red-50 p-4 rounded-full mb-6 border border-red-100">
-          <ShieldAlert size={40} className="text-red-900" />
+        <div className="bg-red-50 p-5 rounded-full mb-6 border border-red-100/50 shadow-sm">
+          <ShieldAlert size={48} className="text-red-500" />
         </div>
-        <h2 className="text-2xl font-bold text-stone-900 tracking-tight">Access Restricted</h2>
-        <p className="text-stone-600 mt-3 max-w-sm mx-auto text-base leading-relaxed">
-          Global statistics are strictly limited to Administrator accounts.
+        <h2 className="text-2xl font-medium text-slate-800 tracking-tight">Access Restricted</h2>
+        <p className="text-slate-500 mt-3 max-w-sm mx-auto text-sm leading-relaxed font-normal">
+          Global statistics and demographic analytics are strictly limited to Administrator accounts.
         </p>
       </div>
     );
   }
 
-  // --- LOADING STATE ---
   if (loading) {
     return (
         <>
@@ -79,7 +78,7 @@ export default function DashboardStats({ userRole }) {
     { name: 'Female', value: stats?.total_female || 0 },
   ];
 
-  const GENDER_COLORS = ['#57534e', '#7f1d1d']; 
+  const GENDER_COLORS = ['#475569', '#dc2626'];
 
   const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
     const RADIAN = Math.PI / 180;
@@ -94,7 +93,7 @@ export default function DashboardStats({ userRole }) {
         fill="white" 
         textAnchor="middle" 
         dominantBaseline="central" 
-        className="text-xs font-bold font-gov"
+        className="text-xs font-normal font-gov tracking-wide"
       >
         {`${(percent * 100).toFixed(0)}%`}
       </text>
@@ -102,42 +101,58 @@ export default function DashboardStats({ userRole }) {
   };
 
   return (
-    <div className="font-gov space-y-8 pb-12 animate-in fade-in duration-700 bg-stone-50/50 p-6 rounded-xl">
+    <div className="font-gov space-y-8 pb-12 animate-in fade-in duration-500 max-w-7xl mx-auto">
       <style>{govFontStyles}</style>
 
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-stone-200 pb-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
         <div>
-          <h6 className="text-xs font-bold text-red-900/80 uppercase tracking-widest mb-1">
-            Municipality of San Felipe, Zambales
-          </h6>
-          <h1 className="text-3xl font-extrabold text-stone-900 tracking-tight">
-            Demographic Overview
+          <div className="flex items-center gap-2.5 text-red-600 mb-2">
+            <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center border border-slate-200 shadow-sm p-0.5 overflow-hidden">
+                <img 
+                    src={logoUrl} 
+                    alt="San Felipe Seal" 
+                    className="w-full h-full object-contain rounded-full" 
+                    onError={(e) => (e.target.style.display = 'none')} 
+                />
+            </div>
+            <span className="text-[11px] font-medium tracking-widest uppercase">Municipality of San Felipe, Zambales</span>
+          </div>
+          <h1 className="text-3xl font-medium text-slate-800 tracking-tight">
+            Population Overview
           </h1>
         </div>
       </div>
 
       {/* STAT CARDS ROW */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatCard 
           title="Total Residents" 
           value={stats?.total_residents} 
-          icon={<UsersRound size={20} />} 
+          icon={<UsersRound size={22} />} 
+          colorClass="text-blue-600"
+          bgClass="bg-blue-50"
         />
         <StatCard 
           title="Total Households" 
           value={stats?.total_households} 
-          icon={<Building2 size={20} />} 
+          icon={<Building2 size={22} />} 
+          colorClass="text-emerald-600"
+          bgClass="bg-emerald-50"
         />
         <StatCard 
           title="Male Population" 
           value={stats?.total_male} 
-          icon={<UserRound size={20} />} 
+          icon={<UserRound size={22} />} 
+          colorClass="text-slate-600"
+          bgClass="bg-slate-100"
         />
         <StatCard 
           title="Female Population" 
           value={stats?.total_female} 
-          icon={<UserRound size={20} />} 
+          icon={<UserRound size={22} />} 
+          colorClass="text-red-600"
+          bgClass="bg-red-50"
         />
       </div>
 
@@ -145,21 +160,24 @@ export default function DashboardStats({ userRole }) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* BARANGAY CHART */}
-        <div className="lg:col-span-2 bg-white rounded-lg p-6 border border-stone-200 shadow-sm">
-          <div className="mb-6 border-b border-stone-100 pb-4">
-            <h3 className="text-base font-bold text-stone-900 uppercase tracking-wide">Population by Location</h3>
-            <p className="text-xs text-stone-500 mt-1">Recorded residents per Barangay unit</p>
+        <div className="lg:col-span-2 bg-white rounded-2xl p-6 md:p-8 border border-slate-200 shadow-sm">
+          <div className="mb-8 flex items-center gap-3 border-b border-slate-100 pb-5">
+            <div className="p-2 bg-slate-50 text-slate-400 rounded-lg border border-slate-100"><MapPin size={20} /></div>
+            <div>
+              <h3 className="text-base font-medium text-slate-800 tracking-tight">Population by Location</h3>
+              <p className="text-xs font-normal text-slate-400 mt-0.5">Recorded residents per Barangay unit</p>
+            </div>
           </div>
           <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={barangayData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7e5e4" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis 
                     dataKey="name" 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fill: '#78716c', fontSize: 11, fontFamily: 'Public Sans', fontWeight: 600 }}
-                    dy={10}
+                    tick={{ fill: '#94a3b8', fontSize: 11, fontFamily: 'Public Sans', fontWeight: 400 }}
+                    dy={15}
                     interval={0}
                     angle={-45}
                     textAnchor="end"
@@ -168,14 +186,14 @@ export default function DashboardStats({ userRole }) {
                 <YAxis 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fill: '#78716c', fontSize: 11, fontFamily: 'Public Sans' }}
+                    tick={{ fill: '#94a3b8', fontSize: 11, fontFamily: 'Public Sans', fontWeight: 400 }}
                 />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f5f5f4' }} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
                 <Bar 
                     dataKey="value" 
-                    fill="#7f1d1d" // Maroon
-                    radius={[2, 2, 0, 0]} 
-                    barSize={24}
+                    fill="#dc2626" 
+                    radius={[6, 6, 0, 0]} 
+                    barSize={28}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -183,10 +201,12 @@ export default function DashboardStats({ userRole }) {
         </div>
 
         {/* GENDER DONUT CHART */}
-        <div className="lg:col-span-1 bg-white rounded-lg p-6 border border-stone-200 shadow-sm flex flex-col">
-          <div className="mb-4 border-b border-stone-100 pb-4">
-            <h3 className="text-base font-bold text-stone-900 uppercase tracking-wide">Gender Ratio</h3>
-            <p className="text-xs text-stone-500 mt-1">Demographic distribution split</p>
+        <div className="lg:col-span-1 bg-white rounded-2xl p-6 md:p-8 border border-slate-200 shadow-sm flex flex-col">
+          <div className="mb-6 flex items-center gap-3 border-b border-slate-100 pb-5">
+            <div className="p-2 bg-slate-50 text-slate-400 rounded-lg border border-slate-100"><UsersRound size={20} /></div>
+            <div>
+              <h3 className="text-base font-medium text-slate-800 tracking-tight">Gender Ratio</h3>
+            </div>
           </div>
           
           <div className="flex-1 relative min-h-[250px]">
@@ -196,9 +216,9 @@ export default function DashboardStats({ userRole }) {
                   data={genderData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={65}
-                  outerRadius={100}
-                  paddingAngle={2}
+                  innerRadius={70}
+                  outerRadius={105}
+                  paddingAngle={3}
                   dataKey="value"
                   stroke="none"
                   labelLine={false}
@@ -215,10 +235,10 @@ export default function DashboardStats({ userRole }) {
             {/* Center Text */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="text-center">
-                    <span className="block text-2xl font-extrabold text-stone-900 tabular-nums tracking-tight">
+                    <span className="block text-2xl font-medium text-slate-800 tabular-nums tracking-tight">
                         {(stats?.total_residents || 0).toLocaleString()}
                     </span>
-                    <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">
+                    <span className="text-[10px] font-normal text-slate-400 uppercase tracking-widest mt-1">
                         Total
                     </span>
                 </div>
@@ -226,19 +246,19 @@ export default function DashboardStats({ userRole }) {
           </div>
 
           {/* Legend */}
-          <div className="mt-4 flex flex-col gap-2 pt-4 border-t border-stone-100">
+          <div className="mt-6 flex flex-col gap-3 pt-5 border-t border-slate-100">
             {genderData.map((entry, index) => (
-              <div key={entry.name} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div key={entry.name} className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-3">
                   <div 
-                    className="w-3 h-3 rounded-sm"
+                    className="w-3.5 h-3.5 rounded-md shadow-sm"
                     style={{ backgroundColor: GENDER_COLORS[index] }}
                   />
-                  <span className="text-xs font-bold text-stone-600 uppercase tracking-wide">
+                  <span className="text-xs font-normal text-slate-600 uppercase tracking-wide">
                     {entry.name}
                   </span>
                 </div>
-                <div className="text-sm font-bold text-stone-900 tabular-nums">
+                <div className="text-sm font-medium text-slate-800 tabular-nums">
                   {entry.value.toLocaleString()}
                 </div>
               </div>
@@ -249,39 +269,39 @@ export default function DashboardStats({ userRole }) {
       </div>
 
       {/* SECTOR LIST CHART */}
-      <div className="bg-white rounded-lg p-6 border border-stone-200 shadow-sm">
-        <div className="flex items-center justify-between mb-6 border-b border-stone-100 pb-4">
-            <div>
-                <h3 className="text-base font-bold text-stone-900 uppercase tracking-wide">Sector Classification</h3>
-                <p className="text-xs text-stone-500 mt-1">Census breakdown by occupation/sector</p>
-            </div>
+      <div className="bg-white rounded-2xl p-6 md:p-8 border border-slate-200 shadow-sm">
+        <div className="flex items-center gap-3 mb-8 border-b border-slate-100 pb-5">
+           <div className="p-2 bg-slate-50 text-slate-400 rounded-lg border border-slate-100"><Activity size={20} /></div>
+           <div>
+               <h3 className="text-base font-medium text-slate-800 tracking-tight">Sector Classification</h3>
+           </div>
         </div>
 
         <div className="w-full overflow-hidden">
-            <ResponsiveContainer width="100%" height={Math.max(400, sectorData.length * 50)}>
+            <ResponsiveContainer width="100%" height={Math.max(400, sectorData.length * 55)}>
               <BarChart
                 layout="vertical"
                 data={sectorData}
                 margin={{ top: 0, right: 30, left: 30, bottom: 0 }}
-                barGap={4}
+                barGap={6}
               >
-                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e7e5e4" />
+                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" />
                 <XAxis type="number" hide />
                 <YAxis 
                     type="category" 
                     dataKey="name" 
                     width={180}
-                    tick={{ fill: '#44403c', fontSize: 12, fontWeight: 600, fontFamily: 'Public Sans' }}
+                    tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 400, fontFamily: 'Public Sans' }}
                     axisLine={false}
                     tickLine={false}
                 />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#fafaf9' }} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
                 <Bar 
                     dataKey="value" 
-                    fill="#7f1d1d" // Maroon
-                    radius={[0, 4, 4, 0]} 
-                    barSize={20}
-                    background={{ fill: '#f5f5f4', radius: [0, 4, 4, 0] }}
+                    fill="#dc2626" 
+                    radius={[0, 6, 6, 0]} 
+                    barSize={24}
+                    background={{ fill: '#f1f5f9', radius: [0, 6, 6, 0] }} 
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -294,19 +314,19 @@ export default function DashboardStats({ userRole }) {
 
 // --- SUBCOMPONENTS ---
 
-function StatCard({ title, value, icon }) {
+function StatCard({ title, value, icon, colorClass, bgClass }) {
   return (
-    <div className="bg-white p-5 rounded-lg border border-stone-200 shadow-sm hover:shadow-md hover:border-red-200 transition-all duration-200">
+    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-red-200 transition-all duration-300 group">
       <div className="flex justify-between items-start">
-        <div className="space-y-1">
-            <p className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">
+        <div className="space-y-1.5">
+            <p className="text-[11px] font-normal text-slate-400 uppercase tracking-widest">
                 {title}
             </p>
-            <h4 className="text-2xl font-extrabold text-stone-900 tabular-nums tracking-tight">
+            <h4 className="text-3xl font-medium text-slate-800 tabular-nums tracking-tight">
                 {(value || 0).toLocaleString()}
             </h4>
         </div>
-        <div className="w-10 h-10 flex items-center justify-center bg-stone-50 text-red-900 rounded-md border border-stone-100">
+        <div className={`w-12 h-12 flex items-center justify-center rounded-xl ${bgClass} ${colorClass} group-hover:scale-110 transition-transform duration-300`}>
              {icon}
         </div>
       </div>
@@ -317,9 +337,9 @@ function StatCard({ title, value, icon }) {
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-stone-900 text-white p-3 rounded-md shadow-xl border border-stone-800 text-xs">
-          <p className="font-bold text-stone-400 mb-1 uppercase tracking-wider">{label}</p>
-          <p className="text-lg font-bold text-white tabular-nums">
+        <div className="bg-slate-900/95 backdrop-blur-sm text-white p-4 rounded-xl shadow-xl border border-slate-800 animate-in zoom-in-95 duration-200">
+          <p className="text-[10px] font-normal text-slate-400 mb-1 uppercase tracking-widest">{label}</p>
+          <p className="text-xl font-medium text-white tabular-nums tracking-tight">
             {payload[0].value.toLocaleString()}
           </p>
         </div>
@@ -331,25 +351,32 @@ const CustomTooltip = ({ active, payload, label }) => {
 // --- LOADING COMPONENT ---
 function BufferingLoader() {
     return (
-        <div className="relative min-h-[80vh] w-full bg-stone-50 p-6 font-gov">
-            {/* 1. Background Skeleton */}
-            <div className="space-y-8 opacity-20 pointer-events-none select-none">
-                <div className="flex justify-between items-end border-b border-stone-300 pb-4">
-                   <div className="h-8 w-48 bg-stone-400 rounded-sm"></div>
+        <div className="relative min-h-[80vh] w-full max-w-7xl mx-auto p-6 font-gov">
+            {/* Background Skeleton */}
+            <div className="space-y-8 opacity-30 pointer-events-none select-none animate-pulse">
+                <div className="mb-8">
+                   <div className="h-4 w-32 bg-slate-300 rounded-full mb-3"></div>
+                   <div className="h-8 w-64 bg-slate-300 rounded-lg"></div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                     {[...Array(4)].map((_, i) => (
-                        <div key={i} className="h-32 bg-stone-300 rounded-md"></div>
+                        <div key={i} className="h-32 bg-slate-200 rounded-2xl"></div>
                     ))}
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+                    <div className="lg:col-span-2 h-[400px] bg-slate-200 rounded-2xl"></div>
+                    <div className="lg:col-span-1 h-[400px] bg-slate-200 rounded-2xl"></div>
                 </div>
             </div>
 
-            {/* 2. Loader Overlay */}
+            {/* Loader Overlay */}
             <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
-                <Loader2 size={32} className="text-red-900 animate-spin mb-4" />
-                <p className="text-xs font-bold text-stone-600 uppercase tracking-widest">
-                    Retrieving Data...
-                </p>
+                <div className="p-5 bg-white rounded-2xl shadow-xl border border-slate-100 flex flex-col items-center animate-in zoom-in-95 duration-300">
+                    <Loader2 size={36} className="text-red-600 animate-spin mb-3" />
+                    <p className="text-[11px] font-normal text-slate-400 uppercase tracking-widest">
+                        Compiling Data...
+                    </p>
+                </div>
             </div>
         </div>
     )
