@@ -1,17 +1,18 @@
 # app/services/import_service.py
 # ------------------------------------------------------------
 # Excel Import Service (Residents + Spouse + Family Members)
-# - Normalizes column headers (old + new forms)
-# - Handles PH dates safely (dayfirst=True)
+# Railway/Postgres-friendly:
+# - PH date parsing (dayfirst=True)
+# - Flexible column normalization
+# - Flexible detection for family columns (supports "1. FIRST NAME", "1.FIRST NAME", "1 . FIRST NAME")
 # - Inserts residents with ON CONFLICT DO NOTHING
-# - Fetches resident IDs, then inserts family members
+# - Fetches resident IDs, then inserts family members (chunked)
 # - Skips invalid family slots (requires FIRST NAME)
-# - Chunk inserts to avoid big-transaction / SSL EOF issues on Railway
+# - Returns family_added so your UI can show if family inserts are working
 # ------------------------------------------------------------
 
 from __future__ import annotations
 
-import io
 import re
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
@@ -48,9 +49,9 @@ def get_any(row: pd.Series, *keys: str) -> str:
     return ""
 
 
-def parse_date(date_val: Any) -> Optional[pd.Timestamp]:
+def parse_date(date_val: Any) -> Optional[Any]:
     """
-    Parses Excel dates robustly.
+    Parses Excel dates robustly:
     - supports pd.Timestamp
     - supports Excel serial numbers
     - supports strings like DD/MM/YYYY (PH common) using dayfirst=True
@@ -75,7 +76,6 @@ def parse_date(date_val: Any) -> Optional[pd.Timestamp]:
     try:
         return pd.to_datetime(s, dayfirst=True, errors="raise").date()
     except Exception:
-        # fallback
         try:
             dt = pd.to_datetime(s, errors="coerce")
             return dt.date() if dt is not pd.NaT else None
@@ -84,9 +84,6 @@ def parse_date(date_val: Any) -> Optional[pd.Timestamp]:
 
 
 def is_checked(value: Any) -> bool:
-    """
-    Treat any non-empty string as checked (since some Excel exports may not use ✓ or 1)
-    """
     v = clean_str(value).lower()
     return v in ["\\", "/", "✓", "1", "yes", "y", "true"] or v != ""
 
@@ -96,12 +93,17 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     Unifies headers from OLD + NEW forms:
     - strips everything after first newline or '('
     - uppercases
-    - fixes common variants (CONTACT/PHONE NUMBER, PRECINT/PRECINCT, EXTENSION NAME/EXT NAME)
+    - normalizes common variants
+    - IMPORTANT: keeps leading "1." / "2." etc so family member columns remain detectable
     """
     cols: List[str] = []
     for c in df.columns:
         c = str(c)
-        c = re.sub(r"\s*[\(\n].*", "", c)  # remove from first "(" or "\n" onward
+
+        # remove from first "(" or "\n" onward
+        c = re.sub(r"\s*[\(\n].*", "", c)
+
+        # normalize spaces
         c = re.sub(r"\s+", " ", c).strip().upper()
 
         # Standardize common variants
@@ -120,19 +122,14 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def chunked(lst: List[Dict[str, Any]], size: int) -> List[List[Dict[str, Any]]]:
-    return [lst[i : i + size] for i in range(0, len(lst), size)]
+def chunked(items: List[Dict[str, Any]], size: int) -> List[List[Dict[str, Any]]]:
+    return [items[i : i + size] for i in range(0, len(items), size)]
 
 
 # ===============================
 # MAIN IMPORT
 # ===============================
 def process_excel_import(file_content, db: Session, sheet_name=None) -> Dict[str, Any]:
-    """
-    file_content: bytes, file-like, or BytesIO
-    sheet_name: Excel sheet name or index. If None, uses first sheet (0)
-    """
-    # ----- read excel -----
     df = pd.read_excel(
         file_content,
         sheet_name=(0 if sheet_name is None else sheet_name),
@@ -174,8 +171,6 @@ def process_excel_import(file_content, db: Session, sheet_name=None) -> Dict[str
 
     # -------------------------------
     # Detect spouse columns (NEW profiled)
-    # After normalization, NEW file becomes:
-    # LAST NAME.1, FIRST NAME.1, MIDDLE NAME.1, EXT NAME.1
     # -------------------------------
     spouse_last_col = "LAST NAME.1" if "LAST NAME.1" in df.columns else None
     spouse_first_col = "FIRST NAME.1" if "FIRST NAME.1" in df.columns else None
@@ -183,15 +178,16 @@ def process_excel_import(file_content, db: Session, sheet_name=None) -> Dict[str
     spouse_ext_col = "EXT NAME.1" if "EXT NAME.1" in df.columns else None
 
     # -------------------------------
-    # Family member columns like:
-    # 1. LAST NAME, 1. FIRST NAME, 1. MIDDLE NAME, 1. RELATIONSHIP
+    # Detect family member columns
+    # FIXED: allow "1. FIRST NAME" or "1.FIRST NAME" or "1 . FIRST NAME"
     # -------------------------------
-    family_columns = [c for c in df.columns if re.match(r"^\d+\.\s", c)]
+    family_columns = [c for c in df.columns if re.match(r"^\d+\s*\.", str(c))]
 
     # Map member_no -> {FIELD: column_name}
     members_map: Dict[int, Dict[str, str]] = {}
     for col in family_columns:
-        m = re.match(r"^(\d+)\.\s*(.*)$", col)
+        # Accept: "1. FIRST NAME" or "1.FIRST NAME"
+        m = re.match(r"^(\d+)\s*\.\s*(.*)$", col)
         if not m:
             continue
         no = int(m.group(1))
@@ -212,6 +208,12 @@ def process_excel_import(file_content, db: Session, sheet_name=None) -> Dict[str
             continue
 
         members_map.setdefault(no, {})[field] = col
+
+    # If members_map is empty, family insert will be impossible—capture as error for visibility
+    if not members_map:
+        errors.append(
+            "No family member columns detected. Expected headers like '1. FIRST NAME', '1. RELATIONSHIP', etc."
+        )
 
     # -------------------------------
     # Build rows for ResidentProfile insert
@@ -239,11 +241,10 @@ def process_excel_import(file_content, db: Session, sheet_name=None) -> Dict[str
 
             birthdate = parse_date(row.get("BIRTHDATE"))
 
-            # sectors -> summary text (for dashboard)
+            # sectors -> summary
             active_sectors = [c for c in sector_columns if is_checked(row.get(c))]
             sector_summary = ", ".join(active_sectors) if active_sectors else None
 
-            # spouse info (NEW file)
             spouse_last = clean_str(row.get(spouse_last_col)).upper() if spouse_last_col else ""
             spouse_first = clean_str(row.get(spouse_first_col)).upper() if spouse_first_col else ""
             spouse_middle = clean_str(row.get(spouse_middle_col)).upper() if spouse_middle_col else ""
@@ -284,7 +285,7 @@ def process_excel_import(file_content, db: Session, sheet_name=None) -> Dict[str
             errors.append(f"Row {index + 2}: {str(e)}")
 
     # -------------------------------
-    # Insert residents with ON CONFLICT DO NOTHING
+    # Insert residents
     # -------------------------------
     inserted_count = 0
     if residents_to_insert:
@@ -309,7 +310,7 @@ def process_excel_import(file_content, db: Session, sheet_name=None) -> Dict[str
             }
 
     # -------------------------------
-    # Fetch IDs for residents in this file (so we can insert family members)
+    # Fetch IDs for residents in this file (for family members)
     # -------------------------------
     resident_id_map: Dict[Tuple[str, str, str, str], int] = {}
     if resident_keys_in_file:
@@ -345,60 +346,62 @@ def process_excel_import(file_content, db: Session, sheet_name=None) -> Dict[str
             }
 
     # -------------------------------
-    # Build family_members insert rows
-    # IMPORTANT FIXES:
+    # Build family_members rows
+    # Key fixes:
     # - require FIRST NAME (prevents NOT NULL / invalid inserts)
-    # - skip truly blank slots
+    # - flexible family column detection above
     # -------------------------------
     family_to_insert: List[Dict[str, Any]] = []
 
-    for index, row in df.iterrows():
-        try:
-            last_name = clean_str(row.get("LAST NAME")).upper()
-            first_name = clean_str(row.get("FIRST NAME")).upper()
-            middle_name = clean_str(row.get("MIDDLE NAME")).upper()
-            barangay = clean_str(row.get("BARANGAY")).upper()
+    # If members_map is empty, skip family processing entirely (but return errors)
+    if members_map:
+        for index, row in df.iterrows():
+            try:
+                last_name = clean_str(row.get("LAST NAME")).upper()
+                first_name = clean_str(row.get("FIRST NAME")).upper()
+                middle_name = clean_str(row.get("MIDDLE NAME")).upper()
+                barangay = clean_str(row.get("BARANGAY")).upper()
 
-            if not last_name or not first_name:
-                continue
-
-            key = (last_name, first_name, middle_name, barangay)
-            resident_id = resident_id_map.get(key)
-            if not resident_id:
-                continue
-
-            for member_no in sorted(members_map.keys()):
-                cols = members_map[member_no]
-
-                lname = clean_str(row.get(cols.get("LAST NAME", ""))).upper()
-                fname = clean_str(row.get(cols.get("FIRST NAME", ""))).upper()
-                mname = clean_str(row.get(cols.get("MIDDLE NAME", ""))).upper()
-                ext = clean_str(row.get(cols.get("EXT NAME", ""))).upper()
-                rel = clean_str(row.get(cols.get("RELATIONSHIP", ""))).upper()
-
-                # ✅ must have first name to create a person record
-                if fname == "":
+                if not last_name or not first_name:
                     continue
 
-                # default lname to household last name if empty
-                if lname == "":
-                    lname = last_name
+                key = (last_name, first_name, middle_name, barangay)
+                resident_id = resident_id_map.get(key)
+                if not resident_id:
+                    continue
 
-                family_to_insert.append(
-                    {
-                        "profile_id": resident_id,
-                        "last_name": lname,
-                        "first_name": fname,
-                        "middle_name": (mname or None),
-                        "ext_name": (ext or None),
-                        "relationship": (rel or None),
-                        "is_active": True,
-                        "is_family_head": False,
-                    }
-                )
+                for member_no in sorted(members_map.keys()):
+                    cols = members_map[member_no]
 
-        except Exception as e:
-            errors.append(f"Family row {index + 2}: {str(e)}")
+                    lname = clean_str(row.get(cols.get("LAST NAME", ""))).upper()
+                    fname = clean_str(row.get(cols.get("FIRST NAME", ""))).upper()
+                    mname = clean_str(row.get(cols.get("MIDDLE NAME", ""))).upper()
+                    ext = clean_str(row.get(cols.get("EXT NAME", ""))).upper()
+                    rel = clean_str(row.get(cols.get("RELATIONSHIP", ""))).upper()
+
+                    # MUST have first name
+                    if fname == "":
+                        continue
+
+                    # default lname to household last name if empty
+                    if lname == "":
+                        lname = last_name
+
+                    family_to_insert.append(
+                        {
+                            "profile_id": resident_id,
+                            "last_name": lname,
+                            "first_name": fname,
+                            "middle_name": (mname or None),
+                            "ext_name": (ext or None),
+                            "relationship": (rel or None),
+                            "is_active": True,
+                            "is_family_head": False,
+                        }
+                    )
+
+            except Exception as e:
+                errors.append(f"Family row {index + 2}: {str(e)}")
 
     # -------------------------------
     # Insert family members (chunked)
