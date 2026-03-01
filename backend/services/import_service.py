@@ -1,17 +1,43 @@
-import pandas as pd
+# app/services/import_service.py
+# ------------------------------------------------------------
+# Excel Import Service (Residents + Spouse + Family Members)
+# - Normalizes column headers (old + new forms)
+# - Handles PH dates safely (dayfirst=True)
+# - Inserts residents with ON CONFLICT DO NOTHING
+# - Fetches resident IDs, then inserts family members
+# - Skips invalid family slots (requires FIRST NAME)
+# - Chunk inserts to avoid big-transaction / SSL EOF issues on Railway
+# ------------------------------------------------------------
+
+from __future__ import annotations
+
+import io
 import re
 import uuid
+from typing import Any, Dict, List, Optional, Tuple
+
+import pandas as pd
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import tuple_
+from sqlalchemy.exc import SQLAlchemyError
+
 from app.models.models import ResidentProfile, FamilyMember
 
 
 # ===============================
 # Helpers
 # ===============================
-def get_any(row, *keys):
+def clean_str(val: Any) -> str:
+    if val is None:
+        return ""
+    text = str(val).strip()
+    if text.lower() in ["nan", "none", "null", "-", "na", "n/a"]:
+        return ""
+    return text
+
+
+def get_any(row: pd.Series, *keys: str) -> str:
     for k in keys:
         v = row.get(k)
         if v is None:
@@ -21,16 +47,14 @@ def get_any(row, *keys):
             return s
     return ""
 
-def clean_str(val):
-    if val is None:
-        return ""
-    text = str(val).strip()
-    if text.lower() in ["nan", "none", "null", "-", "na", "n/a"]:
-        return ""
-    return text
 
-
-def parse_date(date_val):
+def parse_date(date_val: Any) -> Optional[pd.Timestamp]:
+    """
+    Parses Excel dates robustly.
+    - supports pd.Timestamp
+    - supports Excel serial numbers
+    - supports strings like DD/MM/YYYY (PH common) using dayfirst=True
+    """
     if date_val is None or pd.isna(date_val):
         return None
 
@@ -40,16 +64,29 @@ def parse_date(date_val):
     if isinstance(date_val, (int, float)):
         try:
             return pd.to_datetime(date_val, origin="1899-12-30", unit="D").date()
-        except:
+        except Exception:
             return None
 
-    try:
-        return pd.to_datetime(clean_str(date_val)).date()
-    except:
+    s = clean_str(date_val)
+    if not s:
         return None
 
+    # PH common: DD/MM/YYYY
+    try:
+        return pd.to_datetime(s, dayfirst=True, errors="raise").date()
+    except Exception:
+        # fallback
+        try:
+            dt = pd.to_datetime(s, errors="coerce")
+            return dt.date() if dt is not pd.NaT else None
+        except Exception:
+            return None
 
-def is_checked(value):
+
+def is_checked(value: Any) -> bool:
+    """
+    Treat any non-empty string as checked (since some Excel exports may not use ✓ or 1)
+    """
     v = clean_str(value).lower()
     return v in ["\\", "/", "✓", "1", "yes", "y", "true"] or v != ""
 
@@ -61,15 +98,16 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     - uppercases
     - fixes common variants (CONTACT/PHONE NUMBER, PRECINT/PRECINCT, EXTENSION NAME/EXT NAME)
     """
-    cols = []
+    cols: List[str] = []
     for c in df.columns:
         c = str(c)
-        c = re.sub(r"\s*[\(\n].*", "", c)     # remove from first "(" or "\n" onward
+        c = re.sub(r"\s*[\(\n].*", "", c)  # remove from first "(" or "\n" onward
         c = re.sub(r"\s+", " ", c).strip().upper()
 
-        # Standardize
+        # Standardize common variants
         c = c.replace("EXTENSION NAME", "EXT NAME")
         c = c.replace("CONTACT", "PHONE NUMBER")
+
         c = c.replace("PRECINCT NUMBER ", "PRECINCT NUMBER")
         c = c.replace("PRECINCT NUMBER.", "PRECINCT NUMBER")
         c = c.replace("PRECINCT NO.", "PRECINCT NUMBER")
@@ -82,16 +120,24 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def chunked(lst: List[Dict[str, Any]], size: int) -> List[List[Dict[str, Any]]]:
+    return [lst[i : i + size] for i in range(0, len(lst), size)]
+
+
 # ===============================
 # MAIN IMPORT
 # ===============================
-def process_excel_import(file_content, db: Session, sheet_name=None):
-
+def process_excel_import(file_content, db: Session, sheet_name=None) -> Dict[str, Any]:
+    """
+    file_content: bytes, file-like, or BytesIO
+    sheet_name: Excel sheet name or index. If None, uses first sheet (0)
+    """
+    # ----- read excel -----
     df = pd.read_excel(
         file_content,
         sheet_name=(0 if sheet_name is None else sheet_name),
         dtype=object,
-        engine="openpyxl"
+        engine="openpyxl",
     )
 
     df = df.replace({pd.NaT: None})
@@ -100,10 +146,10 @@ def process_excel_import(file_content, db: Session, sheet_name=None):
 
     success_count = 0
     skipped_duplicates = 0
-    errors = []
+    errors: List[str] = []
 
     # -------------------------------
-    # Detect sector columns (if any)
+    # Detect sector columns
     # -------------------------------
     possible_sectors = [
         "INDIGENOUS PEOPLE",
@@ -143,7 +189,7 @@ def process_excel_import(file_content, db: Session, sheet_name=None):
     family_columns = [c for c in df.columns if re.match(r"^\d+\.\s", c)]
 
     # Map member_no -> {FIELD: column_name}
-    members_map: dict[int, dict[str, str]] = {}
+    members_map: Dict[int, Dict[str, str]] = {}
     for col in family_columns:
         m = re.match(r"^(\d+)\.\s*(.*)$", col)
         if not m:
@@ -170,9 +216,9 @@ def process_excel_import(file_content, db: Session, sheet_name=None):
     # -------------------------------
     # Build rows for ResidentProfile insert
     # -------------------------------
-    seen_in_file = set()
-    residents_to_insert = []
-    resident_keys_in_file = []  # to later fetch IDs
+    seen_in_file: set[Tuple[str, str, str, str]] = set()
+    residents_to_insert: List[Dict[str, Any]] = []
+    resident_keys_in_file: List[Tuple[str, str, str, str]] = []
 
     for index, row in df.iterrows():
         try:
@@ -198,56 +244,47 @@ def process_excel_import(file_content, db: Session, sheet_name=None):
             sector_summary = ", ".join(active_sectors) if active_sectors else None
 
             # spouse info (NEW file)
-            spouse_last = clean_str(row.get(spouse_last_col)).upper() if spouse_last_col else None
-            spouse_first = clean_str(row.get(spouse_first_col)).upper() if spouse_first_col else None
-            spouse_middle = clean_str(row.get(spouse_middle_col)).upper() if spouse_middle_col else None
-            spouse_ext = clean_str(row.get(spouse_ext_col)).upper() if spouse_ext_col else None
+            spouse_last = clean_str(row.get(spouse_last_col)).upper() if spouse_last_col else ""
+            spouse_first = clean_str(row.get(spouse_first_col)).upper() if spouse_first_col else ""
+            spouse_middle = clean_str(row.get(spouse_middle_col)).upper() if spouse_middle_col else ""
+            spouse_ext = clean_str(row.get(spouse_ext_col)).upper() if spouse_ext_col else ""
 
-            residents_to_insert.append({
-                "resident_code": "RES-" + uuid.uuid4().hex[:8].upper(),
-                "is_deleted": False,
-                "is_archived": False,
-                "is_family_head": True,
-                "is_active": True,
-                "status": "Active",
-
-                "last_name": last_name,
-                "first_name": first_name,
-                "middle_name": middle_name,
-                "ext_name": clean_str(row.get("EXT NAME")).upper() or None,
-
-                "house_no": clean_str(row.get("HOUSE NO. / STREET")) or None,
-                "purok": clean_str(row.get("PUROK/SITIO")) or clean_str(row.get("PUROK/SITIO ")) or "",
-                "barangay": barangay,
-
-                "birthdate": birthdate,
-                "sex": clean_str(row.get("SEX")),
-                "civil_status": clean_str(row.get("CIVIL STATUS")) or None,
-                "religion": clean_str(row.get("RELIGION")) or None,
-                "occupation": clean_str(row.get("OCCUPATION")) or None,
-                "contact_no": clean_str(row.get("PHONE NUMBER")) or None,
-                "precinct_no": get_any(
-                    row,
-                    "PRECINCT NUMBER",
-                    "PRECINCT NO",
-                    "PRECINT NO",
-                    "PRECINCT"
-                ) or None,
-
-                # spouse fields
-                "spouse_last_name": spouse_last or None,
-                "spouse_first_name": spouse_first or None,
-                "spouse_middle_name": spouse_middle or None,
-                "spouse_ext_name": spouse_ext or None,
-
-                "sector_summary": sector_summary,
-            })
+            residents_to_insert.append(
+                {
+                    "resident_code": "RES-" + uuid.uuid4().hex[:8].upper(),
+                    "is_deleted": False,
+                    "is_archived": False,
+                    "is_family_head": True,
+                    "is_active": True,
+                    "status": "Active",
+                    "last_name": last_name,
+                    "first_name": first_name,
+                    "middle_name": middle_name,
+                    "ext_name": clean_str(row.get("EXT NAME")).upper() or None,
+                    "house_no": clean_str(row.get("HOUSE NO. / STREET")) or None,
+                    "purok": clean_str(row.get("PUROK/SITIO")) or clean_str(row.get("PUROK/SITIO ")) or "",
+                    "barangay": barangay,
+                    "birthdate": birthdate,
+                    "sex": clean_str(row.get("SEX")),
+                    "civil_status": clean_str(row.get("CIVIL STATUS")) or None,
+                    "religion": clean_str(row.get("RELIGION")) or None,
+                    "occupation": clean_str(row.get("OCCUPATION")) or None,
+                    "contact_no": clean_str(row.get("PHONE NUMBER")) or None,
+                    "precinct_no": get_any(row, "PRECINCT NUMBER", "PRECINCT NO", "PRECINT NO", "PRECINCT") or None,
+                    # spouse fields
+                    "spouse_last_name": spouse_last or None,
+                    "spouse_first_name": spouse_first or None,
+                    "spouse_middle_name": spouse_middle or None,
+                    "spouse_ext_name": spouse_ext or None,
+                    "sector_summary": sector_summary,
+                }
+            )
 
         except Exception as e:
             errors.append(f"Row {index + 2}: {str(e)}")
 
     # -------------------------------
-    # Insert residents with ON CONFLICT
+    # Insert residents with ON CONFLICT DO NOTHING
     # -------------------------------
     inserted_count = 0
     if residents_to_insert:
@@ -259,42 +296,62 @@ def process_excel_import(file_content, db: Session, sheet_name=None):
         try:
             result = db.execute(stmt)
             db.commit()
-        except Exception as e:
+            inserted_count = result.rowcount or 0
+            success_count = inserted_count
+            skipped_duplicates += (len(residents_to_insert) - inserted_count)
+        except SQLAlchemyError as e:
             db.rollback()
-            return {"added": 0, "skipped_duplicates": skipped_duplicates, "errors": [str(e)]}
-
-        inserted_count = result.rowcount or 0
-        success_count = inserted_count
-        skipped_duplicates += (len(residents_to_insert) - inserted_count)
+            return {
+                "added": 0,
+                "family_added": 0,
+                "skipped_duplicates": skipped_duplicates,
+                "errors": [f"Resident insert error: {str(e)}"],
+            }
 
     # -------------------------------
-    # Fetch IDs for residents in this file
-    # (so we can insert family members)
+    # Fetch IDs for residents in this file (so we can insert family members)
     # -------------------------------
-    resident_id_map = {}
+    resident_id_map: Dict[Tuple[str, str, str, str], int] = {}
     if resident_keys_in_file:
-        rows = db.query(
-            ResidentProfile.id,
-            ResidentProfile.last_name,
-            ResidentProfile.first_name,
-            ResidentProfile.middle_name,
-            ResidentProfile.barangay
-        ).filter(
-            tuple_(
-                ResidentProfile.last_name,
-                ResidentProfile.first_name,
-                ResidentProfile.middle_name,
-                ResidentProfile.barangay
-            ).in_(resident_keys_in_file)
-        ).all()
+        try:
+            rows = (
+                db.query(
+                    ResidentProfile.id,
+                    ResidentProfile.last_name,
+                    ResidentProfile.first_name,
+                    ResidentProfile.middle_name,
+                    ResidentProfile.barangay,
+                )
+                .filter(
+                    tuple_(
+                        ResidentProfile.last_name,
+                        ResidentProfile.first_name,
+                        ResidentProfile.middle_name,
+                        ResidentProfile.barangay,
+                    ).in_(resident_keys_in_file)
+                )
+                .all()
+            )
 
-        for rid, ln, fn, mn, br in rows:
-            resident_id_map[(ln.upper(), fn.upper(), (mn or "").upper(), br.upper())] = rid
+            for rid, ln, fn, mn, br in rows:
+                resident_id_map[(ln.upper(), fn.upper(), (mn or "").upper(), br.upper())] = rid
+        except SQLAlchemyError as e:
+            db.rollback()
+            return {
+                "added": success_count,
+                "family_added": 0,
+                "skipped_duplicates": skipped_duplicates,
+                "errors": errors + [f"Resident ID fetch error: {str(e)}"],
+            }
 
     # -------------------------------
     # Build family_members insert rows
+    # IMPORTANT FIXES:
+    # - require FIRST NAME (prevents NOT NULL / invalid inserts)
+    # - skip truly blank slots
     # -------------------------------
-    family_to_insert = []
+    family_to_insert: List[Dict[str, Any]] = []
+
     for index, row in df.iterrows():
         try:
             last_name = clean_str(row.get("LAST NAME")).upper()
@@ -319,39 +376,47 @@ def process_excel_import(file_content, db: Session, sheet_name=None):
                 ext = clean_str(row.get(cols.get("EXT NAME", ""))).upper()
                 rel = clean_str(row.get(cols.get("RELATIONSHIP", ""))).upper()
 
-                # skip blank member slots
+                # ✅ must have first name to create a person record
                 if fname == "":
-                    # optional: log for debugging
-                    # errors.append(f"Row {index+2} member {member_no}: relationship='{rel}' but missing first name")
                     continue
 
-                # also skip if everything else is blank (extra safe)
-                if lname == "" and mname == "" and ext == "" and rel == "":
-                    continue
+                # default lname to household last name if empty
+                if lname == "":
+                    lname = last_name
 
-                family_to_insert.append({
-                    "profile_id": resident_id,
-                    "last_name": lname,
-                    "first_name": fname,
-                    "middle_name": (mname or None),
-                    "ext_name": (ext or None),
-                    "relationship": (rel or None),
-                    "is_active": True,
-                    "is_family_head": False
-                })
+                family_to_insert.append(
+                    {
+                        "profile_id": resident_id,
+                        "last_name": lname,
+                        "first_name": fname,
+                        "middle_name": (mname or None),
+                        "ext_name": (ext or None),
+                        "relationship": (rel or None),
+                        "is_active": True,
+                        "is_family_head": False,
+                    }
+                )
 
         except Exception as e:
             errors.append(f"Family row {index + 2}: {str(e)}")
 
-    # Insert family members (no conflict rule needed unless you add a unique constraint there)
+    # -------------------------------
+    # Insert family members (chunked)
+    # -------------------------------
+    family_inserted = 0
     if family_to_insert:
-        for fm in family_to_insert:
-            try:
-                db.execute(insert(FamilyMember).values([fm]))
-                db.flush()  # validate now
-            except IntegrityError as e:
-                db.rollback()
-                errors.append(f"Family insert failed for profile_id={fm['profile_id']}: {str(e.orig)}")
-        db.commit()
+        try:
+            for part in chunked(family_to_insert, 1000):
+                result = db.execute(insert(FamilyMember).values(part))
+                db.commit()
+                family_inserted += result.rowcount or 0
+        except SQLAlchemyError as e:
+            db.rollback()
+            errors.append(f"Family insert error: {str(e)}")
 
-    return {"added": success_count, "skipped_duplicates": skipped_duplicates, "errors": errors}
+    return {
+        "added": success_count,
+        "family_added": family_inserted,
+        "skipped_duplicates": skipped_duplicates,
+        "errors": errors,
+    }
