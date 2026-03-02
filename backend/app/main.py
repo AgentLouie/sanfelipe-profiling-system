@@ -575,25 +575,22 @@ def backup_data_zip(
         raise HTTPException(status_code=500, detail=f"Backup failed: {str(e)}")
     
 @app.get("/admin/backup/photos")
-def backup_photos(
+def backup_photos_zip(
     current_user: models.User = Depends(get_current_user),
 ):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
 
     try:
-        # Creates a ZIP of everything under the folder/prefix
-        result = cloudinary.uploader.generate_archive(
+        # Creates a ZIP and uploads it to your Cloudinary as a RAW asset
+        # You can then download it via the returned URL
+        result = cloudinary.api.create_archive(
             resource_type="image",
             type="upload",
-            prefix="san_felipe_residents",  # <-- your Cloudinary folder
+            prefix="san_felipe_residents",  # folder name you used in upload
             target_format="zip"
         )
-
-        # result typically contains a downloadable URL
-        # (return whole result so you can see fields like url/public_id)
         return result
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Photo backup failed: {str(e)}")
 
