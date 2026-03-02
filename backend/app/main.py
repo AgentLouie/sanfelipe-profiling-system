@@ -9,7 +9,6 @@ from services.import_service import process_excel_import
 import io
 import qrcode
 import json, zipfile
-import datetime
 from io import BytesIO
 
 # Authentication
