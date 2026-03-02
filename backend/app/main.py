@@ -9,6 +9,7 @@ from services.import_service import process_excel_import
 import io
 import qrcode
 import json, zipfile
+import cloudinary.uploader
 from io import BytesIO
 
 # Authentication
@@ -572,6 +573,29 @@ def backup_data_zip(
     except Exception as e:
         # ✅ you will now SEE the real reason (table missing, SQL error, etc.)
         raise HTTPException(status_code=500, detail=f"Backup failed: {str(e)}")
+    
+@app.get("/admin/backup/photos")
+def backup_photos(
+    current_user: models.User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    try:
+        # Creates a ZIP of everything under the folder/prefix
+        result = cloudinary.uploader.generate_archive(
+            resource_type="image",
+            type="upload",
+            prefix="san_felipe_residents",  # <-- your Cloudinary folder
+            target_format="zip"
+        )
+
+        # result typically contains a downloadable URL
+        # (return whole result so you can see fields like url/public_id)
+        return result
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Photo backup failed: {str(e)}")
 
 # ------------------------------
 # PROMOTE FAMILY HEAD
