@@ -220,47 +220,61 @@ def login(
 class UserCreate(BaseModel):
     username: str
     password: str
-    role: str = "barangay"
+    role: str
 
 @app.post("/users/")
-def create_user(user: UserCreate,
-                db: Session = Depends(get_db),
-                current_user: models.User = Depends(get_current_user)):
-
+def create_user(
+    user: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
     if current_user.role != "admin":
-        raise HTTPException(status_code=403)
+        raise HTTPException(status_code=403, detail="Admin only")
 
-    existing = db.query(models.User).filter(
-        models.User.username == user.username
-    ).first()
+    allowed_roles = {"admin_limited", "barangay"}  # add others if you have
+    if user.role not in allowed_roles:
+        raise HTTPException(status_code=400, detail=f"Invalid role. Allowed: {sorted(list(allowed_roles))}")
 
+    existing = db.query(models.User).filter(models.User.username == user.username).first()
     if existing:
         raise HTTPException(status_code=400, detail="Username already exists")
 
     hashed_pw = pwd_context.hash(user.password)
-    new_user = models.User(
-        username=user.username,
-        hashed_password=hashed_pw,
-        role=user.role
-    )
+    new_user = models.User(username=user.username, hashed_password=hashed_pw, role=user.role)
 
     db.add(new_user)
     db.commit()
-
     return {"message": "User created successfully"}
 
 @app.get("/users/")
 def get_users(db: Session = Depends(get_db),
               current_user: models.User = Depends(get_current_user)):
 
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403)
+    if current_user.role not in ["admin"]:
+        raise HTTPException(status_code=403, detail="Admin access only")
 
     return db.query(models.User).filter(models.User.is_archived == False).all()
 
 def require_role(required_roles: list[str]):
     def role_checker(current_user: models.User = Depends(get_current_user)):
         if current_user.role not in required_roles:
+            raise HTTPException(
+                status_code=403,
+                detail="You do not have permission to perform this action"
+            )
+        return current_user
+    return role_checker
+
+def require_any_role(roles: list[str]):
+    def role_checker(current_user: models.User = Depends(get_current_user)):
+        if current_user.role not in roles:
+            raise HTTPException(status_code=403, detail="Not allowed")
+        return current_user
+    return role_checker
+
+def deny_roles(denied_roles: list[str]):
+    def role_checker(current_user: models.User = Depends(get_current_user)):
+        if current_user.role in denied_roles:
             raise HTTPException(
                 status_code=403,
                 detail="You do not have permission to perform this action"
@@ -433,9 +447,10 @@ async def upload_resident_photo(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # 🔒 Only admin can upload photo
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
+    # 🔒 Allow admin, admin_limited, and barangay to upload photo
+    allowed_roles = ["admin", "admin_limited", "barangay"]
+    if current_user.role not in allowed_roles:
+        raise HTTPException(status_code=403, detail="Not allowed")
 
     resident = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.id == resident_id,
@@ -446,7 +461,7 @@ async def upload_resident_photo(
         raise HTTPException(status_code=404, detail="Resident not found")
 
     # Validate file type
-    if not file.content_type.startswith("image/"):
+    if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
 
     try:
@@ -469,8 +484,6 @@ async def upload_resident_photo(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
 
 # ------------------------------
 # ARCHIVED ROUTE (MUST BE FIRST)
@@ -825,7 +838,7 @@ def generate_resident_qr(
 ):
     # ✅ Restrict to admin only
     if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access only")
+        raise HTTPException(status_code=403, detail="Admin only")
 
     resident = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.resident_code == resident_code,
