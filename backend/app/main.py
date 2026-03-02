@@ -522,7 +522,7 @@ def backup_data_zip(
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
 
-    ts = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     filename = f"sanfelipe_backup_data_{ts}.zip"
 
     try:
