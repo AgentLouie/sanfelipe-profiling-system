@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Query, UploadFile, File
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Union
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,7 +15,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
-import os
+import os, subprocess
 from dotenv import load_dotenv
 from jose.exceptions import ExpiredSignatureError
 
@@ -494,6 +494,37 @@ def archive_resident(
         raise HTTPException(status_code=404, detail="Resident not found")
 
     return {"message": "Resident archived successfully"}
+
+@app.get("/admin/backup/db")
+def download_db_backup(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        raise HTTPException(status_code=500, detail="DATABASE_URL not set")
+
+    ts = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    filename = f"backup_{ts}.sql"
+    filepath = f"/tmp/{filename}"
+
+    # pg_dump must exist in the environment
+    try:
+        subprocess.run(
+            ["pg_dump", db_url, "--no-owner", "--no-privileges", "-f", filepath],
+            check=True
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Backup failed: {e}")
+
+    return FileResponse(
+        filepath,
+        media_type="application/sql",
+        filename=filename
+    )
 
 # ------------------------------
 # PROMOTE FAMILY HEAD
