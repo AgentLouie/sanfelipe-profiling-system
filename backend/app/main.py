@@ -504,13 +504,9 @@ def get_archived_residents(db: Session = Depends(get_db),
 def archive_resident(
     resident_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(require_role(["admin"]))
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Only admin can archive")
-
     result = crud.archive_resident(db, resident_id, current_user.id)
-
     if not result:
         raise HTTPException(status_code=404, detail="Resident not found")
 
@@ -876,9 +872,10 @@ def get_resident_by_code(
     return resident
 
 @app.delete("/residents/{resident_id}")
-def soft_delete_resident(resident_id: int,
-                         db: Session = Depends(get_db),
-                         current_user: models.User = Depends(get_current_user)):
+def soft_delete_resident(
+    resident_id: int,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_role(["admin"]))):
 
     result = crud.soft_delete_resident(db, resident_id)
     if not result:
@@ -905,13 +902,11 @@ def permanently_delete_resident(
 # ---------------------------------------------------
 
 @app.put("/residents/{resident_id}/restore")
-def restore_resident(resident_id: int,
-                     db: Session = Depends(get_db),
-                     current_user: models.User = Depends(get_current_user)):
-
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403)
-
+def restore_resident(
+    resident_id: int,
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_role(["admin"]))  # ✅ admin only
+):
     result = crud.restore_resident(db, resident_id)
     if not result:
         raise HTTPException(status_code=404)
