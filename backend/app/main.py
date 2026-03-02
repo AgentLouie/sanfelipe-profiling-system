@@ -8,6 +8,8 @@ from sqlalchemy import text, func
 from services.import_service import process_excel_import
 import io
 import qrcode
+import json, zipfile
+import datetime
 from io import BytesIO
 
 # Authentication
@@ -95,6 +97,10 @@ BARANGAY_MAPPING = {
     "sanrafael": "SAN RAFAEL",
     "san rafael": "SAN RAFAEL",
 }
+
+def rows_to_dicts(rows):
+    # rows from .mappings().all() are already dict-like
+    return [dict(r) for r in rows]
 
 # ---------------------------------------------------
 # AUTH HELPERS
@@ -495,35 +501,64 @@ def archive_resident(
 
     return {"message": "Resident archived successfully"}
 
-@app.get("/admin/backup/db")
-def download_db_backup(
-    current_user: models.User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+@app.get("/admin/backup/data")
+def backup_data_zip(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
 
-    db_url = os.getenv("DATABASE_URL")
-    if not db_url:
-        raise HTTPException(status_code=500, detail="DATABASE_URL not set")
-
     ts = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    filename = f"backup_{ts}.sql"
-    filepath = f"/tmp/{filename}"
 
-    # pg_dump must exist in the environment
-    try:
-        subprocess.run(
-            ["pg_dump", db_url, "--no-owner", "--no-privileges", "-f", filepath],
-            check=True
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Backup failed: {e}")
+    # Pull tables using raw SQL so it’s fast + consistent
+    residents = rows_to_dicts(db.execute(text("SELECT * FROM resident_profiles")).mappings().all())
+    family = rows_to_dicts(db.execute(text("SELECT * FROM family_members")).mappings().all())
+    sectors = rows_to_dicts(db.execute(text("SELECT * FROM sectors")).mappings().all())
+    resident_sectors = rows_to_dicts(db.execute(text("SELECT * FROM resident_sectors")).mappings().all())
+    assistances = rows_to_dicts(db.execute(text("SELECT * FROM resident_assistance")).mappings().all())
+    barangays = rows_to_dicts(db.execute(text("SELECT * FROM barangays")).mappings().all())
+    puroks = rows_to_dicts(db.execute(text("SELECT * FROM puroks")).mappings().all())
+    relationships = rows_to_dicts(db.execute(text("SELECT * FROM relationships")).mappings().all())
 
-    return FileResponse(
-        filepath,
-        media_type="application/sql",
-        filename=filename
+    # Optional: users (safer to exclude password hashes in downloadable backups)
+    users = rows_to_dicts(db.execute(text("SELECT id, username, role, failed_attempts, locked_until, is_archived, archived_at FROM users")).mappings().all())
+
+    manifest = {
+        "generated_utc": ts,
+        "counts": {
+            "resident_profiles": len(residents),
+            "family_members": len(family),
+            "sectors": len(sectors),
+            "resident_sectors": len(resident_sectors),
+            "resident_assistance": len(assistances),
+            "barangays": len(barangays),
+            "puroks": len(puroks),
+            "relationships": len(relationships),
+            "users": len(users),
+        }
+    }
+
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as z:
+        z.writestr("manifest.json", json.dumps(manifest, default=str, indent=2))
+        z.writestr("resident_profiles.json", json.dumps(residents, default=str))
+        z.writestr("family_members.json", json.dumps(family, default=str))
+        z.writestr("sectors.json", json.dumps(sectors, default=str))
+        z.writestr("resident_sectors.json", json.dumps(resident_sectors, default=str))
+        z.writestr("resident_assistance.json", json.dumps(assistances, default=str))
+        z.writestr("barangays.json", json.dumps(barangays, default=str))
+        z.writestr("puroks.json", json.dumps(puroks, default=str))
+        z.writestr("relationships.json", json.dumps(relationships, default=str))
+        z.writestr("users.json", json.dumps(users, default=str))
+
+    buf.seek(0)
+
+    filename = f"sanfelipe_backup_data_{ts}.zip"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
 
 # ------------------------------
