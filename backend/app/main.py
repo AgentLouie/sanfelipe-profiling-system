@@ -231,7 +231,7 @@ def create_user(
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
 
-    allowed_roles = {"admin_limited", "barangay"}  # add others if you have
+    allowed_roles = {"barangay", "admin_limited", "admin"}  # add others if you have
     if user.role not in allowed_roles:
         raise HTTPException(status_code=400, detail=f"Invalid role. Allowed: {sorted(list(allowed_roles))}")
 
