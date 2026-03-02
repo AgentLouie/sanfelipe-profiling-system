@@ -36,6 +36,8 @@ export default function ResidentList({ userRole, onEdit }) {
   const [sortBy, setSortBy] = useState("last_name");
   const [sortOrder, setSortOrder] = useState("asc");
 
+  const isAdminLike = userRole === "admin" || userRole === "admin_limited";
+
   // --- HELPERS ---
   const calculateAge = (dob) => {
     if (!dob) return null;
@@ -81,7 +83,7 @@ export default function ResidentList({ userRole, onEdit }) {
     try {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
-      if (userRole === 'admin' && barangay) params.append('barangay', barangay);
+      if (isAdminLike && barangay) params.append("barangay", barangay);
       if (sector) params.append('sector', sector);
       params.append('skip', skip);
       params.append('limit', limit);
@@ -534,7 +536,7 @@ export default function ResidentList({ userRole, onEdit }) {
             </div>
 
             {/* Admin Filter */}
-            {userRole === 'admin' && (
+            {isAdminLike && (
               <div className="relative w-48 hidden md:block">
                  <select value={selectedBarangay} onChange={handleBarangayFilter} className="w-full appearance-none pl-4 pr-10 py-3 bg-white border border-stone-300 rounded-xl text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all cursor-pointer shadow-sm uppercase">
                    <option value="">ALL BARANGAYS</option>

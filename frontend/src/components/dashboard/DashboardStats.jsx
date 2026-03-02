@@ -134,13 +134,6 @@ export default function DashboardStats({ userRole }) {
           bgClass="bg-blue-50"
         />
         <StatCard 
-          title="Total Households" 
-          value={stats?.total_households} 
-          icon={<Building2 size={22} />} 
-          colorClass="text-emerald-600"
-          bgClass="bg-emerald-50"
-        />
-        <StatCard 
           title="Male Population" 
           value={stats?.total_male} 
           icon={<UserRound size={22} />} 

@@ -9,9 +9,20 @@ import toast, { Toaster } from 'react-hot-toast';
 import { createPortal } from 'react-dom';
 
 export default function UserManagement() {
+  const role = localStorage.getItem("role");
+  if (role !== "admin") {
+    return (
+      <div className="max-w-5xl mx-auto p-6">
+        <p className="text-slate-600">Not allowed.</p>
+      </div>
+    );
+  }
   const [users, setUsers] = useState([]);
   const [newUser, setNewUser] = useState({ username: '', password: '', role: 'barangay' });
   const [showForm, setShowForm] = useState(false);
+  
+  // NEW: State for toggling password visibility in the create form
+  const [showNewUserPass, setShowNewUserPass] = useState(false);
   
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,6 +64,7 @@ export default function UserManagement() {
       toast.success("Account Deployed!");
       setShowForm(false);
       setNewUser({ username: '', password: '', role: 'barangay' });
+      setShowNewUserPass(false); // Reset toggle on success
       fetchUsers();
     } catch (err) { 
       if (err.response?.status === 401) {
@@ -74,6 +86,7 @@ export default function UserManagement() {
       });
       toast.success(`Password updated for ${resetModal.username}`);
       setResetModal({ isOpen: false, userId: null, username: '', newPassword: '' });
+      setShowResetPass(false); // Reset toggle on success
     } catch (err) {
       toast.error("Failed to reset password.");
     } finally {
@@ -135,15 +148,39 @@ export default function UserManagement() {
                 <label className="block text-[11px] font-normal text-slate-400 uppercase tracking-wider mb-1.5">Username</label>
                 <input required value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} className="w-full border border-slate-200 bg-slate-50 rounded-xl p-3 text-sm focus:ring-2 focus:ring-red-100 focus:border-red-500 focus:bg-white outline-none transition-all font-normal text-slate-800" placeholder="Enter unique username" />
               </div>
+              
+              {/* UPDATED PASSWORD FIELD */}
               <div>
                 <label className="block text-[11px] font-normal text-slate-400 uppercase tracking-wider mb-1.5">Password</label>
-                <input type="password" required value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} className="w-full border border-slate-200 bg-slate-50 rounded-xl p-3 text-sm focus:ring-2 focus:ring-red-100 focus:border-red-500 focus:bg-white outline-none transition-all font-normal text-slate-800" placeholder="••••••••" />
+                <div className="relative">
+                  <input 
+                    type={showNewUserPass ? "text" : "password"} 
+                    required 
+                    value={newUser.password} 
+                    onChange={e => setNewUser({...newUser, password: e.target.value})} 
+                    className="w-full border border-slate-200 bg-slate-50 rounded-xl p-3 pr-10 text-sm focus:ring-2 focus:ring-red-100 focus:border-red-500 focus:bg-white outline-none transition-all font-normal text-slate-800" 
+                    placeholder="••••••••" 
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowNewUserPass(!showNewUserPass)} 
+                    className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showNewUserPass ? <EyeOff size={18} strokeWidth={2} /> : <Eye size={18} strokeWidth={2} />}
+                  </button>
+                </div>
               </div>
+              
               <div>
                 <label className="block text-[11px] font-normal text-slate-400 uppercase tracking-wider mb-1.5">Access Role</label>
                 <div className="relative">
-                  <select value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value})} className="w-full appearance-none border border-slate-200 bg-slate-50 rounded-xl p-3 text-sm focus:ring-2 focus:ring-red-100 focus:border-red-500 focus:bg-white outline-none transition-all font-normal text-slate-700 cursor-pointer">
+                  <select
+                    value={newUser.role}
+                    onChange={e => setNewUser({ ...newUser, role: e.target.value })}
+                    className="w-full appearance-none border border-slate-200 bg-slate-50 rounded-xl p-3 text-sm focus:ring-2 focus:ring-red-100 focus:border-red-500 focus:bg-white outline-none transition-all font-normal text-slate-700 cursor-pointer"
+                  >
                     <option value="barangay">Barangay Staff</option>
+                    <option value="admin_limited">Admin (Limited)</option>
                     <option value="admin">System Admin</option>
                   </select>
                   <ChevronDown className="absolute right-3.5 top-3.5 text-slate-400 pointer-events-none" size={16} />
@@ -188,15 +225,41 @@ export default function UserManagement() {
                   <tr key={u.id} className="hover:bg-slate-50/60 transition-colors group">
                     <td className="p-4">
                       <div className="flex items-center gap-3.5">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center border shadow-sm ${u.role === 'admin' ? 'bg-red-50 text-red-500 border-red-100' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-                          {u.role === 'admin' ? <Shield size={18} strokeWidth={2} /> : <User size={18} strokeWidth={2} />}
+                        <div
+                          className={`w-10 h-10 rounded-full flex items-center justify-center border shadow-sm ${
+                            u.role === "admin"
+                              ? "bg-red-50 text-red-500 border-red-100"
+                              : u.role === "admin_limited"
+                              ? "bg-amber-50 text-amber-600 border-amber-100"
+                              : "bg-slate-50 text-slate-400 border-slate-200"
+                          }`}
+                        >
+                          {u.role === "admin" ? (
+                            <Shield size={18} strokeWidth={2} />
+                          ) : u.role === "admin_limited" ? (
+                            <ShieldCheck size={18} strokeWidth={2} />
+                          ) : (
+                            <User size={18} strokeWidth={2} />
+                          )}
                         </div>
                         <span className="font-normal text-slate-700 tracking-tight">{u.username}</span>
                       </div>
                     </td>
                     <td className="p-4">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-normal tracking-tight border ${u.role === 'admin' ? 'bg-red-50 text-red-600 border-red-100/50' : 'bg-slate-100 text-slate-500 border-slate-200/50'}`}>
-                        {u.role === 'admin' ? 'Administrator' : 'Barangay Staff'}
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-normal tracking-tight border ${
+                          u.role === "admin"
+                            ? "bg-red-50 text-red-600 border-red-100/50"
+                            : u.role === "admin_limited"
+                            ? "bg-amber-50 text-amber-700 border-amber-100/60"
+                            : "bg-slate-100 text-slate-500 border-slate-200/50"
+                        }`}
+                      >
+                        {u.role === "admin"
+                          ? "Administrator"
+                          : u.role === "admin_limited"
+                          ? "Admin (Limited)"
+                          : "Barangay Staff"}
                       </span>
                     </td>
                     <td className="p-4 text-right">
