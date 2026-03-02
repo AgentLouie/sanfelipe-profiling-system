@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing import List, Union
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sqlalchemy import text, func
+from sqlalchemy import text, func, inspect
 from services.import_service import process_excel_import
 import io
 import qrcode
@@ -501,6 +501,20 @@ def archive_resident(
 
     return {"message": "Resident archived successfully"}
 
+def _dump_table_if_exists(db: Session, z: zipfile.ZipFile, table_name: str):
+    """Export a table as JSON into the zip if it exists."""
+    insp = inspect(engine)
+    tables = set(insp.get_table_names())
+
+    if table_name not in tables:
+        # skip silently but you’ll see it in manifest
+        return {"table": table_name, "status": "skipped_missing", "count": 0}
+
+    rows = db.execute(text(f"SELECT * FROM {table_name}")).mappings().all()
+    data = [dict(r) for r in rows]
+    z.writestr(f"{table_name}.json", json.dumps(data, default=str))
+    return {"table": table_name, "status": "ok", "count": len(data)}
+
 @app.get("/admin/backup/data")
 def backup_data_zip(
     db: Session = Depends(get_db),
@@ -510,56 +524,55 @@ def backup_data_zip(
         raise HTTPException(status_code=403, detail="Admin only")
 
     ts = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-
-    # Pull tables using raw SQL so it’s fast + consistent
-    residents = rows_to_dicts(db.execute(text("SELECT * FROM resident_profiles")).mappings().all())
-    family = rows_to_dicts(db.execute(text("SELECT * FROM family_members")).mappings().all())
-    sectors = rows_to_dicts(db.execute(text("SELECT * FROM sectors")).mappings().all())
-    resident_sectors = rows_to_dicts(db.execute(text("SELECT * FROM resident_sectors")).mappings().all())
-    assistances = rows_to_dicts(db.execute(text("SELECT * FROM resident_assistance")).mappings().all())
-    barangays = rows_to_dicts(db.execute(text("SELECT * FROM barangays")).mappings().all())
-    puroks = rows_to_dicts(db.execute(text("SELECT * FROM puroks")).mappings().all())
-    relationships = rows_to_dicts(db.execute(text("SELECT * FROM relationships")).mappings().all())
-
-    # Optional: users (safer to exclude password hashes in downloadable backups)
-    users = rows_to_dicts(db.execute(text("SELECT id, username, role, failed_attempts, locked_until, is_archived, archived_at FROM users")).mappings().all())
-
-    manifest = {
-        "generated_utc": ts,
-        "counts": {
-            "resident_profiles": len(residents),
-            "family_members": len(family),
-            "sectors": len(sectors),
-            "resident_sectors": len(resident_sectors),
-            "resident_assistance": len(assistances),
-            "barangays": len(barangays),
-            "puroks": len(puroks),
-            "relationships": len(relationships),
-            "users": len(users),
-        }
-    }
-
-    buf = BytesIO()
-    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as z:
-        z.writestr("manifest.json", json.dumps(manifest, default=str, indent=2))
-        z.writestr("resident_profiles.json", json.dumps(residents, default=str))
-        z.writestr("family_members.json", json.dumps(family, default=str))
-        z.writestr("sectors.json", json.dumps(sectors, default=str))
-        z.writestr("resident_sectors.json", json.dumps(resident_sectors, default=str))
-        z.writestr("resident_assistance.json", json.dumps(assistances, default=str))
-        z.writestr("barangays.json", json.dumps(barangays, default=str))
-        z.writestr("puroks.json", json.dumps(puroks, default=str))
-        z.writestr("relationships.json", json.dumps(relationships, default=str))
-        z.writestr("users.json", json.dumps(users, default=str))
-
-    buf.seek(0)
-
     filename = f"sanfelipe_backup_data_{ts}.zip"
-    return StreamingResponse(
-        iter([buf.getvalue()]),
-        media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
-    )
+
+    try:
+        buf = BytesIO()
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as z:
+            results = []
+
+            # ✅ match your actual table names in models.py
+            for t in [
+                "resident_profiles",
+                "family_members",
+                "sectors",
+                "resident_sectors",
+                "resident_assistance",
+                "barangays",
+                "puroks",
+                "relationships",
+            ]:
+                results.append(_dump_table_if_exists(db, z, t))
+
+            # users: export WITHOUT hashed_password
+            insp = inspect(engine)
+            if "users" in set(insp.get_table_names()):
+                users = db.execute(text("""
+                    SELECT id, username, role, failed_attempts, locked_until, is_archived, archived_at
+                    FROM users
+                """)).mappings().all()
+                z.writestr("users.json", json.dumps([dict(r) for r in users], default=str))
+                results.append({"table": "users", "status": "ok", "count": len(users)})
+            else:
+                results.append({"table": "users", "status": "skipped_missing", "count": 0})
+
+            manifest = {
+                "generated_utc": ts,
+                "tables": results
+            }
+            z.writestr("manifest.json", json.dumps(manifest, indent=2))
+
+        buf.seek(0)
+
+        return StreamingResponse(
+            buf,
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+
+    except Exception as e:
+        # ✅ you will now SEE the real reason (table missing, SQL error, etc.)
+        raise HTTPException(status_code=500, detail=f"Backup failed: {str(e)}")
 
 # ------------------------------
 # PROMOTE FAMILY HEAD
