@@ -360,7 +360,7 @@ def create_resident(resident: schemas.ResidentCreate,
                     db: Session = Depends(get_db),
                     current_user: models.User = Depends(get_current_user)):
     
-    if current_user.role != "admin":
+    if current_user.role not in ["admin", "admin_limited"]:
         username_lower = current_user.username.lower()
         official_name = None
         for key in BARANGAY_MAPPING:
@@ -792,7 +792,7 @@ def read_residents(skip: int = 0,
 
     filter_barangay = barangay
 
-    if current_user.role != "admin":
+    if current_user.role not in ["admin", "admin_limited"]:
         username_lower = current_user.username.lower()
         official_name = None
         for key in BARANGAY_MAPPING:
@@ -953,7 +953,7 @@ def export_residents_excel(
     # Restrict barangay automatically for non-admin
     target_barangay = barangay
 
-    if current_user.role != "admin":
+    if current_user.role not in ["admin", "admin_limited"]:
         official_name = BARANGAY_MAPPING.get(current_user.username.lower())
 
         if official_name:
