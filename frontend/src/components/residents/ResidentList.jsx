@@ -208,155 +208,165 @@ export default function ResidentList({ userRole, onEdit }) {
   };
 
   // --- DETAILS SUB-RENDER FUNCTION ---
-  const renderResidentDetails = (r) => (
-    <div className="bg-stone-100 p-6 md:p-8 shadow-inner rounded-b-xl border-t-2 border-stone-200">
-      <div className="flex items-center gap-3 mb-6 border-b border-stone-300 pb-4">
-         <div className="p-2 bg-rose-700 text-white rounded-lg shadow-sm"><FileText size={18} /></div>
-         <h3 className="text-lg font-medium text-stone-900 tracking-tight">Information Background</h3>
-      </div>
+  const renderResidentDetails = (r) => {
+    const created = r.created_at ? new Date(r.created_at) : null;
+    const updated = r.updated_at ? new Date(r.updated_at) : null;
+    const wasEdited =
+    created && updated && Math.abs(updated.getTime() - created.getTime()) > 1000;
+    return (
+      <div className="bg-stone-100 p-6 md:p-8 shadow-inner rounded-b-xl border-t-2 border-stone-200">
+        <div className="flex items-center gap-3 mb-6 border-b border-stone-300 pb-4">
+          <div className="p-2 bg-rose-700 text-white rounded-lg shadow-sm"><FileText size={18} /></div>
+          <h3 className="text-lg font-medium text-stone-900 tracking-tight">Information Background</h3>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Left Column */}
-        <div className="space-y-6">
-          <div className="bg-white border border-stone-300 rounded-xl p-5 shadow-sm">
-            <h4 className="text-xs font-medium text-stone-700 uppercase tracking-wider mb-5 flex justify-between items-center border-b border-stone-100 pb-3">
-              Personal Information
-              {r.photo_url && (
-                <img src={r.photo_url} alt="Resident" className="w-14 h-14 object-cover rounded-full border-2 border-stone-200 shadow-sm" />
-              )}
-            </h4>
-            <div className="grid grid-cols-2 gap-y-6 gap-x-4">
-              <div>
-                <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Civil Status</p>
-                <p className="text-sm font-normal text-stone-800">{r.civil_status || '-'}</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Religion</p>
-                <p className="text-sm font-normal text-stone-800">{r.religion || '-'}</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Contact</p>
-                <p className="text-sm font-normal text-stone-800">{r.contact_no || '-'}</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Precinct ID</p>
-                <p className="text-sm font-mono font-normal text-stone-800 bg-stone-100 px-2 py-1 rounded border border-stone-200 inline-block">{r.precinct_no || '-'}</p>
-              </div>
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">
-                Last Updated
-              </p>
-              <p className="text-sm font-normal text-stone-800">
-                {formatDateTime(r.updated_at || r.created_at)}
-              </p>
-            </div>
-          </div>
         
-          {r.assistances?.length > 0 && (
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Left Column */}
+          <div className="space-y-6">
             <div className="bg-white border border-stone-300 rounded-xl p-5 shadow-sm">
-              <h4 className="text-xs font-medium text-stone-700 uppercase tracking-wider mb-4 border-b border-stone-100 pb-3">Assistance Records</h4>
-              <div className="overflow-x-auto">
+              <h4 className="text-xs font-medium text-stone-700 uppercase tracking-wider mb-5 flex justify-between items-center border-b border-stone-100 pb-3">
+                Personal Information
+                {r.photo_url && (
+                  <img src={r.photo_url} alt="Resident" className="w-14 h-14 object-cover rounded-full border-2 border-stone-200 shadow-sm" />
+                )}
+              </h4>
+              <div className="grid grid-cols-2 gap-y-6 gap-x-4">
+                <div>
+                  <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Civil Status</p>
+                  <p className="text-sm font-normal text-stone-800">{r.civil_status || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Religion</p>
+                  <p className="text-sm font-normal text-stone-800">{r.religion || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Contact</p>
+                  <p className="text-sm font-normal text-stone-800">{r.contact_no || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Precinct ID</p>
+                  <p className="text-sm font-mono font-normal text-stone-800 bg-stone-100 px-2 py-1 rounded border border-stone-200 inline-block">{r.precinct_no || '-'}</p>
+                </div>
+              </div>
+              {wasEdited && (
+                <div>
+                  <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">
+                    Last Updated
+                  </p>
+                  <p className="text-sm font-normal text-stone-800">
+                    {formatDateTime(r.updated_at || r.created_at)}
+                  </p>
+                </div>
+              )}
+            </div>
+          
+            {r.assistances?.length > 0 && (
+              <div className="bg-white border border-stone-300 rounded-xl p-5 shadow-sm">
+                <h4 className="text-xs font-medium text-stone-700 uppercase tracking-wider mb-4 border-b border-stone-100 pb-3">Assistance Records</h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-stone-50 text-stone-600 text-left text-[11px] uppercase tracking-wider border-y border-stone-200">
+                        <th className="py-3 px-2 font-medium">Type</th>
+                        <th className="py-3 px-2 font-medium">Processed</th>
+                        <th className="py-3 px-2 font-medium">Claimed</th>
+                        <th className="py-3 px-2 font-medium">Amount</th>
+                        <th className="py-3 px-2 font-medium text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {r.assistances.map((a) => (
+                        <tr key={a.id} className="hover:bg-stone-50 transition-colors">
+                          <td className="py-3 px-2 font-medium text-stone-800">{a.type_of_assistance}</td>
+                          <td className="py-3 px-2 font-normal text-stone-600">{formatDate(a.date_processed)}</td>
+                          <td className="py-3 px-2 font-normal text-stone-600">{formatDate(a.date_claimed)}</td>
+                          <td className="py-3 px-2 font-medium text-rose-700">
+                            {a.amount ? `₱${a.amount.toLocaleString()}` : "-"}
+                          </td>
+                          <td className="py-3 px-2 text-right">
+                            {isAdminLike && (
+                              <div className="flex justify-end gap-2">
+                                <button onClick={() => setAssistanceModal({ isOpen: true, resident: r, assistance: a })} className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-600 hover:text-white rounded-md transition-colors border border-rose-100">
+                                  <Edit size={14} />
+                                </button>
+                                <button onClick={() => setDeleteAssistanceModal({ isOpen: true, assistance: a })} className="p-1.5 text-red-600 bg-red-50 hover:bg-red-600 hover:text-white rounded-md transition-colors border border-red-100">
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right Column */}
+          <div className="space-y-6">
+            <div className="bg-white border border-stone-300 rounded-xl p-5 shadow-sm">
+              <h4 className="text-xs font-medium text-stone-700 uppercase tracking-wider mb-3 border-b border-stone-100 pb-3">Registered Sector</h4>
+              <div className="inline-flex items-center px-4 py-2 bg-stone-100 rounded-lg border border-stone-300 shadow-sm">
+                <span className="text-sm font-normal text-stone-800 tracking-tight uppercase">
+                  {formatSectors(r.sector_summary, r.other_sector_details)}
+                </span>
+              </div>
+            </div>
+
+            {(r.spouse_first_name || r.spouse_last_name) && (
+              <div className="bg-white border border-stone-300 rounded-xl p-5 shadow-sm flex items-center justify-between">
+                <div>
+                  <h4 className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Legal Spouse</h4>
+                  <p className="text-base font-normal text-stone-800 uppercase">
+                    {r.spouse_last_name}, {r.spouse_first_name} {r.spouse_middle_name || ''}
+                  </p>
+                </div>
+                <button onClick={() => setPromotionModal({ isOpen: true, memberId: "spouse", reason: "Deceased" })} className="text-[11px] font-medium text-white bg-rose-700 hover:bg-rose-800 px-4 py-2 rounded-lg transition-colors shadow-sm">
+                  ASSIGN AS HEAD
+                </button>
+              </div>
+            )}
+
+            <div className="bg-white border border-stone-300 rounded-xl p-5 shadow-sm">
+              <h4 className="text-xs font-medium text-stone-700 uppercase tracking-wider mb-4 border-b border-stone-100 pb-3">Household Composition</h4>
+              {r.family_members?.length > 0 ? (
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-stone-50 text-stone-600 text-left text-[11px] uppercase tracking-wider border-y border-stone-200">
-                      <th className="py-3 px-2 font-medium">Type</th>
-                      <th className="py-3 px-2 font-medium">Processed</th>
-                      <th className="py-3 px-2 font-medium">Claimed</th>
-                      <th className="py-3 px-2 font-medium">Amount</th>
-                      <th className="py-3 px-2 font-medium text-right">Actions</th>
+                      <th className="py-3 px-3 font-medium">Name</th>
+                      <th className="py-3 px-3 font-medium">Relation</th>
+                      <th className="py-3 px-3 font-medium text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
-                    {r.assistances.map((a) => (
-                      <tr key={a.id} className="hover:bg-stone-50 transition-colors">
-                        <td className="py-3 px-2 font-medium text-stone-800">{a.type_of_assistance}</td>
-                        <td className="py-3 px-2 font-normal text-stone-600">{formatDate(a.date_processed)}</td>
-                        <td className="py-3 px-2 font-normal text-stone-600">{formatDate(a.date_claimed)}</td>
-                        <td className="py-3 px-2 font-medium text-rose-700">
-                          {a.amount ? `₱${a.amount.toLocaleString()}` : "-"}
-                        </td>
-                        <td className="py-3 px-2 text-right">
-                          {isAdminLike && (
-                            <div className="flex justify-end gap-2">
-                              <button onClick={() => setAssistanceModal({ isOpen: true, resident: r, assistance: a })} className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-600 hover:text-white rounded-md transition-colors border border-rose-100">
-                                <Edit size={14} />
-                              </button>
-                              <button onClick={() => setDeleteAssistanceModal({ isOpen: true, assistance: a })} className="p-1.5 text-red-600 bg-red-50 hover:bg-red-600 hover:text-white rounded-md transition-colors border border-red-100">
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          )}
+                    {r.family_members.filter(fm => fm.first_name).map((fm, i) => (
+                      <tr key={i} className="hover:bg-stone-50 transition-colors">
+                        <td className="py-3 px-3 font-medium text-stone-800 uppercase">{fm.last_name}, {fm.first_name} {fm.middle_name || ""}</td>
+                        <td className="py-3 px-3 font-normal text-stone-600 italic">{fm.relationship}</td>
+                        <td className="py-3 px-3 text-right">
+                          <button onClick={(e) => { e.stopPropagation(); setPromotionModal({ isOpen: true, memberId: fm.id, reason: "Deceased" }); }} className="text-[11px] text-stone-600 font-medium bg-stone-200 hover:bg-rose-700 hover:text-white px-3 py-1.5 rounded-md transition-colors border border-stone-300 hover:border-rose-700 shadow-sm">
+                            PROMOTE
+                          </button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
+              ) : (
+                <div className="py-6 text-center border-2 border-dashed border-stone-200 rounded-xl bg-stone-50">
+                  <p className="text-sm font-normal text-stone-500">Single Occupant / No listed members.</p>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-
-        {/* Right Column */}
-        <div className="space-y-6">
-          <div className="bg-white border border-stone-300 rounded-xl p-5 shadow-sm">
-            <h4 className="text-xs font-medium text-stone-700 uppercase tracking-wider mb-3 border-b border-stone-100 pb-3">Registered Sector</h4>
-            <div className="inline-flex items-center px-4 py-2 bg-stone-100 rounded-lg border border-stone-300 shadow-sm">
-              <span className="text-sm font-normal text-stone-800 tracking-tight uppercase">
-                {formatSectors(r.sector_summary, r.other_sector_details)}
-              </span>
-            </div>
-          </div>
-
-          {(r.spouse_first_name || r.spouse_last_name) && (
-            <div className="bg-white border border-stone-300 rounded-xl p-5 shadow-sm flex items-center justify-between">
-              <div>
-                <h4 className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Legal Spouse</h4>
-                <p className="text-base font-normal text-stone-800 uppercase">
-                  {r.spouse_last_name}, {r.spouse_first_name} {r.spouse_middle_name || ''}
-                </p>
-              </div>
-              <button onClick={() => setPromotionModal({ isOpen: true, memberId: "spouse", reason: "Deceased" })} className="text-[11px] font-medium text-white bg-rose-700 hover:bg-rose-800 px-4 py-2 rounded-lg transition-colors shadow-sm">
-                ASSIGN AS HEAD
-              </button>
-            </div>
-          )}
-
-          <div className="bg-white border border-stone-300 rounded-xl p-5 shadow-sm">
-            <h4 className="text-xs font-medium text-stone-700 uppercase tracking-wider mb-4 border-b border-stone-100 pb-3">Household Composition</h4>
-            {r.family_members?.length > 0 ? (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-stone-50 text-stone-600 text-left text-[11px] uppercase tracking-wider border-y border-stone-200">
-                    <th className="py-3 px-3 font-medium">Name</th>
-                    <th className="py-3 px-3 font-medium">Relation</th>
-                    <th className="py-3 px-3 font-medium text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100">
-                  {r.family_members.filter(fm => fm.first_name).map((fm, i) => (
-                    <tr key={i} className="hover:bg-stone-50 transition-colors">
-                      <td className="py-3 px-3 font-medium text-stone-800 uppercase">{fm.last_name}, {fm.first_name} {fm.middle_name || ""}</td>
-                      <td className="py-3 px-3 font-normal text-stone-600 italic">{fm.relationship}</td>
-                      <td className="py-3 px-3 text-right">
-                        <button onClick={(e) => { e.stopPropagation(); setPromotionModal({ isOpen: true, memberId: fm.id, reason: "Deceased" }); }} className="text-[11px] text-stone-600 font-medium bg-stone-200 hover:bg-rose-700 hover:text-white px-3 py-1.5 rounded-md transition-colors border border-stone-300 hover:border-rose-700 shadow-sm">
-                          PROMOTE
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="py-6 text-center border-2 border-dashed border-stone-200 rounded-xl bg-stone-50">
-                <p className="text-sm font-normal text-stone-500">Single Occupant / No listed members.</p>
-              </div>
-            )}
           </div>
         </div>
       </div>
-    </div>
-  );
+      );
+  };
 
   return (
     <div className="font-sans text-stone-900 animate-in fade-in duration-300">
@@ -527,7 +537,7 @@ export default function ResidentList({ userRole, onEdit }) {
                   placeholder="Search by name or ID..." 
                   value={searchTerm} 
                   onChange={handleSearchChange} 
-                  className="w-full pl-11 pr-10 py-3 bg-white border border-stone-300 rounded-xl text-sm font-normal text-stone-800 placeholder:text-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all shadow-sm"
+                  className="w-full pl-11 pr-10 py-3 bg-white border border-stone-300 rounded-xl text-sm font-normal text-stone-800 placeholder:text-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all shadow-sm uppercase"
                />
                {searchTerm && (
                  <button onClick={() => { setSearchTerm(''); setCurrentPage(1); }} className="absolute right-3 top-3 text-stone-400 hover:text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-lg p-1 transition-colors">
