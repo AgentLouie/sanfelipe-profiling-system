@@ -110,7 +110,7 @@ class ResidentProfile(Base):
     # System Fields
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # --- RELATIONSHIPS ---
     family_members = orm_relationship("FamilyMember", back_populates="head", cascade="all, delete-orphan")
