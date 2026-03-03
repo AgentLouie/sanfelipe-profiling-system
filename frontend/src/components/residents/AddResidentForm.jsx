@@ -158,7 +158,9 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
   const [imageSrc, setImageSrc] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   
-  const userRole = localStorage.getItem('role') || 'staff'; 
+  const userRole = (localStorage.getItem('role') || 'staff').toLowerCase();
+  const isAdminLike = userRole === "admin" || userRole === "admin_limited";
+  const isBarangayUser = userRole === "barangay";
 
   // --- FETCH DATA ---
   useEffect(() => {
@@ -446,9 +448,9 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
                 value={formData.barangay} 
                 onChange={handleChange} 
                 options={barangayOptions} 
-                required={userRole === 'admin'} 
-                disabled={userRole !== 'admin'} 
-                placeholder={userRole === 'admin' ? "Select Barangay" : "Auto-Assigned"}
+                required={isAdminLike} 
+                disabled={!isAdminLike} 
+                placeholder={isAdminLike ? "Select Barangay" : "Auto-Assigned"}
               />
             </div>
           </div>
