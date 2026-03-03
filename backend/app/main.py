@@ -413,8 +413,8 @@ def edit_assistance(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403)
+    if current_user.role not in ["admin", "admin_limited"]:
+        raise HTTPException(status_code=403, detail="Not allowed")
 
     result = crud.update_assistance(db, assistance_id, assistance)
 
@@ -430,8 +430,8 @@ def remove_assistance(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403)
+    if current_user.role not in ["admin", "admin_limited"]:
+        raise HTTPException(status_code=403, detail="Not allowed")
 
     result = crud.delete_assistance(db, assistance_id)
 
