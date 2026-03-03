@@ -17,10 +17,11 @@ export default function DashboardStats({ userRole }) {
 
   const logoUrl = '/san_felipe_seal.png';
 
-  const isAdmin = userRole?.toLowerCase() === 'admin';
+  const role = userRole?.toLowerCase();
+  const isAdminLike = role === "admin" || role === "admin_limited";
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!isAdminLike) {
       setLoading(false);
       return;
     }
@@ -29,9 +30,7 @@ export default function DashboardStats({ userRole }) {
       try {
         const res = await api.get('/dashboard/stats');
         setStats(res.data);
-        setTimeout(() => {
-            setLoading(false);
-        }, 500);
+        setTimeout(() => setLoading(false), 500);
       } catch (err) {
         console.error('Failed to fetch stats:', err);
         setLoading(false);
@@ -39,9 +38,9 @@ export default function DashboardStats({ userRole }) {
     };
 
     fetchStats();
-  }, [isAdmin]);
+  }, [isAdminLike]);
 
-  if (!isAdmin) {
+  if (!isAdminLike) {
     return (
       <div className="font-gov flex flex-col items-center justify-center min-h-[60vh] bg-slate-50/50 border border-slate-200 rounded-3xl p-12 text-center shadow-sm animate-in fade-in zoom-in-95 duration-300">
         <style>{govFontStyles}</style>

@@ -258,7 +258,7 @@ export default function ResidentList({ userRole, onEdit }) {
                           {a.amount ? `₱${a.amount.toLocaleString()}` : "-"}
                         </td>
                         <td className="py-3 px-2 text-right">
-                          {userRole === "admin" && (
+                          {isAdminLike && (
                             <div className="flex justify-end gap-2">
                               <button onClick={() => setAssistanceModal({ isOpen: true, resident: r, assistance: a })} className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-600 hover:text-white rounded-md transition-colors border border-rose-100">
                                 <Edit size={14} />
@@ -659,17 +659,36 @@ export default function ResidentList({ userRole, onEdit }) {
                           <button onClick={() => onEdit(r)} className="p-2.5 bg-stone-100 text-stone-500 hover:bg-rose-600 hover:text-white rounded-lg transition-all shadow-sm border border-stone-200 hover:border-rose-600" title="Edit Resident">
                               <Edit size={16} strokeWidth={2} />
                           </button>
-                          {userRole === "admin" && (
+                          {isAdminLike && (
                             <>
-                              <button onClick={() => setAssistanceModal({ isOpen: true, resident: r })} className="p-2.5 bg-stone-100 text-stone-500 hover:bg-rose-700 hover:text-white rounded-lg transition-all shadow-sm border border-stone-200 hover:border-rose-700" title="Add Assistance">
+                              <button
+                                onClick={() => setAssistanceModal({ isOpen: true, resident: r })}
+                                className="p-2.5 bg-stone-100 text-stone-500 hover:bg-rose-700 hover:text-white rounded-lg transition-all shadow-sm border border-stone-200 hover:border-rose-700"
+                                title="Add Assistance"
+                              >
                                 <FileText size={16} strokeWidth={2} />
                               </button>
-                              <button onClick={() => navigate(`/dashboard/residents/${r.resident_code}/qr`)} className="p-2.5 bg-stone-100 text-stone-500 hover:bg-stone-800 hover:text-white rounded-lg transition-all shadow-sm border border-stone-200 hover:border-stone-800" title="Generate QR">
-                                <QrCode size={16} strokeWidth={2} />
-                              </button>
-                              <button onClick={() => handleArchive(r.id)} className="p-2.5 bg-stone-100 text-stone-500 hover:bg-orange-700 hover:text-white rounded-lg transition-all shadow-sm border border-stone-200 hover:border-orange-700" title="Archive Resident">
-                                <Archive size={16} strokeWidth={2} />
-                              </button>
+
+                              {/* keep these ADMIN ONLY */}
+                              {userRole === "admin" && (
+                                <>
+                                  <button
+                                    onClick={() => navigate(`/dashboard/residents/${r.resident_code}/qr`)}
+                                    className="p-2.5 bg-stone-100 text-stone-500 hover:bg-stone-800 hover:text-white rounded-lg transition-all shadow-sm border border-stone-200 hover:border-stone-800"
+                                    title="Generate QR"
+                                  >
+                                    <QrCode size={16} strokeWidth={2} />
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleArchive(r.id)}
+                                    className="p-2.5 bg-stone-100 text-stone-500 hover:bg-orange-700 hover:text-white rounded-lg transition-all shadow-sm border border-stone-200 hover:border-orange-700"
+                                    title="Archive Resident"
+                                  >
+                                    <Archive size={16} strokeWidth={2} />
+                                  </button>
+                                </>
+                              )}
                             </>
                           )}
                        </div>

@@ -36,6 +36,7 @@ const DashboardLayout = ({ userRole, onLogout, onResetView }) => {
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [role, setRole] = useState(localStorage.getItem('role') || 'staff');
+  const isAdminLike = role === "admin" || role === "admin_limited";
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentResident, setCurrentResident] = useState(null);
@@ -92,8 +93,10 @@ export default function App() {
         <Route 
           path="overview" 
           element={
-            role === 'admin' ? <DashboardStats userRole={role} /> : <Navigate to="/dashboard/residents" replace />
-          } 
+            (role === "admin" || role === "admin_limited")
+              ? <DashboardStats userRole={role} />
+              : <Navigate to="/dashboard/residents" replace />
+          }
         />
 
         <Route 

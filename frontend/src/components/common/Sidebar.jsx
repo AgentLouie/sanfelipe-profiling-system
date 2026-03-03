@@ -20,8 +20,19 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
 
   const logoUrl = '/san_felipe_seal.png';
 
+  const role = (userRole || "").toLowerCase();
+  const isAdmin = role === "admin";
+  const isAdminLimited = role === "admin_limited";
+  const isAdminLike = isAdmin || isAdminLimited;
+
+  const roleLabel =
+  role === "admin" ? "Admin" :
+  role === "admin_limited" ? "Admin" :
+  role === "barangay" ? "Barangay" :
+  "User";
+
   const allMenuItems = [
-    { label: 'Overview', path: '/dashboard/overview', Icon: LayoutDashboard, role: 'admin' }, 
+    { label: 'Overview', path: '/dashboard/overview', Icon: LayoutDashboard, role: 'admin_like' }, 
     { label: 'Resident Database', path: '/dashboard/residents', Icon: Users, role: 'all' },
     { label: 'Register Resident', path: '/dashboard/create', Icon: UserPlus, role: 'all' },
     { label: 'Scan QR', path: '/dashboard/scan', Icon: QrCode, role: 'admin' },
@@ -31,6 +42,7 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
   const menuItems = allMenuItems.filter(item => {
     if (item.role === 'all') return true;
     if (item.role === 'admin' && userRole?.toLowerCase() === 'admin') return true;
+    if (item.role === 'admin_like' && isAdminLike) return true;
     return false;
   });
 
@@ -140,7 +152,7 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
               {userRole?.charAt(0)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-slate-800 capitalize truncate">{userRole} Account</p>
+              <p className="text-sm font-bold text-slate-800 capitalize truncate">{roleLabel} Account</p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
