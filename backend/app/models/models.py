@@ -81,6 +81,7 @@ class ResidentProfile(Base):
     house_no = Column(String, nullable=True)
     purok = Column(String, index=True)
     barangay = Column(String, index=True)
+    sitio = Column(String, nullable=True)
     
     # 3 Spouse/Partner
     spouse_last_name = Column(String, nullable=True)
