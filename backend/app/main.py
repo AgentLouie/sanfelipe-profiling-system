@@ -991,7 +991,7 @@ def export_residents_excel(
     # Restrict barangay automatically for non-admin
     target_barangay = barangay
 
-    if current_user.role != "admin":
+    if current_user.role not in ["admin", "admin_limited"]:
         official_name = BARANGAY_MAPPING.get(current_user.username.lower())
 
         if official_name:
@@ -1010,7 +1010,7 @@ def export_residents_excel(
             if target_barangay else "All"
         )
 
-        filename = f"SanFelipe_Households_{clean_name}.xlsx"
+        filename = f"SanFelipe_Residents_{clean_name}.xlsx"
 
         return StreamingResponse(
             excel_file,
