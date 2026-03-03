@@ -2,7 +2,7 @@ import { Download, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 
-const API_URL = import.meta.env.VITE_API_URL || "https://sanfelipe-profiling-system-production.up.railway.app";
+const API_URL = import.meta.env.VITE_API_URL || "https://sanfelipe-profiling-system-production-13e4.up.railway.app";
 
 export default function ExportButton({ barangay }) {
   const [loading, setLoading] = useState(false);
@@ -38,7 +38,7 @@ export default function ExportButton({ barangay }) {
       if (!response.ok) throw new Error("Server error.");
 
       const disposition = response.headers.get('Content-Disposition');
-      let filename = "SanFelipe_Report.xlsx"; 
+      let filename = "SanFelipe_Residents.xlsx"; 
 
       if (disposition && disposition.includes('filename=')) {
         filename = disposition.split('filename=')[1].replace(/["']/g, "").trim();

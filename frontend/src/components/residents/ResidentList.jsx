@@ -54,6 +54,17 @@ export default function ResidentList({ userRole, onEdit }) {
     });
   };
 
+  const formatDateTime = (dateString) => {
+    if (!dateString) return "-";
+    return new Date(dateString).toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   const formatSectors = (summary, details) => {
     if (!summary) return "None";
     let text = summary;
@@ -232,8 +243,16 @@ export default function ResidentList({ userRole, onEdit }) {
                 <p className="text-sm font-mono font-normal text-stone-800 bg-stone-100 px-2 py-1 rounded border border-stone-200 inline-block">{r.precinct_no || '-'}</p>
               </div>
             </div>
+            <div>
+              <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">
+                Last Updated
+              </p>
+              <p className="text-sm font-normal text-stone-800">
+                {formatDateTime(r.updated_at || r.created_at)}
+              </p>
+            </div>
           </div>
-
+        
           {r.assistances?.length > 0 && (
             <div className="bg-white border border-stone-300 rounded-xl p-5 shadow-sm">
               <h4 className="text-xs font-medium text-stone-700 uppercase tracking-wider mb-4 border-b border-stone-100 pb-3">Assistance Records</h4>
@@ -317,7 +336,7 @@ export default function ResidentList({ userRole, onEdit }) {
                 <tbody className="divide-y divide-stone-100">
                   {r.family_members.filter(fm => fm.first_name).map((fm, i) => (
                     <tr key={i} className="hover:bg-stone-50 transition-colors">
-                      <td className="py-3 px-3 font-medium text-stone-800 uppercase">{fm.last_name}, {fm.first_name}</td>
+                      <td className="py-3 px-3 font-medium text-stone-800 uppercase">{fm.last_name}, {fm.first_name} {fm.middle_name || ""}</td>
                       <td className="py-3 px-3 font-normal text-stone-600 italic">{fm.relationship}</td>
                       <td className="py-3 px-3 text-right">
                         <button onClick={(e) => { e.stopPropagation(); setPromotionModal({ isOpen: true, memberId: fm.id, reason: "Deceased" }); }} className="text-[11px] text-stone-600 font-medium bg-stone-200 hover:bg-rose-700 hover:text-white px-3 py-1.5 rounded-md transition-colors border border-stone-300 hover:border-rose-700 shadow-sm">
@@ -488,7 +507,9 @@ export default function ResidentList({ userRole, onEdit }) {
            <h1 className="text-3xl font-medium text-stone-900 tracking-tight">Registered Residents</h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          {(userRole === "admin" || userRole === "admin_limited") && (
            <ImportButton onSuccess={handleImportSuccess} className="bg-white border-2 border-stone-300 text-stone-700 font-medium hover:bg-stone-100 rounded-xl shadow-sm transition-all" />
+           )}
            <ExportButton barangay={selectedBarangay} className="bg-stone-900 text-white font-medium hover:bg-stone-800 rounded-xl shadow-md transition-all" />
         </div>
       </div>

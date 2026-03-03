@@ -85,9 +85,21 @@ const SelectGroup = ({ label, name, value, onChange, options, required = false, 
           {placeholder || (disabled ? "System Assigned" : "Select Option")}
         </option>
         {options.map((opt) => {
-          const val = typeof opt === 'object' ? opt.name || opt.id : opt;
-          const key = typeof opt === 'object' ? opt.id || opt.name : opt;
-          return <option key={key} value={val}>{val}</option>
+          // allow { value, label } OR backend objects { id, name }
+          const value =
+            typeof opt === "object" ? (opt.value ?? opt.name ?? opt.id) : opt;
+
+          const label =
+            typeof opt === "object" ? (opt.label ?? opt.name ?? opt.id) : opt;
+
+          const key =
+            typeof opt === "object" ? (opt.id ?? opt.value ?? opt.name) : opt;
+
+          return (
+            <option key={key} value={value}>
+              {label}
+            </option>
+          );
         })}
       </select>
       <ChevronDown
@@ -162,6 +174,55 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
   const isAdminLike = userRole === "admin" || userRole === "admin_limited";
   const isBarangayUser = userRole === "barangay";
 
+  const relationshipOptions = [
+  "Son", "Daughter", "Mother", "Father", "Sibling",
+  "Grandparent", "Grandchild",
+  "Guardian", "In-laws", "Relative",
+];
+
+  const mergePurokAndSitio = (items) => {
+    const all = Array.isArray(items) ? items : [];
+
+    const purokOnly = all.filter((p) => {
+      const name = (p?.name || "").toLowerCase();
+      if (!name.includes("purok")) return false;
+      const match = name.match(/\d+/);
+      const n = match ? parseInt(match[0], 10) : NaN;
+      return n >= 1 && n <= 12;
+    });
+
+    const sitioOnly = all.filter((p) => {
+      const name = (p?.name || "").toLowerCase();
+      return name.includes("sitio") || name.includes("bantay");
+    });
+
+    const sitioLabeled = sitioOnly.map((s) => {
+      const name = s.name;
+      const sitioToPurok = {
+        "Sitio Sagpat": 6,
+        "Sitio Tektek": 6,
+        "Sitio Cabuyao": 7,
+        "Bantay Carmen": 4,
+        "Sitio Ticub": 7,
+        "Sitio Lalec": 7,
+        "Sitio Laoag": 8,
+      };
+
+      const n = sitioToPurok[name];
+      return {
+        value: name,
+        label: n ? `${name} (Purok ${n})` : name,
+      };
+    });
+
+    const purokLabeled = purokOnly.map((p) => ({
+      value: p.name,
+      label: p.name,
+    }));
+
+    return [...purokLabeled, ...sitioLabeled];
+  };
+
   // --- FETCH DATA ---
   useEffect(() => {
     const fetchOptions = async () => {
@@ -170,7 +231,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
           api.get('/barangays/'), api.get('/puroks/'), api.get('/sectors/')
         ]);
         setBarangayOptions(bRes.data);
-        setPurokOptions(pRes.data);
+        setPurokOptions(mergePurokAndSitio(pRes.data));
         setSectorOptions(sRes.data);
       } catch (err) { toast.error("System Error: Failed to load form options."); }
     };
@@ -181,17 +242,51 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
   useEffect(() => {
     if (residentToEdit && barangayOptions.length && purokOptions.length) {
 
-      const normalizeSelect = (value, options) => {
-        if (!value) return '';
-        const cleaned = value.toLowerCase().trim();
-        const match = options.find(opt => {
-          const optionValue = (opt.name || opt).toLowerCase().trim();
-          return (
-            optionValue === cleaned ||
-            optionValue.replace("purok", "").trim() === cleaned.replace("purok", "").trim()
-          );
+      const normalizeText = (v) =>
+        String(v ?? "")
+          .toLowerCase()
+          .trim()
+          .replace(/\s+/g, " ");
+
+      const normalizePurokSitioKey = (v) => {
+        const t = normalizeText(v);
+
+        // "Purok 6" / "PUROK 6" -> purok-6
+        const numMatch = t.match(/\b(\d{1,2})\b/);
+        if (t.includes("purok") && numMatch) return `purok-${numMatch[1]}`;
+
+        // "6" -> purok-6
+        if (/^\d{1,2}$/.test(t)) return `purok-${t}`;
+
+        // Sitio/Bantay/etc
+        return t;
+      };
+
+      const normalizeSelect = (value, options, mode = "text") => {
+        if (!value) return "";
+
+        const targetKey =
+          mode === "purok" ? normalizePurokSitioKey(value) : normalizeText(value);
+
+        const match = (options || []).find((opt) => {
+          // ✅ this is the important fix:
+          const optionRaw =
+            typeof opt === "object"
+              ? (opt.value ?? opt.name ?? opt.label ?? opt.id)
+              : opt;
+
+          const optionKey =
+            mode === "purok"
+              ? normalizePurokSitioKey(optionRaw)
+              : normalizeText(optionRaw);
+
+          return optionKey === targetKey;
         });
-        return match ? (match.name || match) : '';
+
+        // ✅ must return the option VALUE (because <option value="..."> uses value)
+        return match
+          ? String(typeof match === "object" ? (match.value ?? match.name ?? match.id) : match)
+          : "";
       };
 
       const normalizeSex = (value) => {
@@ -221,7 +316,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
         sex: normalizeSex(residentToEdit.sex),
         civil_status: normalizeCivilStatus(residentToEdit.civil_status),
         barangay: normalizeSelect(residentToEdit.barangay, barangayOptions),
-        purok: normalizeSelect(residentToEdit.purok, purokOptions),
+        purok: normalizeSelect(residentToEdit.purok, purokOptions, "purok"),
         sector_ids: residentToEdit.sectors
           ? residentToEdit.sectors.map((s) => s.id)
           : [],
@@ -241,7 +336,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     const { name, value } = e.target;
     setFormData(prev => {
       const newState = { ...prev, [name]: value };
-      if (name === "civil_status" && value !== "Married" && value !== "Live-in Partner") {
+      if (name === "civil_status" && value !== "Married" && value !== "Live-in Partner" && value !== "Separated") {
         newState.spouse_last_name = '';
         newState.spouse_first_name = '';
         newState.spouse_middle_name = '';
@@ -261,11 +356,14 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
   };
 
   const addFamilyMember = () => {
-    setFormData(prev => ({
-      ...prev,
-      family_members: [...prev.family_members, { first_name: '', last_name: '', relationship: '' }]
-    }));
-  };
+  setFormData(prev => ({
+    ...prev,
+    family_members: [
+      ...prev.family_members,
+      { first_name: '', middle_name: '', last_name: '', relationship: '' }
+    ]
+  }));
+};
 
   const handleFamilyChange = (index, field, value) => {
     const updated = [...formData.family_members];
@@ -362,7 +460,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
              <SectionHeader icon={User} title="Personal Information" colorClass="text-blue-600" />
              
             <div className="space-y-8">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 <InputGroup label="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} required placeholder="DELA CRUZ" className="lg:col-span-1" />
                 <InputGroup label="First Name" name="first_name" value={formData.first_name} onChange={handleChange} required placeholder="JUAN" className="lg:col-span-1" />
                 <InputGroup label="Middle Name" name="middle_name" value={formData.middle_name} onChange={handleChange} placeholder="SANTOS" />
@@ -406,7 +504,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 <InputGroup label="Date of Birth" name="birthdate" type="date" value={formData.birthdate} onChange={handleChange} required />
                 <SelectGroup label="Sex" name="sex" value={formData.sex} onChange={handleChange} options={['Male', 'Female']} required placeholder="Select Gender" />
-                <SelectGroup label="Civil Status" name="civil_status" value={formData.civil_status} onChange={handleChange} options={['Single', 'Married', 'Widowed', 'Live-in Partner']} required placeholder="Select Status" />
+                <SelectGroup label="Civil Status" name="civil_status" value={formData.civil_status} onChange={handleChange} options={['Single', 'Married', 'Widowed', 'Live-in Partner', 'Separated']} required placeholder="Select Status" />
                 <InputGroup label="Religion" name="religion" value={formData.religion} onChange={handleChange} placeholder="ROMAN CATHOLIC" />
               </div>
 
@@ -439,9 +537,17 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
         <div className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
           <div className="px-6 md:px-8 py-6">
              <SectionHeader icon={MapPin} title="Residency & Location" colorClass="text-emerald-600" />
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               <InputGroup label="House No. / Street" name="house_no" value={formData.house_no} onChange={handleChange} placeholder="House No. / Street Name" />
-              <SelectGroup label="Purok / Zone" name="purok" value={formData.purok} onChange={handleChange} options={purokOptions} required placeholder="Select Purok" />
+              <SelectGroup
+                label="Purok / Sitio"
+                name="purok"
+                value={formData.purok}
+                onChange={handleChange}
+                options={purokOptions}
+                required
+                placeholder="Select Purok or Sitio"
+              />
               <SelectGroup 
                 label="Barangay"
                 name="barangay" 
@@ -508,14 +614,41 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
                {formData.family_members.map((member, index) => (
                  <div key={index} className="flex flex-col md:flex-row gap-4 p-5 bg-slate-50 border border-slate-200 rounded-2xl relative items-end animate-in fade-in duration-300">
                    <div className="flex-1 w-full">
-                      <InputGroup label="First Name" value={member.first_name} onChange={(e) => handleFamilyChange(index, 'first_name', e.target.value)} placeholder="Given Name" />
-                   </div>
-                   <div className="flex-1 w-full">
-                      <InputGroup label="Last Name" value={member.last_name} onChange={(e) => handleFamilyChange(index, 'last_name', e.target.value)} placeholder="Surname" />
-                   </div>
-                   <div className="flex-1 w-full">
-                      <SelectGroup label="Relationship" value={member.relationship} onChange={(e) => handleFamilyChange(index, 'relationship', e.target.value)} options={['Son', 'Daughter', 'Mother', 'Father', 'Sibling', 'Grandparent', 'Grandchild']} placeholder="Select Relation" />
-                   </div>
+                      <InputGroup
+                        label="First Name"
+                        value={member.first_name}
+                        onChange={(e) => handleFamilyChange(index, 'first_name', e.target.value)}
+                        placeholder="Given Name"
+                      />
+                    </div>
+
+                    <div className="flex-1 w-full">
+                      <InputGroup
+                        label="Middle Name"
+                        value={member.middle_name}
+                        onChange={(e) => handleFamilyChange(index, 'middle_name', e.target.value)}
+                        placeholder="Middle Name"
+                      />
+                    </div>
+
+                    <div className="flex-1 w-full">
+                      <InputGroup
+                        label="Last Name"
+                        value={member.last_name}
+                        onChange={(e) => handleFamilyChange(index, 'last_name', e.target.value)}
+                        placeholder="Surname"
+                      />
+                    </div>
+
+                    <div className="flex-1 w-full">
+                      <SelectGroup
+                        label="Relationship"
+                        value={member.relationship}
+                        onChange={(e) => handleFamilyChange(index, 'relationship', e.target.value)}
+                        options={relationshipOptions}
+                        placeholder="Select Relation"
+                      />
+                    </div>
                    <button type="button" onClick={() => setFormData({...formData, family_members: formData.family_members.filter((_, i) => i !== index)})} className="p-3 bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 rounded-xl transition-colors shrink-0" title="Remove Member">
                       <Trash2 size={18} strokeWidth={2} />
                    </button>
