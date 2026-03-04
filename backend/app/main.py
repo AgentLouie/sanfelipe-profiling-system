@@ -1032,3 +1032,21 @@ def get_sectors(db: Session = Depends(get_db),
 def get_relationships(db: Session = Depends(get_db),
                       current_user: models.User = Depends(get_current_user)):
     return db.query(models.Relationship).all()
+
+@app.get("/barangays")
+def get_barangays(db: Session = Depends(get_db)):
+    rows = db.execute(text("SELECT id, name FROM barangays ORDER BY name")).mappings().all()
+    return rows
+
+@app.get("/barangays/{barangay_id}/areas")
+def get_barangay_areas(barangay_id: int, db: Session = Depends(get_db)):
+    rows = db.execute(text("""
+        SELECT id, name, area_type, parent_purok
+        FROM barangay_areas
+        WHERE barangay_id = :bid
+        ORDER BY
+          CASE WHEN area_type='PUROK' THEN 0 ELSE 1 END,
+          name
+    """), {"bid": barangay_id}).mappings().all()
+
+    return rows
