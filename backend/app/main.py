@@ -1099,3 +1099,39 @@ def get_areas_by_name(barangay_name: str, db: Session = Depends(get_db)):
     """), {"bid": b["id"]}).mappings().all()
 
     return rows
+
+@app.get("/me")
+def get_me(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Determine official barangay name for barangay users (same logic you already use)
+    barangay_name = None
+
+    if current_user.role not in ["admin", "admin_limited"]:
+        username_lower = current_user.username.lower()
+        official_name = None
+        for key in BARANGAY_MAPPING:
+            if key in username_lower:
+                official_name = BARANGAY_MAPPING[key]
+                break
+        barangay_name = official_name or current_user.username.replace("_", " ").title()
+
+    # Convert barangay_name -> barangay_id
+    barangay_id = None
+    if barangay_name:
+        row = db.execute(
+            text("SELECT id, name FROM barangays WHERE LOWER(name)=LOWER(:n) LIMIT 1"),
+            {"n": barangay_name}
+        ).mappings().first()
+
+        if row:
+            barangay_id = row["id"]
+            barangay_name = row["name"]  # normalize to DB casing
+
+    return {
+        "username": current_user.username,
+        "role": current_user.role,
+        "barangay_id": barangay_id,
+        "barangay": barangay_name
+    }
