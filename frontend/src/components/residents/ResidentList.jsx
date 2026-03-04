@@ -83,13 +83,51 @@ export default function ResidentList({ userRole, onEdit }) {
     const created = r?.created_at ? new Date(r.created_at) : null;
     const updated = r?.updated_at ? new Date(r.updated_at) : null;
 
-    // icon lalabas lang pag may real update
     return (
       created &&
       updated &&
       Math.abs(updated.getTime() - created.getTime()) > 1000
     );
   };
+
+  const sitioToPurok = {
+  "Sitio Sagpat": 6,
+  "Sitio Tektek": 6,
+  "Sitio Cabuyao": 7,
+  "Bantay Carmen": 4,
+  "Sitio Ticub": 7,
+  "Sitio Lalec": 7,
+  "Sitio Laoag": 8,
+};
+
+  const formatPurokDisplay = (p) => {
+  if (!p) return "-";
+
+  const raw = String(p).trim().replace(/\s+/g, " ");
+  const low = raw.toLowerCase();
+
+  if (low.startsWith("purok") || low.includes("(purok")) {
+    return raw.toUpperCase();
+  }
+
+  if (low.startsWith("sitio") || low.startsWith("bantay")) {
+    const key = raw
+      .split(" ")
+      .map(w => w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w)
+      .join(" ");
+
+    const n = sitioToPurok[key];
+    return n ? `${key.toUpperCase()} (PUROK ${n})` : key.toUpperCase();
+  }
+
+  // If purok stored as number
+  if (/^\d{1,2}$/.test(low)) {
+    return `PUROK ${raw}`;
+  }
+
+  // Fallback
+  return raw.toUpperCase();
+};
 
   // --- DATA FETCHING ---
   const fetchResidents = async (
@@ -693,7 +731,9 @@ export default function ResidentList({ userRole, onEdit }) {
                     {/* ADDRESS */}
                     <td className="py-4 px-5">
                        <span className="block font-medium text-stone-700 uppercase tracking-wide">{r.barangay}</span>
-                       <span className="block text-xs font-normal text-stone-400 uppercase">PUROK {r.purok} {r.house_no ? `#${r.house_no}` : ''}</span>
+                       <span className="block text-xs font-normal text-stone-400 uppercase">
+                          {formatPurokDisplay(r.purok)} {r.house_no ? `#${r.house_no}` : ""}
+                        </span>
                     </td>
 
                     {/* SECTOR */}

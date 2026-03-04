@@ -59,49 +59,63 @@ const SectionHeader = ({ icon: Icon, title, colorClass = "text-slate-600" }) => 
   </div>
 );
 
-const SelectGroup = ({ label, name, value, onChange, options, required = false, disabled = false, placeholder, className = "" }) => (
+const SelectGroup = ({
+  label,
+  name,
+  value,
+  onChange,
+  options,
+  required = false,
+  disabled = false,
+  placeholder,
+  className = ""
+}) => (
   <div className="space-y-1.5 w-full">
     <label className="flex items-center text-[11px] font-normal text-slate-400 uppercase tracking-wider">
       {label} {required && <span className="text-red-500 ml-1">*</span>}
     </label>
+
     <div className="relative">
-      <select 
-        name={name} 
-        value={value || ''} 
-        onChange={onChange} 
-        required={required} 
+      <select
+        name={name}
+        value={value || ""}
+        onChange={onChange}
+        required={required}
         disabled={disabled}
         className={`
           w-full px-4 py-3 border rounded-xl
           text-sm font-normal appearance-none outline-none transition-all cursor-pointer
+          uppercase
           ${className}
-          ${disabled 
-            ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' 
-            : 'bg-slate-50 text-slate-800 border-slate-200 focus:bg-white focus:border-red-400 focus:ring-4 focus:ring-red-50 hover:border-slate-300'
+          ${
+            disabled
+              ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+              : "bg-slate-50 text-slate-800 border-slate-200 focus:bg-white focus:border-red-400 focus:ring-4 focus:ring-red-50 hover:border-slate-300"
           }
         `}
       >
-        <option value="" disabled className="text-slate-400">
+        <option value="" disabled className="text-slate-400 uppercase">
           {placeholder || (disabled ? "System Assigned" : "Select Option")}
         </option>
+
         {options.map((opt) => {
-          // allow { value, label } OR backend objects { id, name }
-          const value =
+          const optionValue =
             typeof opt === "object" ? (opt.value ?? opt.name ?? opt.id) : opt;
 
-          const label =
+          const optionLabel =
             typeof opt === "object" ? (opt.label ?? opt.name ?? opt.id) : opt;
 
           const key =
             typeof opt === "object" ? (opt.id ?? opt.value ?? opt.name) : opt;
 
           return (
-            <option key={key} value={value}>
-              {label}
+            <option key={key} value={optionValue} className="uppercase">
+              {String(optionLabel).toUpperCase()}
             </option>
           );
         })}
       </select>
+
       <ChevronDown
         className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
         size={16}
