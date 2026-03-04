@@ -3,7 +3,7 @@ import api from '../../api/api';
 import {
   Trash2, Edit, Search, ChevronDown, ChevronUp,
   Loader2, Filter, FileText, Users, AlertCircle,
-  ChevronLeft, ChevronRight, X, Archive, QrCode, ShieldAlert
+  ChevronLeft, ChevronRight, X, Archive, QrCode, ShieldAlert, CheckCircle2
 } from 'lucide-react';
 import ExportButton from './ExportButton';
 import ImportButton from './ImportButton';
@@ -78,6 +78,18 @@ export default function ResidentList({ userRole, onEdit }) {
   };
 
   const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+  const wasUpdated = (r) => {
+    const created = r?.created_at ? new Date(r.created_at) : null;
+    const updated = r?.updated_at ? new Date(r.updated_at) : null;
+
+    // icon lalabas lang pag may real update
+    return (
+      created &&
+      updated &&
+      Math.abs(updated.getTime() - created.getTime()) > 1000
+    );
+  };
 
   // --- DATA FETCHING ---
   const fetchResidents = async (
@@ -653,6 +665,13 @@ export default function ResidentList({ userRole, onEdit }) {
                           <span className="font-medium text-stone-800 text-[15px] tracking-tight uppercase">
                             {r.last_name}, {r.first_name} {r.middle_name || ''} {r.ext_name || ''}
                           </span>
+                          {wasUpdated(r) && (
+                            <CheckCircle2
+                              size={16}
+                              className="text-emerald-600"
+                              title={`Updated: ${formatDateTime(r.updated_at)}`}
+                            />
+                          )}
                           <div className="flex items-center gap-2 mt-1">
                             <span className="px-1.5 py-0.5 bg-stone-100 text-stone-600 rounded text-[10px] font-normal uppercase tracking-wider">
                               {r.sex}
