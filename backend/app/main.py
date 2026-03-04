@@ -368,6 +368,18 @@ def create_resident(resident: schemas.ResidentCreate,
                 official_name = BARANGAY_MAPPING[key]
                 break
         resident.barangay = official_name or current_user.username.replace("_", " ").title()
+        resident.barangay_id = None
+    
+    if resident.barangay_id and not resident.barangay:
+        b = db.execute(
+            text("SELECT name FROM barangays WHERE id = :id"),
+            {"id": resident.barangay_id}
+        ).mappings().first()
+
+        if not b:
+            raise HTTPException(status_code=400, detail="Invalid barangay_id")
+
+        resident.barangay = b["name"]
 
     try:
         return crud.create_resident(db=db, resident=resident)
@@ -388,6 +400,27 @@ def update_resident(
         resident_id=resident_id,
         resident_data=resident
     )
+    
+    if current_user.role not in ["admin", "admin_limited"]:
+        username_lower = current_user.username.lower()
+        official_name = None
+        for key in BARANGAY_MAPPING:
+            if key in username_lower:
+                official_name = BARANGAY_MAPPING[key]
+                break
+        resident.barangay = official_name or current_user.username.replace("_", " ").title()
+        resident.barangay_id = None
+    
+    if resident.barangay_id and not resident.barangay:
+        b = db.execute(
+            text("SELECT name FROM barangays WHERE id = :id"),
+            {"id": resident.barangay_id}
+        ).mappings().first()
+
+        if not b:
+            raise HTTPException(status_code=400, detail="Invalid barangay_id")
+
+        resident.barangay = b["name"]
 
     if not db_resident:
         raise HTTPException(status_code=404, detail="Resident not found")

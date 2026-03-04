@@ -83,7 +83,8 @@ class ResidentBase(BaseModel):
     # Address
     house_no: Optional[str] = None
     purok: str
-    barangay: str
+    barangay: Optional[str] = None
+    barangay_id: Optional[int] = None
     sitio: Optional[str] = None
     
     # Personal Info
