@@ -609,6 +609,11 @@ export default function ResidentList({ userRole, onEdit }) {
                  <option value="ATV'S/UTV'S OWNER">ATV'S/UTV'S OWNER</option>
                  <option value="BANANA BOAT/DRAGON BOAT OWNER">BANANA BOAT/DRAGON BOAT OWNER</option>
                  <option value="FAMILY HEADS">FAMILY HEADS</option>
+                 <option value="BANCA OWNER">BANCA OWNER</option>
+                 <option value="LIFEGUARD">LIFEGUARD</option>
+                 <option value="FARMERS">FARMERS</option>
+                 <option value="LGU EMPLOYEE">LGU EMPLOYEE</option>
+                 <option value="BRGY. OFFICIAL/EMPLOYEE">BRGY. OFFICIAL/EMPLOYEE</option>
                  <option value="OTHERS">OTHERS</option>
                </select>
                <ChevronDown className="absolute right-4 top-3.5 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
