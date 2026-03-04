@@ -100,7 +100,7 @@ const SelectGroup = ({
 
         {options.map((opt) => {
           const optionValue =
-            typeof opt === "object" ? (opt.value ?? opt.name ?? opt.id) : opt;
+            typeof opt === "object" ? (opt.id ?? opt.value ?? opt.name) : opt;
 
           const optionLabel =
             typeof opt === "object" ? (opt.label ?? opt.name ?? opt.id) : opt;
@@ -162,7 +162,9 @@ const InputGroup = ({
 // --- INITIAL STATE ---
 const getInitialFormState = () => ({
   last_name: '', first_name: '', middle_name: '', ext_name: '',
-  house_no: '', purok: '', barangay: '',
+  house_no: '',
+  purok: "",
+  barangay_id: "",
   birthdate: '', sex: '', civil_status: '',
   religion: '',
   occupation: '', precinct_no: '', contact_no: '',
@@ -241,20 +243,72 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
   useEffect(() => {
     const fetchOptions = async () => {
       try {
-        const [bRes, pRes, sRes] = await Promise.all([
-          api.get('/barangays/'), api.get('/puroks/'), api.get('/sectors/')
+        const [bRes, sRes] = await Promise.all([
+          api.get('/barangays/'), 
+          api.get('/sectors/')
         ]);
-        setBarangayOptions(bRes.data);
-        setPurokOptions(mergePurokAndSitio(pRes.data));
+
+        setBarangayOptions(
+          (bRes.data || []).map(b => ({
+            ...b,
+            value: b.id,
+            label: b.name
+          }))
+        );
         setSectorOptions(sRes.data);
       } catch (err) { toast.error("System Error: Failed to load form options."); }
     };
     fetchOptions();
   }, []);
 
+  useEffect(() => {
+  const loadAreas = async () => {
+    if (!formData.barangay_id) {
+      setPurokOptions([]);
+      setFormData(prev => ({ ...prev, purok: "" }));
+      return;
+    }
+
+    try {
+      const res = await api.get(`/barangays/${formData.barangay_id}/areas`);
+      const opts = (res.data || []).map(a => ({
+        value: a.name,
+        label: a.parent_purok ? `${a.name} (${a.parent_purok})` : a.name
+      }));
+      setPurokOptions(opts);
+      setFormData(prev => ({
+        ...prev,
+        purok: residentToEdit?.purok ? residentToEdit.purok : ""
+      }));
+
+    } catch (err) {
+      setPurokOptions([]);
+      toast.error("Failed to load Purok/Sitio for selected barangay.");
+    }
+  };
+
+  loadAreas();
+}, [formData.barangay_id, residentToEdit]);
+
+useEffect(() => {
+  const loadMe = async () => {
+    try {
+      const res = await api.get("/me");
+      const { role, barangay_id } = res.data || {};
+
+      if (String(role).toLowerCase() === "barangay" && barangay_id) {
+        setFormData((prev) => ({ ...prev, barangay_id: String(barangay_id) }));
+      }
+    } catch (e) {
+    }
+  };
+
+  loadMe();
+}, []);
+
   // --- POPULATE EDIT DATA ---
   useEffect(() => {
-    if (residentToEdit && barangayOptions.length && purokOptions.length) {
+    if (residentToEdit && barangayOptions.length) {
 
       const normalizeText = (v) =>
         String(v ?? "")
@@ -324,16 +378,13 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
       setFormData({
         ...getInitialFormState(),
         ...residentToEdit,
-        birthdate: residentToEdit.birthdate
-          ? residentToEdit.birthdate.split("T")[0]
-          : "",
+        birthdate: residentToEdit.birthdate ? residentToEdit.birthdate.split("T")[0] : "",
         sex: normalizeSex(residentToEdit.sex),
         civil_status: normalizeCivilStatus(residentToEdit.civil_status),
-        barangay: normalizeSelect(residentToEdit.barangay, barangayOptions),
-        purok: normalizeSelect(residentToEdit.purok, purokOptions, "purok"),
-        sector_ids: residentToEdit.sectors
-          ? residentToEdit.sectors.map((s) => s.id)
-          : [],
+
+        barangay_id: barangayMatch ? String(barangayMatch.id) : "",
+
+        sector_ids: residentToEdit.sectors ? residentToEdit.sectors.map((s) => s.id) : [],
         family_members: residentToEdit.family_members || [],
       });
 
@@ -441,6 +492,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
       }
       setLoading(false);
     }
+    
   };
 
   const isOtherSelected = sectorOptions.find(s => s.name.toLowerCase().includes('other') && formData.sector_ids.includes(s.id));
@@ -553,6 +605,16 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
              <SectionHeader icon={MapPin} title="Residency & Location" colorClass="text-emerald-600" />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               <InputGroup label="House No. / Street" name="house_no" value={formData.house_no} onChange={handleChange} placeholder="House No. / Street Name" />
+              <SelectGroup 
+                label="Barangay"
+                name="barangay_id" 
+                value={formData.barangay_id} 
+                onChange={handleChange} 
+                options={barangayOptions} 
+                required={isAdminLike} 
+                disabled={!isAdminLike} 
+                placeholder={isAdminLike ? "Select Barangay" : "Auto-Assigned"}
+              />
               <SelectGroup
                 label="Purok / Sitio"
                 name="purok"
@@ -561,16 +623,6 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
                 options={purokOptions}
                 required
                 placeholder="Select Purok or Sitio"
-              />
-              <SelectGroup 
-                label="Barangay"
-                name="barangay" 
-                value={formData.barangay} 
-                onChange={handleChange} 
-                options={barangayOptions} 
-                required={isAdminLike} 
-                disabled={!isAdminLike} 
-                placeholder={isAdminLike ? "Select Barangay" : "Auto-Assigned"}
               />
             </div>
           </div>

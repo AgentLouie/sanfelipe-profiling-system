@@ -17,10 +17,10 @@ print("Connecting to database...")
 
 engine = create_engine(
     DATABASE_URL, 
-    pool_size=5,         # Keep only 5 connections open
-    max_overflow=10,     # Allow 10 temporary extra connections
-    pool_timeout=30,     # Wait 30s before giving up
-    pool_recycle=1800    # Refresh connections every 30 mins
+    pool_size=5,
+    max_overflow=10,
+    pool_timeout=30,
+    pool_recycle=1800
 )
 
 SessionLocal = sessionmaker(

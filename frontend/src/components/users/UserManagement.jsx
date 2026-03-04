@@ -21,7 +21,6 @@ export default function UserManagement() {
   const [newUser, setNewUser] = useState({ username: '', password: '', role: 'barangay' });
   const [showForm, setShowForm] = useState(false);
   
-  // NEW: State for toggling password visibility in the create form
   const [showNewUserPass, setShowNewUserPass] = useState(false);
   
   const [loading, setLoading] = useState(true);
@@ -64,7 +63,7 @@ export default function UserManagement() {
       toast.success("Account Deployed!");
       setShowForm(false);
       setNewUser({ username: '', password: '', role: 'barangay' });
-      setShowNewUserPass(false); // Reset toggle on success
+      setShowNewUserPass(false);
       fetchUsers();
     } catch (err) { 
       if (err.response?.status === 401) {
@@ -86,7 +85,7 @@ export default function UserManagement() {
       });
       toast.success(`Password updated for ${resetModal.username}`);
       setResetModal({ isOpen: false, userId: null, username: '', newPassword: '' });
-      setShowResetPass(false); // Reset toggle on success
+      setShowResetPass(false);
     } catch (err) {
       toast.error("Failed to reset password.");
     } finally {

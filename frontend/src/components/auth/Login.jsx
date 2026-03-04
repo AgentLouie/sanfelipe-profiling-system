@@ -10,13 +10,11 @@ export default function Login({ onLogin }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // 🔒 Security States
   const [attempts, setAttempts] = useState(0);
   const [lockTime, setLockTime] = useState(0);
 
   const navigate = useNavigate();
 
-  // ⏳ Countdown timer effect
   useEffect(() => {
     let timer;
 
@@ -32,7 +30,6 @@ export default function Login({ onLogin }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // 🔒 Prevent login if locked
     if (lockTime > 0) {
       setError(`Too many attempts. Try again in ${lockTime}s.`);
       return;
@@ -48,7 +45,6 @@ export default function Login({ onLogin }) {
 
       const response = await api.post('/token', formData);
 
-      // ✅ Success → Reset attempts
       setAttempts(0);
       setLockTime(0);
 
@@ -72,10 +68,9 @@ export default function Login({ onLogin }) {
         setError("Login failed. Please try again.");
       }
 
-      // 🔒 Lock after 5 failed attempts
       if (newAttempts >= 5) {
-        setLockTime(30);      // 30 seconds lock
-        setAttempts(0);       // reset attempts
+        setLockTime(30);
+        setAttempts(0);
         setError("Too many failed attempts. Locked for 30 seconds.");
       }
 
@@ -138,7 +133,7 @@ export default function Login({ onLogin }) {
               <p className="text-stone-500 font-bold text-sm mt-2">Enter your secure credentials to continue.</p>
             </div>
 
-            {/* 🔒 Lock Countdown Message */}
+            {/* Lock Countdown Message */}
             {lockTime > 0 && (
               <div className="mb-6 p-4 bg-orange-50 border-2 border-orange-200 rounded-xl flex items-center gap-3 text-orange-800 shadow-sm animate-in zoom-in-95">
                 <Lock size={20} />

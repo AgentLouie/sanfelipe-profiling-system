@@ -1,36 +1,30 @@
-import axios from 'axios';
-
-console.log("API BASE URL:", import.meta.env.VITE_API_URL);
+import axios from "axios";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-  baseURL: "https://sanfelipe-profiling-system-production-13e4.up.railway.app" // Your FastAPI URL
+  baseURL:
+    import.meta.env.VITE_API_URL ||
+    "https://sanfelipe-profiling-system-production-13e4.up.railway.app",
 });
 
 api.interceptors.request.use(
   (config) => {
-    // 1. Grab token from storage
-    const token = localStorage.getItem('token');
-    
-    // 2. If token exists, attach it to the header
+    const token =
+      localStorage.getItem("token") || localStorage.getItem("access_token");
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// INTERCEPTOR: Runs when we get a response
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // If the backend says "401 Unauthorized" (Token expired or fake)
-    if (error.response && error.response.status === 401) {
-      localStorage.clear(); // Delete the bad token
-      window.location.href = '/login'; // Force them back to login
+    if (error.response?.status === 401) {
+      localStorage.clear();
+      window.location.href = "/login";
     }
     return Promise.reject(error);
   }

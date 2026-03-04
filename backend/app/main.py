@@ -1105,7 +1105,6 @@ def get_me(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # Determine official barangay name for barangay users (same logic you already use)
     barangay_name = None
 
     if current_user.role not in ["admin", "admin_limited"]:
@@ -1116,8 +1115,6 @@ def get_me(
                 official_name = BARANGAY_MAPPING[key]
                 break
         barangay_name = official_name or current_user.username.replace("_", " ").title()
-
-    # Convert barangay_name -> barangay_id
     barangay_id = None
     if barangay_name:
         row = db.execute(
@@ -1127,7 +1124,7 @@ def get_me(
 
         if row:
             barangay_id = row["id"]
-            barangay_name = row["name"]  # normalize to DB casing
+            barangay_name = row["name"]
 
     return {
         "username": current_user.username,

@@ -128,20 +128,12 @@ export default function ResidentQRPage() {
       </p>
 
       {/* BOTH CARDS CONTAINER */}
-      {/* FIXES:
-          - md:items-stretch to force equal height in row layout
-          - items-center (mobile) for nicer centering
-      */}
       <div
         id="qr-print-area"
         className="flex flex-col md:flex-row gap-8 items-center md:items-stretch justify-center w-full
                    print:absolute print:top-0 print:left-0 print:m-0 print:p-0 print:w-[3.5in] print:flex-col print:gap-0"
       >
         {/* ── FRONT SIDE ── */}
-        {/* FIXES:
-            - md:h-[520px] to make both cards equal height on desktop preview
-            - print:h-[5in] still controls printing
-        */}
         <div className="bg-white rounded-2xl w-[320px] md:h-[520px] shadow-xl border border-stone-300 overflow-hidden flex flex-col box-border
                         print:w-[3.5in] print:h-[5in] print:shadow-none print:border print:border-stone-300 print:rounded-2xl print:break-inside-avoid print:break-after-page print:flex-shrink-0">
           <CardHeader isFront={true} />
@@ -219,11 +211,6 @@ export default function ResidentQRPage() {
         </div>
 
         {/* ── BACK SIDE ── */}
-        {/* FIXES:
-            - md:h-[520px] matches front
-            - normalize padding to pt-6 pb-6 (same as front)
-            - remove justify-center to prevent vertical drift; use flex-1 + mt-auto patterns instead
-        */}
         <div className="bg-white rounded-2xl w-[320px] md:h-[520px] shadow-xl border border-stone-300 overflow-hidden flex flex-col box-border
                         print:w-[3.5in] print:h-[5in] print:shadow-none print:border print:border-stone-300 print:rounded-2xl print:break-inside-avoid print:flex-shrink-0">
           <CardHeader isFront={false} />

@@ -120,12 +120,10 @@ export default function ResidentList({ userRole, onEdit }) {
     return n ? `${key.toUpperCase()} (PUROK ${n})` : key.toUpperCase();
   }
 
-  // If purok stored as number
   if (/^\d{1,2}$/.test(low)) {
     return `PUROK ${raw}`;
   }
 
-  // Fallback
   return raw.toUpperCase();
 };
 
