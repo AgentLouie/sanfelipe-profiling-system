@@ -1050,3 +1050,19 @@ def get_barangay_areas(barangay_id: int, db: Session = Depends(get_db)):
     """), {"bid": barangay_id}).mappings().all()
 
     return rows
+
+@app.get("/barangays/by-name/{barangay_name}/areas")
+def get_areas_by_name(barangay_name: str, db: Session = Depends(get_db)):
+    b = db.execute(text("SELECT id FROM barangays WHERE LOWER(name)=LOWER(:n)"),
+                   {"n": barangay_name}).mappings().first()
+    if not b:
+        raise HTTPException(status_code=404, detail="Barangay not found")
+
+    rows = db.execute(text("""
+        SELECT id, name, area_type, parent_purok
+        FROM barangay_areas
+        WHERE barangay_id = :bid
+        ORDER BY CASE WHEN area_type='PUROK' THEN 0 ELSE 1 END, name
+    """), {"bid": b["id"]}).mappings().all()
+
+    return rows
