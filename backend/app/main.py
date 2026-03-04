@@ -930,20 +930,6 @@ def get_stats(db: Session = Depends(get_db),
 # Import/Export
 # ---------------------------------------------------
 
-@app.post("/import/excel")
-async def import_residents_excel(
-    file: UploadFile = File(...),
-    sheet_name: str | None = None,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403)
-
-    contents = await file.read()
-
-    return process_excel_import(io.BytesIO(contents), db, sheet_name=sheet_name)
-
 @app.get("/export/excel")
 def export_residents_excel(
     barangay: str = Query(None),
