@@ -336,7 +336,7 @@ def get_resident_count(
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
 
-    return query.distinct(models.ResidentProfile.id).count()
+    return query.distinct().count()
 
 
 # =====================================================
@@ -362,7 +362,7 @@ def get_residents(
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
     
-    query = query.distinct(models.ResidentProfile.id)
+    query = query.distinct()
 
     if sort_order.lower() == "desc":
         query = query.order_by(
