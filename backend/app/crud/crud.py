@@ -413,30 +413,27 @@ def get_dashboard_stats(db: Session):
 
     stats_barangay = {b: count for b, count in barangay_counts if b}
 
-    sector_counts = (
-        db.query(
-            func.upper(func.trim(models.Sector.name)).label("sector"),
-            func.count(func.distinct(models.ResidentProfile.id)).label("count"),
-        )
-        .join(models.ResidentProfile.sectors)
-        .filter(models.ResidentProfile.is_deleted == False)
-        .group_by(func.upper(func.trim(models.Sector.name)))
-        .all()
-    )
+    sector_counts = db.query(
+        models.ResidentProfile.sector_summary,
+        func.count(models.ResidentProfile.id)
+    ).filter(
+        models.ResidentProfile.is_deleted == False
+    ).group_by(
+        models.ResidentProfile.sector_summary
+    ).all()
 
-    stats_sector = {sector: count for sector, count in sector_counts if sector}
+    stats_sector = {}
 
     def norm_sector(name: str) -> str:
-        # trim, collapse spaces, unify casing
         return " ".join((name or "").strip().upper().split())
 
-    for sector_summary, count in sector_counts:
-        if not sector_summary or sector_summary.strip().lower() == "none":
+    for summary, count in sector_counts:
+        if not summary or summary.strip().lower() == "none":
             continue
 
-        parts = [p for p in (x.strip() for x in sector_summary.split(",")) if p]
+        parts = [p.strip() for p in summary.split(",") if p.strip()]
         for p in parts:
-            key = " ".join(p.strip().upper().split())
+            key = norm_sector(p)
             stats_sector[key] = stats_sector.get(key, 0) + count
 
     return {
