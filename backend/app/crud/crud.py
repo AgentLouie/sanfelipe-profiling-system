@@ -413,20 +413,18 @@ def get_dashboard_stats(db: Session):
 
     stats_barangay = {b: count for b, count in barangay_counts if b}
 
-    sector_counts = db.query(
-        func.upper(func.trim(models.Sector.name)).label("sector"),
-        func.count(func.distinct(models.ResidentProfile.id))
-    ).join(
-        models.ResidentProfile.sectors
-    ).filter(
-        models.ResidentProfile.is_deleted == False
-    ).group_by(
-        func.upper(func.trim(models.Sector.name))
-    ).all()
+    sector_counts = (
+        db.query(
+            func.upper(func.trim(models.Sector.name)).label("sector"),
+            func.count(func.distinct(models.ResidentProfile.id)).label("count"),
+        )
+        .join(models.ResidentProfile.sectors)  # uses resident_sectors association
+        .filter(models.ResidentProfile.is_deleted == False)
+        .group_by(func.upper(func.trim(models.Sector.name)))
+        .all()
+    )
 
-    stats_sector = {s: c for s, c in sector_counts if s}
-
-    stats_sector = {}
+    stats_sector = {sector: count for sector, count in sector_counts if sector}
 
     def norm_sector(name: str) -> str:
         # trim, collapse spaces, unify casing
