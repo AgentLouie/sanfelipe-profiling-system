@@ -112,7 +112,7 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
         if sector_ids:
             sectors = db.query(models.Sector).filter(models.Sector.id.in_(sector_ids)).all()
             db_resident.sectors = sectors
-            db_resident.sector_summary = ", ".join([s.name for s in sectors])
+            db_resident.sector_summary = ", ".join([" ".join(s.name.strip().upper().split()) for s in sectors])
         else:
             db_resident.sector_summary = "None"
 
@@ -423,11 +423,23 @@ def get_dashboard_stats(db: Session):
     ).all()
 
     stats_sector = {}
+
+    def norm_sector(name: str) -> str:
+        # trim, collapse spaces, unify casing
+        return " ".join((name or "").strip().upper().split())
+
     for sector_summary, count in sector_counts:
-        if not sector_summary or sector_summary.lower() == "none":
+        if not sector_summary:
             continue
-        for s in [s.strip() for s in sector_summary.split(",")]:
-            stats_sector[s] = stats_sector.get(s, 0) + count
+        if sector_summary.strip().lower() == "none":
+            continue
+
+        parts = [p for p in (x.strip() for x in sector_summary.split(",")) if p]
+        for p in parts:
+            key = norm_sector(p)
+            if not key:
+                continue
+            stats_sector[key] = stats_sector.get(key, 0) + count
 
     return {
         "total_residents": total_residents,
