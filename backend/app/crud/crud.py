@@ -414,13 +414,17 @@ def get_dashboard_stats(db: Session):
     stats_barangay = {b: count for b, count in barangay_counts if b}
 
     sector_counts = db.query(
-        models.ResidentProfile.sector_summary,
-        func.count(models.ResidentProfile.id)
+        func.upper(func.trim(models.Sector.name)).label("sector"),
+        func.count(func.distinct(models.ResidentProfile.id))
+    ).join(
+        models.ResidentProfile.sectors
     ).filter(
         models.ResidentProfile.is_deleted == False
     ).group_by(
-        models.ResidentProfile.sector_summary
+        func.upper(func.trim(models.Sector.name))
     ).all()
+
+    stats_sector = {s: c for s, c in sector_counts if s}
 
     stats_sector = {}
 
