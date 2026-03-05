@@ -605,6 +605,7 @@ export default function ResidentList({ userRole, onEdit }) {
                 <option value="BRGY BNS/BHW">BRGY. BNS/BHW</option>
                 <option value="FAMILY HEADS">FAMILY HEADS</option>
                 <option value="FARMERS">FARMERS</option>
+                <option value="FISHERFOLK">FISHERFOLK</option>
                 <option value="Fisherman">FISHERMAN</option>
                 <option value="Indigenous People">INDIGENOUS PEOPLE</option>
                 <option value="LIFEGUARD">LIFEGUARD</option>
