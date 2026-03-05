@@ -429,16 +429,12 @@ def get_dashboard_stats(db: Session):
         return " ".join((name or "").strip().upper().split())
 
     for sector_summary, count in sector_counts:
-        if not sector_summary:
-            continue
-        if sector_summary.strip().lower() == "none":
+        if not sector_summary or sector_summary.strip().lower() == "none":
             continue
 
         parts = [p for p in (x.strip() for x in sector_summary.split(",")) if p]
         for p in parts:
-            key = norm_sector(p)
-            if not key:
-                continue
+            key = " ".join(p.strip().upper().split())
             stats_sector[key] = stats_sector.get(key, 0) + count
 
     return {
