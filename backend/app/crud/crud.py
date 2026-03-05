@@ -169,7 +169,7 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
     if resident_data.sector_ids:
         new_sectors = db.query(models.Sector).filter(models.Sector.id.in_(resident_data.sector_ids)).all()
         db_resident.sectors = new_sectors
-        db_resident.sector_summary = ", ".join([s.name for s in new_sectors])
+        db_resident.sector_summary = ", ".join([" ".join(s.name.strip().upper().split()) for s in new_sectors])
     else:
         db_resident.sector_summary = "None"
 
@@ -418,7 +418,7 @@ def get_dashboard_stats(db: Session):
             func.upper(func.trim(models.Sector.name)).label("sector"),
             func.count(func.distinct(models.ResidentProfile.id)).label("count"),
         )
-        .join(models.ResidentProfile.sectors)  # uses resident_sectors association
+        .join(models.ResidentProfile.sectors)
         .filter(models.ResidentProfile.is_deleted == False)
         .group_by(func.upper(func.trim(models.Sector.name)))
         .all()
