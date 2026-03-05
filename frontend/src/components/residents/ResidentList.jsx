@@ -598,7 +598,7 @@ export default function ResidentList({ userRole, onEdit }) {
             <div className="relative w-48 hidden md:block">
                <select value={selectedSector} onChange={handleSectorFilter} className="w-full appearance-none pl-4 pr-10 py-3 bg-white border border-stone-300 rounded-xl text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all cursor-pointer shadow-sm uppercase">
                  <option value="">ALL SECTORS</option>
-                 <option value="Fisherman/Banca Owner">FISHERFOLK</option>
+                 <option value="Fisherman">FISHERMAN</option>
                  <option value="Senior Citizen">SENIOR CITIZEN</option>
                  <option value="PWD">PWD</option>
                  <option value="OFW">OFW</option>
@@ -614,6 +614,7 @@ export default function ResidentList({ userRole, onEdit }) {
                  <option value="FARMERS">FARMERS</option>
                  <option value="LGU EMPLOYEE">LGU EMPLOYEE</option>
                  <option value="BRGY. OFFICIAL/EMPLOYEE">BRGY. OFFICIAL/EMPLOYEE</option>
+                 <option value="BRGY BNS/BHW">BRGY. BNS/BHW</option>
                  <option value="OTHERS">OTHERS</option>
                </select>
                <ChevronDown className="absolute right-4 top-3.5 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
@@ -741,7 +742,7 @@ export default function ResidentList({ userRole, onEdit }) {
 
                     {/* SECTOR */}
                     <td className="py-4 px-5">
-                       <span className="inline-flex items-center bg-stone-100 border border-stone-200 px-3 py-1.5 rounded-lg text-[11px] font-normal text-stone-600 tracking-tight uppercase max-w-[150px] truncate shadow-sm">
+                       <span className="inline-flex items-center bg-stone-100 border border-stone-200 px-3 py-1.5 rounded-lg text-[11px] font-normal text-stone-600 tracking-tight uppercase shadow-sm whitespace-normal break-words max-w-[200px]">
                           {formatSectors(r.sector_summary, r.other_sector_details)}
                        </span>
                     </td>
