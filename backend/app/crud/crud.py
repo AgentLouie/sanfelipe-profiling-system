@@ -55,9 +55,9 @@ def apply_sector_filter(query, sector: str):
     if not sector:
         return query
 
-    normalized = sector.strip().lower()
+    normalized = " ".join(sector.strip().upper().split())
 
-    if normalized == "others":
+    if normalized == "OTHERS":
         return query.filter(
             or_(
                 func.lower(func.coalesce(models.ResidentProfile.sector_summary, "")).like("%others%"),
@@ -65,8 +65,8 @@ def apply_sector_filter(query, sector: str):
             )
         )
 
-    return query.filter(
-        func.lower(func.coalesce(models.ResidentProfile.sector_summary, "")).like(f"%{normalized}%")
+    return query.join(models.ResidentProfile.sectors).filter(
+        func.upper(func.trim(models.Sector.name)) == normalized
     )
 
 
@@ -334,7 +334,7 @@ def get_resident_count(
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
 
-    return query.count()
+    return query.distinct(models.ResidentProfile.id).count()
 
 
 # =====================================================
@@ -359,6 +359,8 @@ def get_residents(
     query = apply_search_filter(query, search)
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
+    
+    query = query.distinct(models.ResidentProfile.id)
 
     if sort_order.lower() == "desc":
         query = query.order_by(
