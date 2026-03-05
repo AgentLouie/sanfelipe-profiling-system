@@ -1079,6 +1079,11 @@ def get_barangay_areas(barangay_id: int, db: Session = Depends(get_db)):
         WHERE barangay_id = :bid
         ORDER BY
           CASE WHEN area_type='PUROK' THEN 0 ELSE 1 END,
+          CASE
+            WHEN name ILIKE 'PUROK %'
+              THEN NULLIF(regexp_replace(name, '[^0-9]', '', 'g'), '')::int
+            ELSE NULL
+          END,
           name
     """), {"bid": barangay_id}).mappings().all()
 
