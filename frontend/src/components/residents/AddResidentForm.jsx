@@ -261,17 +261,6 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     fetchOptions();
   }, []);
 
-  const normalizeName = (s) =>
-  String(s || "")
-    .toLowerCase()
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, ""); // handles ñ
-
-const barangayMatch = barangayOptions.find(
-  (b) => normalizeName(b.name) === normalizeName(residentToEdit.barangay)
-);
-
   useEffect(() => {
   const loadAreas = async () => {
     if (!formData.barangay_id) {
@@ -289,7 +278,7 @@ const barangayMatch = barangayOptions.find(
       setPurokOptions(opts);
       setFormData(prev => ({
         ...prev,
-        purok: residentToEdit?.purok ? residentToEdit.purok : ""
+        purok: prev.purok || (residentToEdit?.purok ?? "")
       }));
 
     } catch (err) {
@@ -317,95 +306,100 @@ useEffect(() => {
   loadMe();
 }, []);
 
-  // --- POPULATE EDIT DATA ---
-  useEffect(() => {
-    if (residentToEdit && barangayOptions.length) {
+ // --- POPULATE EDIT DATA ---
+useEffect(() => {
+  if (!residentToEdit) return;
+  if (!barangayOptions.length) return;
 
-      const normalizeText = (v) =>
-        String(v ?? "")
-          .toLowerCase()
-          .trim()
-          .replace(/\s+/g, " ");
+  const normalizeText = (v) =>
+    String(v ?? "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, " ")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
 
-      const normalizePurokSitioKey = (v) => {
-        const t = normalizeText(v);
+  const normalizePurokSitioKey = (v) => {
+    const t = normalizeText(v);
 
-        // "Purok 6" / "PUROK 6" -> purok-6
-        const numMatch = t.match(/\b(\d{1,2})\b/);
-        if (t.includes("purok") && numMatch) return `purok-${numMatch[1]}`;
+    const numMatch = t.match(/\b(\d{1,2})\b/);
+    if (t.includes("purok") && numMatch) return `purok-${numMatch[1]}`;
 
-        // "6" -> purok-6
-        if (/^\d{1,2}$/.test(t)) return `purok-${t}`;
+    if (/^\d{1,2}$/.test(t)) return `purok-${t}`;
 
-        // Sitio/Bantay/etc
-        return t;
-      };
+    return t;
+  };
 
-      const normalizeSelect = (value, options, mode = "text") => {
-        if (!value) return "";
+  const normalizeSelect = (value, options, mode = "text") => {
+    if (!value) return "";
 
-        const targetKey =
-          mode === "purok" ? normalizePurokSitioKey(value) : normalizeText(value);
+    const targetKey =
+      mode === "purok" ? normalizePurokSitioKey(value) : normalizeText(value);
 
-        const match = (options || []).find((opt) => {
-          // ✅ this is the important fix:
-          const optionRaw =
-            typeof opt === "object"
-              ? (opt.value ?? opt.name ?? opt.label ?? opt.id)
-              : opt;
+    const match = (options || []).find((opt) => {
+      const optionRaw =
+        typeof opt === "object"
+          ? (opt.value ?? opt.name ?? opt.label ?? opt.id)
+          : opt;
 
-          const optionKey =
-            mode === "purok"
-              ? normalizePurokSitioKey(optionRaw)
-              : normalizeText(optionRaw);
+      const optionKey =
+        mode === "purok"
+          ? normalizePurokSitioKey(optionRaw)
+          : normalizeText(optionRaw);
 
-          return optionKey === targetKey;
-        });
+      return optionKey === targetKey;
+    });
 
-        // ✅ must return the option VALUE (because <option value="..."> uses value)
-        return match
-          ? String(typeof match === "object" ? (match.value ?? match.name ?? match.id) : match)
-          : "";
-      };
+    return match
+      ? String(
+          typeof match === "object"
+            ? (match.value ?? match.id ?? match.name)
+            : match
+        )
+      : "";
+  };
 
-      const normalizeSex = (value) => {
-        if (!value) return '';
-        const v = value.toLowerCase().trim();
-        if (v === 'm' || v === 'male') return 'Male';
-        if (v === 'f' || v === 'female') return 'Female';
-        return '';
-      };
+  const normalizeSex = (value) => {
+    if (!value) return "";
+    const v = String(value).toLowerCase().trim();
+    if (v === "m" || v === "male") return "Male";
+    if (v === "f" || v === "female") return "Female";
+    return "";
+  };
 
-      const normalizeCivilStatus = (value) => {
-        if (!value) return '';
-        const v = value.toLowerCase().trim();
-        if (v === 'single') return 'Single';
-        if (v === 'married') return 'Married';
-        if (v === 'widowed') return 'Widowed';
-        if (v.includes('live')) return 'Live-in Partner';
-        return '';
-      };
+  const normalizeCivilStatus = (value) => {
+    if (!value) return "";
+    const v = String(value).toLowerCase().trim();
+    if (v === "single") return "Single";
+    if (v === "married") return "Married";
+    if (v === "widowed") return "Widowed";
+    if (v.includes("live")) return "Live-in Partner";
+    return "";
+  };
 
-      setFormData({
-        ...getInitialFormState(),
-        ...residentToEdit,
-        birthdate: residentToEdit.birthdate ? residentToEdit.birthdate.split("T")[0] : "",
-        sex: normalizeSex(residentToEdit.sex),
-        civil_status: normalizeCivilStatus(residentToEdit.civil_status),
+  const barangayMatch = barangayOptions.find(
+    (b) => normalizeText(b.name) === normalizeText(residentToEdit?.barangay)
+  );
 
-        barangay_id: barangayMatch ? String(barangayMatch.id) : "",
+  setFormData({
+    ...getInitialFormState(),
+    ...residentToEdit,
+    birthdate: residentToEdit.birthdate
+      ? residentToEdit.birthdate.split("T")[0]
+      : "",
+    sex: normalizeSex(residentToEdit.sex),
+    civil_status: normalizeCivilStatus(residentToEdit.civil_status),
 
-        sector_ids: residentToEdit.sectors ? residentToEdit.sectors.map((s) => s.id) : [],
-        family_members: residentToEdit.family_members || [],
-      });
+    barangay_id: barangayMatch ? String(barangayMatch.value ?? barangayMatch.id) : "",
 
-      if (residentToEdit.photo_url) {
-        setPhotoPreview(residentToEdit.photo_url);
-      } else {
-        setPhotoPreview(null);
-      }
-    }
-  }, [residentToEdit, barangayOptions, purokOptions]);
+    purok: residentToEdit.purok ? normalizeSelect(residentToEdit.purok, purokOptions, "purok") : "",
+
+    sector_ids: residentToEdit.sectors ? residentToEdit.sectors.map((s) => s.id) : [],
+    family_members: residentToEdit.family_members || [],
+  });
+
+  setPhotoPreview(residentToEdit.photo_url || null);
+}, [residentToEdit?.id, barangayOptions]);
 
   // --- HANDLERS ---
   const handleChange = (e) => {
