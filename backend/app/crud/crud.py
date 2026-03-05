@@ -65,8 +65,10 @@ def apply_sector_filter(query, sector: str):
             )
         )
 
-    return query.join(models.ResidentProfile.sectors).filter(
-        func.upper(func.trim(models.Sector.name)) == normalized
+    return query.filter(
+        models.ResidentProfile.sectors.any(
+            func.upper(func.trim(models.Sector.name)) == normalized
+        )
     )
 
 
