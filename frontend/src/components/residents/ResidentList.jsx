@@ -597,25 +597,26 @@ export default function ResidentList({ userRole, onEdit }) {
             {/* Sector Filter */}
             <div className="relative w-48 hidden md:block">
                <select value={selectedSector} onChange={handleSectorFilter} className="w-full appearance-none pl-4 pr-10 py-3 bg-white border border-stone-300 rounded-xl text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all cursor-pointer shadow-sm uppercase">
-                 <option value="">ALL SECTORS</option>
-                 <option value="Fisherman">FISHERMAN</option>
-                 <option value="Senior Citizen">SENIOR CITIZEN</option>
-                 <option value="PWD">PWD</option>
-                 <option value="OFW">OFW</option>
-                 <option value="Student">STUDENT</option>
-                 <option value="SOLO PARENT">SOLO PARENT</option>
-                 <option value="Indigenous People">INDIGENOUS PEOPLE</option>
-                 <option value="LGU Employee">GOV EMPLOYEE</option>
-                 <option value="ATV'S/UTV'S OWNER">ATV'S/UTV'S OWNER</option>
-                 <option value="BANANA BOAT/DRAGON BOAT OWNER">BANANA BOAT/DRAGON BOAT OWNER</option>
-                 <option value="FAMILY HEADS">FAMILY HEADS</option>
-                 <option value="BANCA OWNER">BANCA OWNER</option>
-                 <option value="LIFEGUARD">LIFEGUARD</option>
-                 <option value="FARMERS">FARMERS</option>
-                 <option value="LGU EMPLOYEE">LGU EMPLOYEE</option>
-                 <option value="BRGY. OFFICIAL/EMPLOYEE">BRGY. OFFICIAL/EMPLOYEE</option>
-                 <option value="BRGY BNS/BHW">BRGY. BNS/BHW</option>
-                 <option value="OTHERS">OTHERS</option>
+                <option value="">ALL SECTORS</option>
+                <option value="ATV'S/UTV'S OWNER">ATV'S/UTV'S OWNER</option>
+                <option value="BANANA BOAT/DRAGON BOAT OWNER">BANANA BOAT/DRAGON BOAT OWNER</option>
+                <option value="BANCA OWNER">BANCA OWNER</option>
+                <option value="BRGY. OFFICIAL/EMPLOYEE">BRGY. OFFICIAL/EMPLOYEE</option>
+                <option value="BRGY BNS/BHW">BRGY. BNS/BHW</option>
+                <option value="FAMILY HEADS">FAMILY HEADS</option>
+                <option value="FARMERS">FARMERS</option>
+                <option value="Fisherman">FISHERMAN</option>
+                <option value="Indigenous People">INDIGENOUS PEOPLE</option>
+                <option value="LIFEGUARD">LIFEGUARD</option>
+                <option value="LGU Employee">GOV EMPLOYEE</option>
+                <option value="LGU EMPLOYEE">LGU EMPLOYEE</option>
+                <option value="OFW">OFW</option>
+                <option value="PWD">PWD</option>
+                <option value="Senior Citizen">SENIOR CITIZEN</option>
+                <option value="SOLO PARENT">SOLO PARENT</option>
+                <option value="Student">STUDENT</option>
+                <option value="TODA">TODA</option>
+                <option value="OTHERS">OTHERS</option>
                </select>
                <ChevronDown className="absolute right-4 top-3.5 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
             </div>

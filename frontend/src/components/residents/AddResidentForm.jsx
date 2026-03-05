@@ -633,7 +633,15 @@ useEffect(() => {
            <div className="px-6 md:px-8 py-6">
              <SectionHeader icon={Briefcase} title="Sectoral Classification" colorClass="text-purple-600" />
              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-               {sectorOptions.map((s) => (
+               {[...sectorOptions]
+                .sort((a, b) => {
+                  const aIsOther = a.name.toLowerCase().includes('other');
+                  const bIsOther = b.name.toLowerCase().includes('other');
+                  if (aIsOther && !bIsOther) return 1;
+                  if (!aIsOther && bIsOther) return -1;
+                  return 0;
+                })
+                .map((s) => (
                  <label 
                    key={s.id} 
                    className={`
