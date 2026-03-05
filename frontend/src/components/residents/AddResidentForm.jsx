@@ -261,6 +261,17 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
     fetchOptions();
   }, []);
 
+  const normalizeName = (s) =>
+  String(s || "")
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, ""); // handles ñ
+
+const barangayMatch = barangayOptions.find(
+  (b) => normalizeName(b.name) === normalizeName(residentToEdit.barangay)
+);
+
   useEffect(() => {
   const loadAreas = async () => {
     if (!formData.barangay_id) {
