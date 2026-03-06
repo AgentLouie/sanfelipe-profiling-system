@@ -277,29 +277,83 @@ export default function ResidentList({ userRole, onEdit }) {
               <h4 className="text-xs font-medium text-stone-700 uppercase tracking-wider mb-5 flex justify-between items-center border-b border-stone-100 pb-3">
                 Personal Information
                 {r.photo_url && (
-                  <img src={r.photo_url} alt="Resident" className="w-14 h-14 object-cover rounded-full border-2 border-stone-200 shadow-sm" />
+                  <img
+                    src={r.photo_url}
+                    alt="Resident"
+                    className="w-14 h-14 object-cover rounded-full border-2 border-stone-200 shadow-sm"
+                  />
                 )}
               </h4>
+
               <div className="grid grid-cols-2 gap-y-6 gap-x-4">
                 <div>
-                  <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Civil Status</p>
+                  <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">
+                    Civil Status
+                  </p>
                   <p className="text-sm font-normal text-stone-800">{r.civil_status || '-'}</p>
                 </div>
+
                 <div>
-                  <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Religion</p>
+                  <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">
+                    Religion
+                  </p>
                   <p className="text-sm font-normal text-stone-800">{r.religion || '-'}</p>
                 </div>
+
                 <div>
-                  <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Contact</p>
+                  <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">
+                    Contact
+                  </p>
                   <p className="text-sm font-normal text-stone-800">{r.contact_no || '-'}</p>
                 </div>
+
                 <div>
-                  <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">Precinct ID</p>
-                  <p className="text-sm font-mono font-normal text-stone-800 bg-stone-100 px-2 py-1 rounded border border-stone-200 inline-block">{r.precinct_no || '-'}</p>
+                  <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">
+                    Precinct ID
+                  </p>
+                  <p className="text-sm font-mono font-normal text-stone-800 bg-stone-100 px-2 py-1 rounded border border-stone-200 inline-block">
+                    {r.precinct_no || '-'}
+                  </p>
                 </div>
               </div>
+
+              <div className="mt-6 border-t border-stone-100 pt-5">
+                <h5 className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-4">
+                  Emergency Contact
+                </h5>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">
+                      Name
+                    </p>
+                    <p className="text-sm font-normal text-stone-800 uppercase break-words">
+                      {r.emergency_name || '-'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">
+                      Contact Number
+                    </p>
+                    <p className="text-sm font-normal text-stone-800">
+                      {r.emergency_contact_no || '-'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">
+                      Address
+                    </p>
+                    <p className="text-sm font-normal text-stone-800 uppercase break-words">
+                      {r.emergency_address || '-'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {wasEdited && (
-                <div>
+                <div className="mt-6 border-t border-stone-100 pt-5">
                   <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">
                     Last Updated
                   </p>

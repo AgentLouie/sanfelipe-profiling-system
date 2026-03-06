@@ -168,8 +168,13 @@ const getInitialFormState = () => ({
   birthdate: '', sex: '', civil_status: '',
   religion: '',
   occupation: '', precinct_no: '', contact_no: '',
+
+  emergency_name: '',
+  emergency_contact_no: '',
+  emergency_address: '',
+
   spouse_last_name: '', spouse_first_name: '', spouse_middle_name: '', spouse_ext_name: '',
-  sector_ids: [], family_members: [], other_sector_details: '' 
+  sector_ids: [], family_members: [], other_sector_details: ''
 });
 
 export default function AddResidentForm({ onSuccess, onCancel, residentToEdit }) {
@@ -599,6 +604,44 @@ useEffect(() => {
                 <InputGroup label="Occupation / Profession" name="occupation" value={formData.occupation} onChange={handleChange} placeholder="E.G. FARMER, EMPLOYEE" />
                 <InputGroup label="Mobile Number" name="contact_no" value={formData.contact_no} onChange={(e) => { const val = e.target.value.replace(/\D/g, ''); setFormData(prev => ({ ...prev, contact_no: val })); }} placeholder="09XXXXXXXXX" />
                 <InputGroup label="Precinct / Voter ID" name="precinct_no" value={formData.precinct_no} onChange={handleChange} placeholder="OPTIONAL" />
+              </div>
+              <div className="border-t border-slate-100 pt-6">
+                <div className="flex items-center gap-2 mb-5 text-slate-400">
+                  <Phone size={16} className="text-red-400" strokeWidth={2} />
+                  <span className="text-[11px] font-normal uppercase tracking-wider">
+                    Emergency Contact Information
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  <InputGroup
+                    label="Emergency Contact Name"
+                    name="emergency_name"
+                    value={formData.emergency_name}
+                    onChange={handleChange}
+                    placeholder="FULL NAME"
+                  />
+
+                  <InputGroup
+                    label="Emergency Contact Number"
+                    name="emergency_contact_no"
+                    value={formData.emergency_contact_no}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setFormData(prev => ({ ...prev, emergency_contact_no: val }));
+                    }}
+                    placeholder="09XXXXXXXXX"
+                  />
+
+                  <InputGroup
+                    label="Emergency Address"
+                    name="emergency_address"
+                    value={formData.emergency_address}
+                    onChange={handleChange}
+                    placeholder="BARANGAY / STREET / PUROK"
+                    className="sm:col-span-2 lg:col-span-1"
+                  />
+                </div>
               </div>
             </div>
           </div>
