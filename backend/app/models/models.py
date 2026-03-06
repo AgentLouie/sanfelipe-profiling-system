@@ -85,7 +85,7 @@ class ResidentProfile(Base):
     
     # Emergency Contact
     emergency_name = Column(String, nullable=True)
-    emergency_contact_no = Column(String, nullable=True)
+    emergency_contacat_no = Column(String, nullable=True)
     emergency_address = Column(String, nullable=True)
     
     # 3 Spouse/Partner
