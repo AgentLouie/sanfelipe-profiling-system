@@ -83,6 +83,11 @@ class ResidentProfile(Base):
     barangay = Column(String, index=True)
     sitio = Column(String, nullable=True)
     
+    # Emergency Contact
+    emergency_name = Column(String, nullable=True)
+    emergency_contact_no = Column(String, nullable=True)
+    emergency_address = Column(String, nullable=True)
+    
     # 3 Spouse/Partner
     spouse_last_name = Column(String, nullable=True)
     spouse_first_name = Column(String, nullable=True)

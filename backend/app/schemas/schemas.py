@@ -87,6 +87,11 @@ class ResidentBase(BaseModel):
     barangay_id: Optional[int] = None
     sitio: Optional[str] = None
     
+    # Emergency Contact
+    emergency_name: Optional[str] = None
+    emergency_contact_no: Optional[str] = None
+    emergency_address: Optional[str] = None
+    
     # Personal Info
     sex: Optional[str] = None
     birthdate: Optional[date] = None
