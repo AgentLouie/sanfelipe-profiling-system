@@ -377,11 +377,9 @@ export default function ResidentQRPage() {
             </p>
             <div className="mb-2">
               <p className="text-[11px] text-black font-medium">Contact Number</p>
-              <div className="border-b border-black min-h-[22px] flex items-end">
                 <p className="text-black text-[14px] font-bold leading-tight break-words w-full">
                   {resident.emergency_contact_no || "\u00A0"}
                 </p>
-              </div>
             </div>
           </div>
 
