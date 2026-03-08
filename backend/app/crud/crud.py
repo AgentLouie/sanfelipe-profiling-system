@@ -59,16 +59,18 @@ def apply_sector_filter(query, sector: str):
 
     normalized = " ".join(sector.strip().upper().split())
 
-    # Optional alias cleanup
+    # Canonical names for filtering
     sector_aliases = {
         "FARMER": "FARMERS",
+        "FARMERS": "FARMERS",
         "FISHERMAN": "FISHERFOLK",
-        "INDIGENOUS PEOPLE": "INDIGENOUS PEOPLE",
-        "SENIOR CITIZEN": "SENIOR CITIZEN",
-        "STUDENT": "STUDENT",
-        "LGU EMPLOYEE": "LGU EMPLOYEE",
+        "FISHERFOLK": "FISHERFOLK",
         "GOV EMPLOYEE": "LGU EMPLOYEE",
+        "LGU EMPLOYEE": "LGU EMPLOYEE",
         "BRGY BNS/BHW": "BRGY. BNS/BHW",
+        "BRGY. BNS/BHW": "BRGY. BNS/BHW",
+        "BRGY OFFICIAL": "BRGY. OFFICIAL/EMPLOYEE",
+        "BRGY. OFFICIAL/EMPLOYEE": "BRGY. OFFICIAL/EMPLOYEE",
     }
 
     normalized = sector_aliases.get(normalized, normalized)
@@ -81,15 +83,30 @@ def apply_sector_filter(query, sector: str):
             )
         )
 
+    # Synonyms/legacy labels that should match together
+    sector_variants = {
+        "FARMERS": ["FARMERS", "FARMER"],
+        "FISHERFOLK": ["FISHERFOLK", "FISHERMAN"],
+        "LGU EMPLOYEE": ["LGU EMPLOYEE", "GOV EMPLOYEE"],
+        "BRGY. BNS/BHW": ["BRGY. BNS/BHW", "BRGY BNS/BHW"],
+        "BRGY. OFFICIAL/EMPLOYEE": ["BRGY. OFFICIAL/EMPLOYEE", "BRGY OFFICIAL", "BRGY OFFICIAL/EMPLOYEE"],
+    }
+
+    variants = sector_variants.get(normalized, [normalized])
+
+    sector_table_match = models.ResidentProfile.sectors.any(
+        func.upper(func.trim(models.Sector.name)).in_(variants)
+    )
+
+    summary_match = or_(*[
+        func.upper(func.coalesce(models.ResidentProfile.sector_summary, "")).like(f"%{variant}%")
+        for variant in variants
+    ])
+
     return query.filter(
         or_(
-            # Match linked sector table
-            models.ResidentProfile.sectors.any(
-                func.upper(func.trim(models.Sector.name)) == normalized
-            ),
-
-            # Match plain text summary
-            func.upper(func.coalesce(models.ResidentProfile.sector_summary, "")).like(f"%{normalized}%")
+            sector_table_match,
+            summary_match
         )
     )
 
