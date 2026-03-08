@@ -59,17 +59,16 @@ def apply_sector_filter(query, sector: str):
 
     normalized = " ".join(sector.strip().upper().split())
 
-    # Canonical names for filtering
+    # Canonical names only for sectors you want treated as the same
     sector_aliases = {
         "FARMER": "FARMERS",
         "FARMERS": "FARMERS",
-        "FISHERMAN": "FISHERFOLK",
-        "FISHERFOLK": "FISHERFOLK",
         "GOV EMPLOYEE": "LGU EMPLOYEE",
         "LGU EMPLOYEE": "LGU EMPLOYEE",
         "BRGY BNS/BHW": "BRGY. BNS/BHW",
         "BRGY. BNS/BHW": "BRGY. BNS/BHW",
         "BRGY OFFICIAL": "BRGY. OFFICIAL/EMPLOYEE",
+        "BRGY OFFICIAL/EMPLOYEE": "BRGY. OFFICIAL/EMPLOYEE",
         "BRGY. OFFICIAL/EMPLOYEE": "BRGY. OFFICIAL/EMPLOYEE",
     }
 
@@ -83,13 +82,15 @@ def apply_sector_filter(query, sector: str):
             )
         )
 
-    # Synonyms/legacy labels that should match together
     sector_variants = {
         "FARMERS": ["FARMERS", "FARMER"],
-        "FISHERFOLK": ["FISHERFOLK", "FISHERMAN"],
         "LGU EMPLOYEE": ["LGU EMPLOYEE", "GOV EMPLOYEE"],
         "BRGY. BNS/BHW": ["BRGY. BNS/BHW", "BRGY BNS/BHW"],
-        "BRGY. OFFICIAL/EMPLOYEE": ["BRGY. OFFICIAL/EMPLOYEE", "BRGY OFFICIAL", "BRGY OFFICIAL/EMPLOYEE"],
+        "BRGY. OFFICIAL/EMPLOYEE": [
+            "BRGY. OFFICIAL/EMPLOYEE",
+            "BRGY OFFICIAL",
+            "BRGY OFFICIAL/EMPLOYEE"
+        ],
     }
 
     variants = sector_variants.get(normalized, [normalized])
