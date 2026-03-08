@@ -57,17 +57,37 @@ def apply_sector_filter(query, sector: str):
 
     normalized = " ".join(sector.strip().upper().split())
 
+    # Optional alias cleanup
+    sector_aliases = {
+        "FARMER": "FARMERS",
+        "FISHERMAN": "FISHERFOLK",
+        "INDIGENOUS PEOPLE": "INDIGENOUS PEOPLE",
+        "SENIOR CITIZEN": "SENIOR CITIZEN",
+        "STUDENT": "STUDENT",
+        "LGU EMPLOYEE": "LGU EMPLOYEE",
+        "GOV EMPLOYEE": "LGU EMPLOYEE",
+        "BRGY BNS/BHW": "BRGY. BNS/BHW",
+    }
+
+    normalized = sector_aliases.get(normalized, normalized)
+
     if normalized == "OTHERS":
         return query.filter(
             or_(
-                func.lower(func.coalesce(models.ResidentProfile.sector_summary, "")).like("%others%"),
+                func.upper(func.coalesce(models.ResidentProfile.sector_summary, "")).like("%OTHERS%"),
                 func.coalesce(models.ResidentProfile.other_sector_details, "") != ""
             )
         )
 
     return query.filter(
-        models.ResidentProfile.sectors.any(
-            func.upper(func.trim(models.Sector.name)) == normalized
+        or_(
+            # Match linked sector table
+            models.ResidentProfile.sectors.any(
+                func.upper(func.trim(models.Sector.name)) == normalized
+            ),
+
+            # Match plain text summary
+            func.upper(func.coalesce(models.ResidentProfile.sector_summary, "")).like(f"%{normalized}%")
         )
     )
 
