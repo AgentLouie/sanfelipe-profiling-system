@@ -1,3 +1,5 @@
+from unicodedata import name
+
 from sqlalchemy.orm import Session, joinedload, subqueryload
 from sqlalchemy import or_, func
 from app import models, schemas
@@ -447,7 +449,19 @@ def get_dashboard_stats(db: Session):
     stats_sector = {}
 
     def norm_sector(name: str) -> str:
-        return " ".join((name or "").strip().upper().split())
+        normalized = " ".join((name or "").strip().upper().split())
+
+        sector_aliases = {
+            "FARMER": "FARMERS",
+            "FISHERMAN": "FISHERFOLK",
+            "GOV EMPLOYEE": "LGU EMPLOYEE",
+            "BRGY BNS/BHW": "BRGY. BNS/BHW",
+            "BRGY TANOD": "BRGY TANOD",
+            "BRGY OFFICIAL": "BRGY. OFFICIAL/EMPLOYEE",
+            "BRGY OFFICIAL/EMPLOYEE": "BRGY. OFFICIAL/EMPLOYEE",
+        }
+
+        return sector_aliases.get(normalized, normalized)
 
     for summary, count in sector_counts:
         if not summary or summary.strip().lower() == "none":
