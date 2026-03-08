@@ -204,7 +204,7 @@ export default function ResidentList({ userRole, onEdit }) {
   const handleImportSuccess = () => {
     setCurrentPage(1);
     setSearchTerm('');
-    fetchResidents('', selectedBarangay, 1, itemsPerPage);
+    fetchResidents('', selectedBarangay, selectedSector, 1, itemsPerPage, sortBy, sortOrder);
   };
 
   const handleArchive = async (id) => {
@@ -656,20 +656,19 @@ export default function ResidentList({ userRole, onEdit }) {
                 <option value="BANANA BOAT/DRAGON BOAT OWNER">BANANA BOAT/DRAGON BOAT OWNER</option>
                 <option value="BANCA OWNER">BANCA OWNER</option>
                 <option value="BRGY. OFFICIAL/EMPLOYEE">BRGY. OFFICIAL/EMPLOYEE</option>
-                <option value="BRGY BNS/BHW">BRGY. BNS/BHW</option>
+                <option value="BRGY. BNS/BHW">BRGY. BNS/BHW</option>
                 <option value="FAMILY HEADS">FAMILY HEADS</option>
                 <option value="FARMERS">FARMERS</option>
                 <option value="FISHERFOLK">FISHERFOLK</option>
-                <option value="Fisherman">FISHERMAN</option>
-                <option value="Indigenous People">INDIGENOUS PEOPLE</option>
+                <option value="FISHERMAN">FISHERMAN</option>
+                <option value="INDIGENOUS PEOPLE">INDIGENOUS PEOPLE</option>
                 <option value="LIFEGUARD">LIFEGUARD</option>
-                <option value="LGU Employee">GOV EMPLOYEE</option>
                 <option value="LGU EMPLOYEE">LGU EMPLOYEE</option>
                 <option value="OFW">OFW</option>
                 <option value="PWD">PWD</option>
-                <option value="Senior Citizen">SENIOR CITIZEN</option>
+                <option value="SENIOR CITIZEN">SENIOR CITIZEN</option>
                 <option value="SOLO PARENT">SOLO PARENT</option>
-                <option value="Student">STUDENT</option>
+                <option value="STUDENT">STUDENT</option>
                 <option value="TODA">TODA</option>
                 <option value="OTHERS">OTHERS</option>
                </select>
