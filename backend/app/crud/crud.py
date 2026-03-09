@@ -471,7 +471,6 @@ def get_dashboard_stats(db: Session):
 
         sector_aliases = {
             "FARMER": "FARMERS",
-            "GOV EMPLOYEE": "LGU EMPLOYEE",
             "BRGY BNS/BHW": "BRGY. BNS/BHW",
             "BRGY TANOD": "BRGY TANOD",
             "BRGY OFFICIAL": "BRGY. OFFICIAL/EMPLOYEE",
