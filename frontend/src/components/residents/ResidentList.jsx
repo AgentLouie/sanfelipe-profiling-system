@@ -325,28 +325,10 @@ export default function ResidentList({ userRole, onEdit }) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">
-                      Name
-                    </p>
-                    <p className="text-sm font-normal text-stone-800 uppercase break-words">
-                      {r.emergency_name || '-'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">
                       Contact Number
                     </p>
                     <p className="text-sm font-normal text-stone-800">
                       {r.emergency_contact_no || '-'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">
-                      Address
-                    </p>
-                    <p className="text-sm font-normal text-stone-800 uppercase break-words">
-                      {r.emergency_address || '-'}
                     </p>
                   </div>
                 </div>
@@ -652,11 +634,13 @@ export default function ResidentList({ userRole, onEdit }) {
             <div className="relative w-48 hidden md:block">
                <select value={selectedSector} onChange={handleSectorFilter} className="w-full appearance-none pl-4 pr-10 py-3 bg-white border border-stone-300 rounded-xl text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all cursor-pointer shadow-sm uppercase">
                 <option value="">ALL SECTORS</option>
+                <option value="4P'S">4P'S</option>
                 <option value="ATV'S/UTV'S OWNER">ATV'S/UTV'S OWNER</option>
                 <option value="BANANA BOAT/DRAGON BOAT OWNER">BANANA BOAT/DRAGON BOAT OWNER</option>
                 <option value="BANCA OWNER">BANCA OWNER</option>
                 <option value="BRGY. OFFICIAL/EMPLOYEE">BRGY. OFFICIAL/EMPLOYEE</option>
                 <option value="BRGY. BNS/BHW">BRGY. BNS/BHW</option>
+                <option value="GOV EMPLOYEE">GOV EMPLOYEE</option>
                 <option value="FAMILY HEADS">FAMILY HEADS</option>
                 <option value="FARMERS">FARMERS</option>
                 <option value="FISHERFOLK">FISHERFOLK</option>
@@ -665,8 +649,10 @@ export default function ResidentList({ userRole, onEdit }) {
                 <option value="LIFEGUARD">LIFEGUARD</option>
                 <option value="LGU EMPLOYEE">LGU EMPLOYEE</option>
                 <option value="OFW">OFW</option>
+                <option value="PHILHEALTH MEMBER">PHILHEALTH MEMBER</option>
                 <option value="PWD">PWD</option>
                 <option value="SENIOR CITIZEN">SENIOR CITIZEN</option>
+                <option value="SFAO">SFAO</option>
                 <option value="SOLO PARENT">SOLO PARENT</option>
                 <option value="STUDENT">STUDENT</option>
                 <option value="TODA">TODA</option>

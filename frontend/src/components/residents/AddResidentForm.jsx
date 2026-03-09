@@ -615,14 +615,6 @@ useEffect(() => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   <InputGroup
-                    label="Emergency Contact Name"
-                    name="emergency_name"
-                    value={formData.emergency_name}
-                    onChange={handleChange}
-                    placeholder="FULL NAME"
-                  />
-
-                  <InputGroup
                     label="Emergency Contact Number"
                     name="emergency_contact_no"
                     value={formData.emergency_contact_no}
@@ -631,15 +623,6 @@ useEffect(() => {
                       setFormData(prev => ({ ...prev, emergency_contact_no: val }));
                     }}
                     placeholder="09XXXXXXXXX"
-                  />
-
-                  <InputGroup
-                    label="Emergency Address"
-                    name="emergency_address"
-                    value={formData.emergency_address}
-                    onChange={handleChange}
-                    placeholder="BARANGAY / STREET / PUROK"
-                    className="sm:col-span-2 lg:col-span-1"
                   />
                 </div>
               </div>

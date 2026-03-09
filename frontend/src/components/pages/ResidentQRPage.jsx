@@ -5,7 +5,7 @@ import { Loader2, ShieldAlert, Printer, ArrowLeft } from "lucide-react";
 
 const IdField = ({ label, value, width, valueClassName = "" }) => (
   <div className="flex flex-col" style={{ width }}>
-    <div className="border-b border-black pb-1 text-center flex items-end justify-center min-h-[32px]">
+    <div className="pb-1 text-center flex items-end justify-center min-h-[32px]">
       <p
         className={`text-black font-bold text-[16px] leading-tight px-1 break-words text-center w-full ${valueClassName}`}
       >
