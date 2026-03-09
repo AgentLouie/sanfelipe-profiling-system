@@ -70,6 +70,7 @@ def apply_sector_filter(query, sector: str):
         "BRGY OFFICIAL": "BRGY. OFFICIAL/EMPLOYEE",
         "BRGY OFFICIAL/EMPLOYEE": "BRGY. OFFICIAL/EMPLOYEE",
         "BRGY. OFFICIAL/EMPLOYEE": "BRGY. OFFICIAL/EMPLOYEE",
+        "4PS": "4P'S",
     }
 
     normalized = sector_aliases.get(normalized, normalized)
