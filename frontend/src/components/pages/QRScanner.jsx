@@ -45,6 +45,43 @@ export default function QRScanner() {
   return `PUROK ${value}`.toUpperCase();
 };
 
+const sitioToPurok = {
+  "Sitio Sagpat": 6,
+  "Sitio Tektek": 6,
+  "Sitio Cabuyao": 7,
+  "Bantay Carmen": 4,
+  "Sitio Ticub": 7,
+  "Sitio Lalec": 7,
+  "Sitio Laoag": 8,
+};
+
+const formatPurokDisplay = (p) => {
+  if (!p) return "-";
+
+  const raw = String(p).trim().replace(/\s+/g, " ");
+  const low = raw.toLowerCase();
+
+  if (low.startsWith("purok") || low.includes("(purok")) {
+    return raw.toUpperCase();
+  }
+
+  if (low.startsWith("sitio") || low.startsWith("bantay")) {
+    const key = raw
+      .split(" ")
+      .map((w) => (w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w))
+      .join(" ");
+
+    const n = sitioToPurok[key];
+    return n ? `${key.toUpperCase()} (PUROK ${n})` : key.toUpperCase();
+  }
+
+  if (/^\d{1,2}$/.test(low)) {
+    return `PUROK ${raw}`;
+  }
+
+  return raw.toUpperCase();
+};
+
   return (
     <div className="min-h-screen bg-stone-100 font-sans pb-12">
       <div className="max-w-4xl mx-auto px-4 py-12">
@@ -135,7 +172,7 @@ export default function QRScanner() {
                 <div className="flex items-center gap-2 mt-1.5 text-rose-100">
                   <MapPin size={14} />
                   <p className="text-xs font-normal uppercase tracking-wider">
-                    {resident.barangay} – {formatPurok(resident.purok)}
+                    {resident.barangay} – {formatPurokDisplay(resident.purok)} {resident.house_no ? `#${resident.house_no}` : ""}
                   </p>
                 </div>
               </div>
