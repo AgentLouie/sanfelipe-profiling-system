@@ -325,10 +325,28 @@ export default function ResidentList({ userRole, onEdit }) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">
+                      Name
+                    </p>
+                    <p className="text-sm font-normal text-stone-800 uppercase break-words">
+                      {r.emergency_name || '-'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">
                       Contact Number
                     </p>
                     <p className="text-sm font-normal text-stone-800">
                       {r.emergency_contact_no || '-'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] font-medium text-stone-500 uppercase tracking-wider mb-1">
+                      Address
+                    </p>
+                    <p className="text-sm font-normal text-stone-800 uppercase break-words">
+                      {r.emergency_address || '-'}
                     </p>
                   </div>
                 </div>

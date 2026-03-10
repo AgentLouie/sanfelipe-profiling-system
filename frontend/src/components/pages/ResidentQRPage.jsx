@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../../api/api";
-import { Loader2, ShieldAlert, Printer, ArrowLeft } from "lucide-react";
+import { Loader2, ShieldAlert, Printer, ArrowLeft, Download } from "lucide-react";
+import jsPDF from "jspdf";
 
 const IdField = ({ label, value, width, valueClassName = "" }) => (
   <div className="flex flex-col" style={{ width }}>
@@ -18,6 +19,339 @@ const IdField = ({ label, value, width, valueClassName = "" }) => (
   </div>
 );
 
+// =========================
+// Canvas helpers
+// =========================
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    if (!src) return reject(new Error("Missing image src"));
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+function wrapText(ctx, text, maxWidth) {
+  const content = String(text || "").trim();
+  if (!content) return [" "];
+
+  const words = content.split(/\s+/);
+  const lines = [];
+  let current = "";
+
+  for (const word of words) {
+    const test = current ? `${current} ${word}` : word;
+    if (ctx.measureText(test).width > maxWidth && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = test;
+    }
+  }
+
+  if (current) lines.push(current);
+  return lines.length ? lines : [" "];
+}
+
+// Match DOM preview size proportions
+const DOM_W = 648;
+const DOM_H = 408;
+
+// 2x export for sharper PDF
+const CW = 1296;
+const CH = 816;
+
+const SX = CW / DOM_W;
+const SY = CH / DOM_H;
+const SCALE_AVG = (SX + SY) / 2;
+
+const X = (n) => n * SX;
+const Y = (n) => n * SY;
+const FS = (n) => Math.round(n * SCALE_AVG);
+
+// =========================
+// FRONT canvas
+// =========================
+
+async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl) {
+  const canvas = document.createElement("canvas");
+  canvas.width = CW;
+  canvas.height = CH;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, CW, CH);
+
+  // Background image
+  try {
+    const bg = await loadImage(bgUrl);
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+    ctx.drawImage(bg, 0, 0, CW, CH);
+    ctx.restore();
+  } catch (_) {}
+
+  // Watermark
+  try {
+    const logo = await loadImage(logoUrl);
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    ctx.drawImage(logo, X(648 - 40 - 420), Y((408 - 420) / 2), X(420), Y(420));
+    ctx.restore();
+  } catch (_) {}
+
+  // Red diagonal banner
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(CW, 0);
+  ctx.lineTo(X(466.56), 0); // 72% of 648
+  ctx.lineTo(0, Y(257.04)); // 63% of 408
+  ctx.closePath();
+  ctx.fillStyle = "#cc0000";
+  ctx.fill();
+  ctx.restore();
+
+  // Inner white border
+  ctx.strokeStyle = "rgba(255,255,255,0.8)";
+  ctx.lineWidth = X(1);
+  ctx.strokeRect(X(10), Y(10), X(648 - 20), Y(408 - 20));
+
+  // Seal
+  try {
+    const logo = await loadImage(logoUrl);
+    ctx.drawImage(logo, X(24), Y(24), X(88), Y(88));
+  } catch (_) {}
+
+  // Titles
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#d40000";
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineJoin = "round";
+
+  ctx.font = `900 ${FS(42)}px Arial Black, sans-serif`;
+  ctx.lineWidth = X(2);
+  ctx.strokeText("SAN FELIPE", CW / 2, Y(52));
+  ctx.fillText("SAN FELIPE", CW / 2, Y(52));
+
+  ctx.font = `900 ${FS(40)}px Arial Black, sans-serif`;
+  ctx.strokeText("RESIDENT ID CARD", CW / 2, Y(92));
+  ctx.fillText("RESIDENT ID CARD", CW / 2, Y(92));
+  ctx.restore();
+
+  // Photo
+  const px = X(95), py = Y(140), pw = X(155), ph = Y(180);
+  ctx.fillStyle = "#efefef";
+  ctx.fillRect(px, py, pw, ph);
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = X(3);
+  ctx.strokeRect(px, py, pw, ph);
+
+  if (resident.photo_url) {
+    try {
+      const photo = await loadImage(resident.photo_url);
+      ctx.drawImage(photo, px, py, pw, ph);
+    } catch (_) {}
+  } else {
+    ctx.fillStyle = "#888";
+    ctx.font = `bold ${FS(12)}px Arial`;
+    ctx.textAlign = "center";
+    ctx.fillText("NO PHOTO", px + pw / 2, py + ph / 2);
+  }
+
+  // Resident label
+  ctx.fillStyle = "#000";
+  ctx.font = `900 ${FS(28)}px Arial Black, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.fillText("RESIDENT", px + pw / 2, Y(356));
+
+  function drawField(label, value, x, y, w, valueFs = 16, labelFs = 13) {
+    ctx.fillStyle = "#000";
+    ctx.textAlign = "center";
+    ctx.font = `bold ${FS(valueFs)}px Arial, sans-serif`;
+
+    const lines = wrapText(ctx, String(value || "").toUpperCase(), w - X(8));
+    const lineHeight = FS(valueFs) + Y(2);
+    lines.forEach((line, i) => {
+      ctx.fillText(line, x + w / 2, y + i * lineHeight);
+    });
+
+    ctx.fillStyle = "#222";
+    ctx.font = `500 ${FS(labelFs)}px Arial, sans-serif`;
+    ctx.fillText(label, x + w / 2, y + lineHeight * lines.length + Y(16));
+  }
+
+  const fx = X(320);
+  const fw = X(648 - 320 - 40);
+  let fy = Y(145);
+
+  drawField("Last Name, First Name, M.I", fullName, fx, fy, fw, 17, 13);
+  fy += Y(72);
+
+  const col1 = fw * 0.22;
+  const col2 = fw * 0.42;
+  const col3 = fw * 0.36;
+
+  drawField("Sex", resident.sex || "", fx, fy, col1, 16, 13);
+  drawField("Date of Birth", formattedBirthdate || "", fx + col1, fy, col2, 15, 13);
+  drawField("Civil Status", resident.civil_status || "", fx + col1 + col2, fy, col3, 16, 13);
+
+  fy += Y(66);
+  drawField("Contact No.", resident.contact_no || "", fx, fy, fw * 0.48, 16, 13);
+
+  return canvas;
+}
+
+// =========================
+// BACK canvas
+// =========================
+
+async function drawBack(
+  resident,
+  emergencyName,
+  emergencyContactNo,
+  emergencyAddress,
+  qrSrc,
+  bgUrl,
+  logoUrl
+) {
+  const canvas = document.createElement("canvas");
+  canvas.width = CW;
+  canvas.height = CH;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, CW, CH);
+
+  // Background image
+  try {
+    const bg = await loadImage(bgUrl);
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+    ctx.drawImage(bg, 0, 0, CW, CH);
+    ctx.restore();
+  } catch (_) {}
+
+  // Watermark
+  try {
+    const logo = await loadImage(logoUrl);
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    ctx.drawImage(logo, X(648 - 40 - 420), Y((408 - 420) / 2), X(420), Y(420));
+    ctx.restore();
+  } catch (_) {}
+
+  // Red triangle
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(X(648 * 0.7), 0);
+  ctx.lineTo(0, Y(408 * 0.6));
+  ctx.closePath();
+  ctx.fillStyle = "#cc0000";
+  ctx.fill();
+  ctx.restore();
+
+  // Inner border
+  ctx.strokeStyle = "rgba(255,255,255,0.8)";
+  ctx.lineWidth = X(1);
+  ctx.strokeRect(X(10), Y(10), X(648 - 20), Y(408 - 20));
+
+  // Seal
+  try {
+    const logo = await loadImage(logoUrl);
+    ctx.drawImage(logo, X(24), Y(24), X(88), Y(88));
+  } catch (_) {}
+
+  // Emergency section
+  const leftX = X(35);
+  let topY = Y(165);
+
+  ctx.fillStyle = "#000";
+  ctx.textAlign = "left";
+  ctx.font = `500 ${FS(16)}px Arial, sans-serif`;
+  ctx.fillText("In Case of Emergency", leftX, topY);
+  topY += Y(28);
+
+  function drawEmergencyBlock(label, value, y, valueFs = 14, maxWidth = 235) {
+    ctx.fillStyle = "#222";
+    ctx.font = `500 ${FS(11)}px Arial, sans-serif`;
+    ctx.fillText(label, leftX, y);
+
+    const val = String(value || " ").toUpperCase();
+    ctx.fillStyle = "#000";
+    ctx.font = `bold ${FS(valueFs)}px Arial, sans-serif`;
+    const lines = wrapText(ctx, val, X(maxWidth));
+    const lineHeight = FS(valueFs) + Y(3);
+
+    lines.forEach((line, i) => {
+      ctx.fillText(line, leftX, y + Y(17) + i * lineHeight);
+    });
+
+    return y + Y(17) + lines.length * lineHeight + Y(14);
+  }
+
+  topY = drawEmergencyBlock("Name", emergencyName, topY, 14, 235);
+  topY = drawEmergencyBlock("Contact Number", emergencyContactNo, topY, 14, 235);
+  drawEmergencyBlock("Address", emergencyAddress, topY, 13, 235);
+
+  // Right section
+  const rx = X(648 - 34 - 285);
+  let ry = Y(30);
+
+  ctx.fillStyle = "#000";
+  ctx.textAlign = "left";
+  ctx.font = `900 ${FS(24)}px Arial Black, sans-serif`;
+  ctx.fillText("ID NUMBER:", rx, ry + Y(24));
+
+  ctx.font = `900 ${FS(20)}px Arial Black, sans-serif`;
+  ctx.fillText(resident.resident_code || "—", rx, ry + Y(48));
+
+  // QR
+  const qx = X(648 - 34 - 245);
+  const qy = Y(95);
+  const qw = X(245);
+  const qh = Y(205);
+
+  ctx.fillStyle = "#efefef";
+  ctx.fillRect(qx, qy, qw, qh);
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = X(3);
+  ctx.strokeRect(qx, qy, qw, qh);
+
+  if (qrSrc) {
+    try {
+      const qr = await loadImage(qrSrc);
+      ctx.drawImage(qr, qx + X(8), qy + Y(8), qw - X(16), qh - Y(16));
+    } catch (_) {}
+  }
+
+  // Caption
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#000";
+  ctx.font = `500 ${FS(11)}px Arial, sans-serif`;
+  ctx.fillText(
+    "This QR Code contains verified resident data.",
+    qx + qw / 2,
+    qy + qh + Y(20)
+  );
+  ctx.fillText(
+    "Scan using authorized LGU devices only.",
+    qx + qw / 2,
+    qy + qh + Y(35)
+  );
+
+  return canvas;
+}
+
+// =========================
+// Component
+// =========================
+
 export default function ResidentQRPage() {
   const { code } = useParams();
   const navigate = useNavigate();
@@ -25,6 +359,7 @@ export default function ResidentQRPage() {
   const [resident, setResident] = useState(null);
   const [qrImage, setQrImage] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const logoUrl = "/san_felipe_seal.png";
   const bgUrl = "/sanfe.jpg";
@@ -78,14 +413,46 @@ export default function ResidentQRPage() {
     }`;
   }, [resident]);
 
-  const emergencyContact = useMemo(() => {
-    return (
-      resident?.emergency_name ||
-      resident?.emergency_contact_no ||
-      resident?.emergency_address ||
-      " "
-    );
-  }, [resident]);
+  const emergencyName = useMemo(() => resident?.emergency_name || " ", [resident]);
+  const emergencyContactNo = useMemo(() => resident?.emergency_contact_no || " ", [resident]);
+  const emergencyAddress = useMemo(() => resident?.emergency_address || " ", [resident]);
+
+  const handleDownloadPDF = async () => {
+    if (!resident) return;
+
+    setDownloadingPdf(true);
+    try {
+      const [frontCanvas, backCanvas] = await Promise.all([
+        drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl),
+        drawBack(
+          resident,
+          emergencyName,
+          emergencyContactNo,
+          emergencyAddress,
+          qrImage,
+          bgUrl,
+          logoUrl
+        ),
+      ]);
+
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "px",
+        format: [CW, CH],
+        compress: true,
+      });
+
+      pdf.addImage(frontCanvas.toDataURL("image/png"), "PNG", 0, 0, CW, CH);
+      pdf.addPage([CW, CH], "landscape");
+      pdf.addImage(backCanvas.toDataURL("image/png"), "PNG", 0, 0, CW, CH);
+
+      pdf.save(`ResidentID_${resident?.resident_code || "card"}.pdf`);
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -201,6 +568,7 @@ export default function ResidentQRPage() {
           }
         }
       `}</style>
+
       <p className="text-xs font-bold text-stone-500 uppercase tracking-widest mb-6 text-center print:hidden">
         Resident ID Card Preview — Print Both Sides
       </p>
@@ -211,7 +579,6 @@ export default function ResidentQRPage() {
       >
         {/* FRONT */}
         <div className="id-card relative w-[648px] h-[408px] rounded-2xl overflow-hidden shadow-2xl border border-stone-400 bg-white flex-shrink-0 print:w-[3.375in] print:h-[2.125in] print:rounded-none print:shadow-none print:border-0 print:break-after-page">
-          {/* Background */}
           <div className="absolute inset-0 z-0">
             <img
               src={bgUrl}
@@ -221,7 +588,6 @@ export default function ResidentQRPage() {
             />
           </div>
 
-          {/* Watermark */}
           <img
             src={logoUrl}
             alt=""
@@ -236,7 +602,6 @@ export default function ResidentQRPage() {
             }}
           />
 
-          {/* Red diagonal banner */}
           <div
             className="absolute inset-0 z-10"
             style={{ filter: "drop-shadow(0px 6px 8px rgba(0,0,0,0.35))" }}
@@ -247,10 +612,8 @@ export default function ResidentQRPage() {
             />
           </div>
 
-          {/* Inner white border */}
           <div className="absolute inset-[10px] border border-white/80 z-10" />
 
-          {/* Seal */}
           <img
             src={logoUrl}
             alt="San Felipe Seal"
@@ -258,7 +621,6 @@ export default function ResidentQRPage() {
             onError={(e) => (e.currentTarget.style.display = "none")}
           />
 
-          {/* Titles */}
           <div className="absolute top-[14px] left-1/2 -translate-x-1/2 z-20 text-center leading-none w-full pointer-events-none">
             <h1
               className="text-[42px] font-black uppercase tracking-wide text-[#d40000]"
@@ -282,7 +644,6 @@ export default function ResidentQRPage() {
             </h2>
           </div>
 
-          {/* Photo */}
           <div className="absolute top-[140px] left-[95px] flex flex-col items-center z-20">
             <div className="w-[155px] h-[180px] bg-[#efefef] border-[3px] border-black flex items-center justify-center overflow-hidden">
               {resident.photo_url ? (
@@ -300,7 +661,6 @@ export default function ResidentQRPage() {
             </p>
           </div>
 
-          {/* Fields */}
           <div className="absolute top-[145px] left-[320px] right-[40px] flex flex-col gap-5 z-20">
             <IdField
               label="Last Name, First Name, M.I"
@@ -311,7 +671,12 @@ export default function ResidentQRPage() {
 
             <div className="flex gap-4 w-full">
               <IdField label="Sex" value={resident.sex} width="22%" />
-              <IdField label="Date of Birth" value={formattedBirthdate} width="42%" valueClassName="text-[15px]" />
+              <IdField
+                label="Date of Birth"
+                value={formattedBirthdate}
+                width="42%"
+                valueClassName="text-[15px]"
+              />
               <IdField label="Civil Status" value={resident.civil_status} width="36%" />
             </div>
 
@@ -323,7 +688,6 @@ export default function ResidentQRPage() {
 
         {/* BACK */}
         <div className="id-card relative w-[648px] h-[408px] rounded-2xl overflow-hidden shadow-2xl border border-stone-400 bg-white flex-shrink-0 print:w-[3.375in] print:h-[2.125in] print:rounded-none print:shadow-none print:border-0 print:break-inside-avoid">
-          {/* Background */}
           <div className="absolute inset-0 z-0">
             <img
               src={bgUrl}
@@ -333,7 +697,6 @@ export default function ResidentQRPage() {
             />
           </div>
 
-          {/* Watermark */}
           <img
             src={logoUrl}
             alt=""
@@ -348,7 +711,6 @@ export default function ResidentQRPage() {
             }}
           />
 
-          {/* Red triangle banner */}
           <div
             className="absolute inset-0 z-10"
             style={{ filter: "drop-shadow(0px 6px 8px rgba(0,0,0,0.35))" }}
@@ -359,10 +721,8 @@ export default function ResidentQRPage() {
             />
           </div>
 
-          {/* Inner white border */}
           <div className="absolute inset-[10px] border border-white/80 z-10" />
 
-          {/* Seal */}
           <img
             src={logoUrl}
             alt="San Felipe Seal"
@@ -370,20 +730,33 @@ export default function ResidentQRPage() {
             onError={(e) => (e.currentTarget.style.display = "none")}
           />
 
-          {/* Emergency contact */}
-          <div className="absolute top-[190px] left-[35px] w-[235px] z-20">
-            <p className="text-black text-[16px] font-medium text-left mb-2">
-              Incase of Emergency
+          <div className="absolute top-[165px] left-[35px] w-[235px] z-20">
+            <p className="text-black text-[16px] font-medium text-left mb-3">
+              In Case of Emergency
             </p>
-            <div className="mb-2">
+
+            <div className="mb-3">
+              <p className="text-[11px] text-black font-medium">Name</p>
+              <p className="text-black text-[14px] font-bold leading-tight break-words w-full uppercase">
+                {emergencyName || "\u00A0"}
+              </p>
+            </div>
+
+            <div className="mb-3">
               <p className="text-[11px] text-black font-medium">Contact Number</p>
-                <p className="text-black text-[14px] font-bold leading-tight break-words w-full">
-                  {resident.emergency_contact_no || "\u00A0"}
-                </p>
+              <p className="text-black text-[14px] font-bold leading-tight break-words w-full">
+                {emergencyContactNo || "\u00A0"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-[11px] text-black font-medium">Address</p>
+              <p className="text-black text-[13px] font-bold leading-tight break-words w-full uppercase">
+                {emergencyAddress || "\u00A0"}
+              </p>
             </div>
           </div>
 
-          {/* Right side */}
           <div className="absolute top-[30px] right-[34px] flex flex-col items-center z-20 w-[285px]">
             <div className="w-full mb-2">
               <p className="text-black font-black text-[24px] uppercase tracking-wide leading-none">
@@ -418,6 +791,24 @@ export default function ResidentQRPage() {
         >
           <Printer size={18} />
           Print ID Card
+        </button>
+
+        <button
+          onClick={handleDownloadPDF}
+          disabled={downloadingPdf}
+          className="flex items-center gap-2 px-6 py-3 bg-stone-800 text-white text-sm font-bold uppercase tracking-wider rounded-xl hover:bg-stone-900 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {downloadingPdf ? (
+            <>
+              <Loader2 size={18} className="animate-spin" />
+              Generating PDF...
+            </>
+          ) : (
+            <>
+              <Download size={18} />
+              Download PDF
+            </>
+          )}
         </button>
 
         <button
