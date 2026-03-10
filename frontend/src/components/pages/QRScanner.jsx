@@ -33,6 +33,18 @@ export default function QRScanner() {
     }
   };
 
+  const formatPurok = (purok) => {
+  if (!purok) return "N/A";
+
+  const value = String(purok).trim();
+
+  if (/^purok\b/i.test(value)) {
+    return value.toUpperCase();
+  }
+
+  return `PUROK ${value}`.toUpperCase();
+};
+
   return (
     <div className="min-h-screen bg-stone-100 font-sans pb-12">
       <div className="max-w-4xl mx-auto px-4 py-12">
@@ -123,7 +135,7 @@ export default function QRScanner() {
                 <div className="flex items-center gap-2 mt-1.5 text-rose-100">
                   <MapPin size={14} />
                   <p className="text-xs font-normal uppercase tracking-wider">
-                    {resident.barangay} – Purok {resident.purok}
+                    {resident.barangay} – {formatPurok(resident.purok)}
                   </p>
                 </div>
               </div>
