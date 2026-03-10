@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 
 // --- REAL COMPONENT IMPORTS ---
@@ -11,19 +11,14 @@ import UserManagement from './components/users/UserManagement';
 import ArchivedResidents from './components/residents/ArchivedResidents';
 import QRScanner from './components/pages/QRScanner';
 import ResidentQRPage from "./components/pages/ResidentQRPage";
+import PublicResidentPage from './pages/public/PublicResidentPage';
+import PublicLandingPage from './pages/public/PublicLandingPage';
 
-/**
- * DashboardLayout
- * Wraps protected routes with the Sidebar and a scrollable main content area.
- * Updated to accept `onResetView` and pass it to Sidebar.
- */
-// 1. UPDATE THIS COMPONENT DEFINITION
 const DashboardLayout = ({ userRole, onLogout, onResetView }) => {
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
-      {/* 2. PASS THE RESET FUNCTION TO SIDEBAR */}
       <Sidebar userRole={userRole} onLogout={onLogout} onLinkClick={onResetView} />
-      
+
       <main className="flex-1 lg:ml-[260px] h-full overflow-y-auto transition-all duration-300">
         <div className="p-8 max-w-7xl mx-auto">
           <Outlet />
@@ -36,7 +31,6 @@ const DashboardLayout = ({ userRole, onLogout, onResetView }) => {
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [role, setRole] = useState(localStorage.getItem('role') || 'staff');
-  const isAdminLike = role === "admin" || role === "admin_limited";
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentResident, setCurrentResident] = useState(null);
@@ -46,8 +40,6 @@ export default function App() {
     setIsEditing(true);
   };
 
-  // This function clears the editing state.
-  // We will use this when a form is saved AND when a sidebar link is clicked.
   const handleFinishEditing = () => {
     setIsEditing(false);
     setCurrentResident(null);
@@ -68,51 +60,57 @@ export default function App() {
 
   return (
     <Routes>
-      <Route 
-        path="/login" 
+      {/* PUBLIC ROUTES */}
+      <Route path="/" element={<PublicLandingPage />} />
+      <Route path="/public/id/:code" element={<PublicResidentPage />} />
+
+      {/* LOGIN */}
+      <Route
+        path="/login"
         element={
           !token ? <Login onLogin={handleLogin} /> : <Navigate to="/dashboard/overview" replace />
-        } 
+        }
       />
 
-      <Route 
-        path="/dashboard" 
+      {/* PROTECTED DASHBOARD */}
+      <Route
+        path="/dashboard"
         element={
           token ? (
-            // 3. PASS handleFinishEditing AS onResetView HERE
-            <DashboardLayout 
-              userRole={role} 
-              onLogout={handleLogout} 
-              onResetView={handleFinishEditing} 
+            <DashboardLayout
+              userRole={role}
+              onLogout={handleLogout}
+              onResetView={handleFinishEditing}
             />
           ) : (
             <Navigate to="/login" replace />
           )
         }
       >
-        <Route 
-          path="overview" 
+        <Route
+          path="overview"
           element={
-            (role === "admin" || role === "admin_limited")
+            role === "admin" || role === "admin_limited"
               ? <DashboardStats userRole={role} />
               : <Navigate to="/dashboard/residents" replace />
           }
         />
 
-        <Route 
-          path="residents" 
+        <Route
+          path="residents"
           element={
             !isEditing ? (
               <ResidentList userRole={role} onEdit={handleEditInitiated} />
             ) : (
-              <AddResidentForm 
-                residentToEdit={currentResident} 
-                onSuccess={handleFinishEditing} 
-                onCancel={handleFinishEditing} 
+              <AddResidentForm
+                residentToEdit={currentResident}
+                onSuccess={handleFinishEditing}
+                onCancel={handleFinishEditing}
               />
             )
-          } 
+          }
         />
+
         <Route
           path="residents/:code/qr"
           element={
@@ -122,12 +120,12 @@ export default function App() {
           }
         />
 
-        <Route path="create" element={<AddResidentForm onSuccess={handleFinishEditing} />} />
-        
-        <Route path="users" element={<UserManagement />} />
-        
-        <Route index element={<Navigate to="/dashboard/overview" replace />} />
+        <Route
+          path="create"
+          element={<AddResidentForm onSuccess={handleFinishEditing} />}
+        />
 
+        <Route path="users" element={<UserManagement />} />
         <Route path="archived" element={<ArchivedResidents />} />
 
         <Route
@@ -139,9 +137,11 @@ export default function App() {
           }
         />
 
+        <Route index element={<Navigate to="/dashboard/overview" replace />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      {/* FALLBACK */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

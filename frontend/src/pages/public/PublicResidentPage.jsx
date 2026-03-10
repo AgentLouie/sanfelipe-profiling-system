@@ -28,10 +28,6 @@ const IdField = ({
   </div>
 );
 
-// =========================
-// Canvas helpers
-// =========================
-
 function loadImage(src) {
   return new Promise((resolve, reject) => {
     if (!src) return reject(new Error("Missing image src"));
@@ -65,11 +61,8 @@ function wrapText(ctx, text, maxWidth) {
   return lines.length ? lines : [" "];
 }
 
-// Match DOM preview size proportions
 const DOM_W = 648;
 const DOM_H = 408;
-
-// 2x export for sharper PDF
 const CW = 1296;
 const CH = 816;
 
@@ -81,10 +74,6 @@ const X = (n) => n * SX;
 const Y = (n) => n * SY;
 const FS = (n) => Math.round(n * SCALE_AVG);
 
-// =========================
-// FRONT canvas
-// =========================
-
 async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl) {
   const canvas = document.createElement("canvas");
   canvas.width = CW;
@@ -94,7 +83,6 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, CW, CH);
 
-  // Background image
   try {
     const bg = await loadImage(bgUrl);
     ctx.save();
@@ -103,78 +91,68 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     ctx.restore();
   } catch (_) {}
 
-  // Watermark
   try {
-  const logo = await loadImage(logoUrl);
-  ctx.save();
-  ctx.globalAlpha = 0.12;
+    const logo = await loadImage(logoUrl);
+    ctx.save();
+    ctx.globalAlpha = 0.12;
 
-  const wmW = X(420);
-  const wmH = Y(420);
-  const wmX = CW - wmW + X(55);
-  const wmY = CH - wmH + Y(70);
+    const wmW = X(420);
+    const wmH = Y(420);
+    const wmX = CW - wmW + X(55);
+    const wmY = CH - wmH + Y(70);
 
-  ctx.drawImage(logo, wmX, wmY, wmW, wmH);
-  ctx.restore();
-} catch (_) {}
+    ctx.drawImage(logo, wmX, wmY, wmW, wmH);
+    ctx.restore();
+  } catch (_) {}
 
-  // Red diagonal banner
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(CW, 0);
-  ctx.lineTo(X(466.56), 0); // 72% of 648
-  ctx.lineTo(0, Y(257.04)); // 63% of 408
+  ctx.lineTo(X(466.56), 0);
+  ctx.lineTo(0, Y(257.04));
   ctx.closePath();
   ctx.fillStyle = "#cc0000";
   ctx.fill();
   ctx.restore();
 
-  // Inner white border
   ctx.strokeStyle = "rgba(255,255,255,0.8)";
   ctx.lineWidth = X(1);
   ctx.strokeRect(X(10), Y(10), X(648 - 20), Y(408 - 20));
 
-  // Seal
   try {
-  const logo = await loadImage(logoUrl);
-  const lx = X(24);
-  const ly = Y(24);
-  const lw = X(88);
-  const lh = Y(88);
+    const logo = await loadImage(logoUrl);
+    const lx = X(24);
+    const ly = Y(24);
+    const lw = X(88);
+    const lh = Y(88);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(lx + lw / 2, ly + lh / 2, Math.min(lw, lh) / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(logo, lx, ly, lw, lh);
+    ctx.restore();
+  } catch (_) {}
 
   ctx.save();
-  ctx.beginPath();
-  ctx.arc(lx + lw / 2, ly + lh / 2, Math.min(lw, lh) / 2, 0, Math.PI * 2);
-  ctx.closePath();
-  ctx.clip();
-  ctx.drawImage(logo, lx, ly, lw, lh);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#d40000";
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.lineWidth = X(1.8);
+
+  ctx.font = `900 ${FS(36)}px Barlow, Arial Black, sans-serif`;
+  ctx.strokeText("SAN FELIPE", CW / 2, Y(48));
+  ctx.fillText("SAN FELIPE", CW / 2, Y(48));
+
+  ctx.font = `900 ${FS(34)}px Barlow, Arial Black, sans-serif`;
+  ctx.strokeText("RESIDENT ID CARD", CW / 2, Y(84));
+  ctx.fillText("RESIDENT ID CARD", CW / 2, Y(84));
   ctx.restore();
-} catch (_) {}
 
-  // Titles - match website more closely
-ctx.save();
-ctx.textAlign = "center";
-ctx.fillStyle = "#d40000";
-ctx.strokeStyle = "#ffffff";
-ctx.lineJoin = "round";
-ctx.lineCap = "round";
-
-ctx.lineWidth = X(1.8);
-
-// top line
-ctx.font = `900 ${FS(36)}px Barlow, Arial Black, sans-serif`;
-ctx.strokeText("SAN FELIPE", CW / 2, Y(48));
-ctx.fillText("SAN FELIPE", CW / 2, Y(48));
-
-// second line
-ctx.font = `900 ${FS(34)}px Barlow, Arial Black, sans-serif`;
-ctx.strokeText("RESIDENT ID CARD", CW / 2, Y(84));
-ctx.fillText("RESIDENT ID CARD", CW / 2, Y(84));
-
-ctx.restore();
-
-  // Photo
   const px = X(95), py = Y(140), pw = X(155), ph = Y(180);
   ctx.fillStyle = "#efefef";
   ctx.fillRect(px, py, pw, ph);
@@ -194,7 +172,6 @@ ctx.restore();
     ctx.fillText("NO PHOTO", px + pw / 2, py + ph / 2);
   }
 
-  // Resident label
   ctx.fillStyle = "#000";
   ctx.font = `900 ${FS(28)}px Arial Black, sans-serif`;
   ctx.textAlign = "center";
@@ -237,10 +214,6 @@ ctx.restore();
   return canvas;
 }
 
-// =========================
-// BACK canvas
-// =========================
-
 async function drawBack(
   resident,
   emergencyName,
@@ -258,7 +231,6 @@ async function drawBack(
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, CW, CH);
 
-  // Background image
   try {
     const bg = await loadImage(bgUrl);
     ctx.save();
@@ -267,22 +239,20 @@ async function drawBack(
     ctx.restore();
   } catch (_) {}
 
-  // Watermark
   try {
-  const logo = await loadImage(logoUrl);
-  ctx.save();
-  ctx.globalAlpha = 0.12;
+    const logo = await loadImage(logoUrl);
+    ctx.save();
+    ctx.globalAlpha = 0.12;
 
-  const wmW = X(420);
-  const wmH = Y(420);
-  const wmX = CW - wmW + X(55);
-  const wmY = CH - wmH + Y(70);
+    const wmW = X(420);
+    const wmH = Y(420);
+    const wmX = CW - wmW + X(55);
+    const wmY = CH - wmH + Y(70);
 
-  ctx.drawImage(logo, wmX, wmY, wmW, wmH);
-  ctx.restore();
-} catch (_) {}
+    ctx.drawImage(logo, wmX, wmY, wmW, wmH);
+    ctx.restore();
+  } catch (_) {}
 
-  // Red triangle
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(0, 0);
@@ -293,29 +263,26 @@ async function drawBack(
   ctx.fill();
   ctx.restore();
 
-  // Inner border
   ctx.strokeStyle = "rgba(255,255,255,0.8)";
   ctx.lineWidth = X(1);
   ctx.strokeRect(X(10), Y(10), X(648 - 20), Y(408 - 20));
 
-  // Seal
   try {
-  const logo = await loadImage(logoUrl);
-  const lx = X(24);
-  const ly = Y(24);
-  const lw = X(88);
-  const lh = Y(88);
+    const logo = await loadImage(logoUrl);
+    const lx = X(24);
+    const ly = Y(24);
+    const lw = X(88);
+    const lh = Y(88);
 
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(lx + lw / 2, ly + lh / 2, Math.min(lw, lh) / 2, 0, Math.PI * 2);
-  ctx.closePath();
-  ctx.clip();
-  ctx.drawImage(logo, lx, ly, lw, lh);
-  ctx.restore();
-} catch (_) {}
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(lx + lw / 2, ly + lh / 2, Math.min(lw, lh) / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(logo, lx, ly, lw, lh);
+    ctx.restore();
+  } catch (_) {}
 
-  // Emergency section
   const leftX = X(120);
   let topY = Y(190);
 
@@ -326,24 +293,23 @@ async function drawBack(
   topY += Y(28);
 
   function drawEmergencyBlock(value, y, valueFs = 14, maxWidth = 235) {
-  const val = String(value || " ").toUpperCase();
-  ctx.fillStyle = "#000";
-  ctx.font = `bold ${FS(valueFs)}px Arial, sans-serif`;
-  const lines = wrapText(ctx, val, X(maxWidth));
-  const lineHeight = FS(valueFs) + Y(3);
+    const val = String(value || " ").toUpperCase();
+    ctx.fillStyle = "#000";
+    ctx.font = `bold ${FS(valueFs)}px Arial, sans-serif`;
+    const lines = wrapText(ctx, val, X(maxWidth));
+    const lineHeight = FS(valueFs) + Y(3);
 
-  lines.forEach((line, i) => {
-    ctx.fillText(line, leftX, y + i * lineHeight);
-  });
+    lines.forEach((line, i) => {
+      ctx.fillText(line, leftX, y + i * lineHeight);
+    });
 
-  return y + lines.length * lineHeight + Y(14);
+    return y + lines.length * lineHeight + Y(14);
   }
 
   topY = drawEmergencyBlock(emergencyName, topY, 14, 210);
   topY = drawEmergencyBlock(emergencyContactNo, topY, 14, 210);
   drawEmergencyBlock(emergencyAddress, topY, 13, 210);
 
-  // Right section
   const rx = X(648 - 34 - 285);
   let ry = Y(60);
 
@@ -358,7 +324,6 @@ async function drawBack(
   const labelWidth = ctx.measureText(label).width;
   ctx.fillText(resident.resident_code || "—", rx + labelWidth + X(8), idY);
 
-  // QR
   const qx = X(648 - 34 - 245);
   const qy = Y(135);
   const qw = X(245);
@@ -377,7 +342,6 @@ async function drawBack(
     } catch (_) {}
   }
 
-  // Caption
   ctx.textAlign = "center";
   ctx.fillStyle = "#000";
   ctx.font = `500 ${FS(11)}px Arial, sans-serif`;
@@ -394,10 +358,6 @@ async function drawBack(
 
   return canvas;
 }
-
-// =========================
-// Component
-// =========================
 
 export default function ResidentQRPage() {
   const { code } = useParams();
@@ -720,34 +680,33 @@ export default function ResidentQRPage() {
               value={fullName}
               width="100%"
               valueClassName="text-[17px]"
-              valueBoxClassName="min-h-[32px] items-end"
             />
 
             <div className="flex gap-4 w-full">
             <IdField
-              label="Sex"
-              value={resident.sex}
-              width="22%"
-              valueBoxClassName="h-[28px] items-end"
-              labelClassName="mt-0"
+                label="Sex"
+                value={resident.sex}
+                width="22%"
+                valueBoxClassName="h-[28px] items-end"
+                labelClassName="mt-0"
             />
             <IdField
-              label="Date of Birth"
-              value={formattedBirthdate}
-              width="42%"
-              valueClassName="text-[15px]"
-              valueBoxClassName="h-[28px] items-end"
-              labelClassName="mt-0"
+                label="Date of Birth"
+                value={formattedBirthdate}
+                width="42%"
+                valueClassName="text-[15px]"
+                valueBoxClassName="h-[28px] items-end"
+                labelClassName="mt-0"
             />
             <IdField
-              label="Civil Status"
-              value={(resident.civil_status || "").replace("Live-in Partner", "Live-in\u00A0Partner")}
-              width="36%"
-              valueClassName="text-[14px] whitespace-nowrap"
-              valueBoxClassName="h-[28px] items-end"
-              labelClassName="mt-0"
+                label="Civil Status"
+                value={(resident.civil_status || "").replace("Live-in Partner", "Live-in\u00A0Partner")}
+                width="36%"
+                valueClassName="text-[14px] whitespace-nowrap"
+                valueBoxClassName="h-[28px] items-end"
+                labelClassName="mt-0"
             />
-          </div>
+            </div>
             <div className="flex w-full">
               <IdField label="Contact No." value={resident.contact_no} width="48%" />
             </div>
