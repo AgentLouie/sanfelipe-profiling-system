@@ -122,26 +122,42 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
 
   // Seal
   try {
-    const logo = await loadImage(logoUrl);
-    ctx.drawImage(logo, X(24), Y(24), X(88), Y(88));
-  } catch (_) {}
+  const logo = await loadImage(logoUrl);
+  const lx = X(24);
+  const ly = Y(24);
+  const lw = X(88);
+  const lh = Y(88);
 
-  // Titles
   ctx.save();
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#d40000";
-  ctx.strokeStyle = "#ffffff";
-  ctx.lineJoin = "round";
-
-  ctx.font = `900 ${FS(42)}px Arial Black, sans-serif`;
-  ctx.lineWidth = X(2);
-  ctx.strokeText("SAN FELIPE", CW / 2, Y(52));
-  ctx.fillText("SAN FELIPE", CW / 2, Y(52));
-
-  ctx.font = `900 ${FS(40)}px Arial Black, sans-serif`;
-  ctx.strokeText("RESIDENT ID CARD", CW / 2, Y(92));
-  ctx.fillText("RESIDENT ID CARD", CW / 2, Y(92));
+  ctx.beginPath();
+  ctx.arc(lx + lw / 2, ly + lh / 2, Math.min(lw, lh) / 2, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+  ctx.drawImage(logo, lx, ly, lw, lh);
   ctx.restore();
+} catch (_) {}
+
+  // Titles - match website more closely
+ctx.save();
+ctx.textAlign = "center";
+ctx.fillStyle = "#d40000";
+ctx.strokeStyle = "#ffffff";
+ctx.lineJoin = "round";
+ctx.lineCap = "round";
+
+ctx.lineWidth = X(1.8);
+
+// top line
+ctx.font = `900 ${FS(36)}px Barlow, Arial Black, sans-serif`;
+ctx.strokeText("SAN FELIPE", CW / 2, Y(48));
+ctx.fillText("SAN FELIPE", CW / 2, Y(48));
+
+// second line
+ctx.font = `900 ${FS(34)}px Barlow, Arial Black, sans-serif`;
+ctx.strokeText("RESIDENT ID CARD", CW / 2, Y(84));
+ctx.fillText("RESIDENT ID CARD", CW / 2, Y(84));
+
+ctx.restore();
 
   // Photo
   const px = X(95), py = Y(140), pw = X(155), ph = Y(180);
@@ -263,13 +279,24 @@ async function drawBack(
 
   // Seal
   try {
-    const logo = await loadImage(logoUrl);
-    ctx.drawImage(logo, X(24), Y(24), X(88), Y(88));
-  } catch (_) {}
+  const logo = await loadImage(logoUrl);
+  const lx = X(24);
+  const ly = Y(24);
+  const lw = X(88);
+  const lh = Y(88);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(lx + lw / 2, ly + lh / 2, Math.min(lw, lh) / 2, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+  ctx.drawImage(logo, lx, ly, lw, lh);
+  ctx.restore();
+} catch (_) {}
 
   // Emergency section
-  const leftX = X(35);
-  let topY = Y(165);
+  const leftX = X(120);
+  let topY = Y(190);
 
   ctx.fillStyle = "#000";
   ctx.textAlign = "left";
@@ -277,43 +304,42 @@ async function drawBack(
   ctx.fillText("In Case of Emergency", leftX, topY);
   topY += Y(28);
 
-  function drawEmergencyBlock(label, value, y, valueFs = 14, maxWidth = 235) {
-    ctx.fillStyle = "#222";
-    ctx.font = `500 ${FS(11)}px Arial, sans-serif`;
-    ctx.fillText(label, leftX, y);
+  function drawEmergencyBlock(value, y, valueFs = 14, maxWidth = 235) {
+  const val = String(value || " ").toUpperCase();
+  ctx.fillStyle = "#000";
+  ctx.font = `bold ${FS(valueFs)}px Arial, sans-serif`;
+  const lines = wrapText(ctx, val, X(maxWidth));
+  const lineHeight = FS(valueFs) + Y(3);
 
-    const val = String(value || " ").toUpperCase();
-    ctx.fillStyle = "#000";
-    ctx.font = `bold ${FS(valueFs)}px Arial, sans-serif`;
-    const lines = wrapText(ctx, val, X(maxWidth));
-    const lineHeight = FS(valueFs) + Y(3);
+  lines.forEach((line, i) => {
+    ctx.fillText(line, leftX, y + i * lineHeight);
+  });
 
-    lines.forEach((line, i) => {
-      ctx.fillText(line, leftX, y + Y(17) + i * lineHeight);
-    });
-
-    return y + Y(17) + lines.length * lineHeight + Y(14);
+  return y + lines.length * lineHeight + Y(14);
   }
 
-  topY = drawEmergencyBlock("Name", emergencyName, topY, 14, 235);
-  topY = drawEmergencyBlock("Contact Number", emergencyContactNo, topY, 14, 235);
-  drawEmergencyBlock("Address", emergencyAddress, topY, 13, 235);
+  topY = drawEmergencyBlock(emergencyName, topY, 14, 210);
+  topY = drawEmergencyBlock(emergencyContactNo, topY, 14, 210);
+  drawEmergencyBlock(emergencyAddress, topY, 13, 210);
 
   // Right section
   const rx = X(648 - 34 - 285);
-  let ry = Y(30);
+  let ry = Y(60);
 
   ctx.fillStyle = "#000";
   ctx.textAlign = "left";
-  ctx.font = `900 ${FS(24)}px Arial Black, sans-serif`;
-  ctx.fillText("ID NUMBER:", rx, ry + Y(24));
+  ctx.font = `900 ${FS(22)}px Arial Black, sans-serif`;
 
-  ctx.font = `900 ${FS(20)}px Arial Black, sans-serif`;
-  ctx.fillText(resident.resident_code || "—", rx, ry + Y(48));
+  const idY = ry + Y(30);
+  const label = "ID NUMBER:";
+  ctx.fillText(label, rx, idY);
+
+  const labelWidth = ctx.measureText(label).width;
+  ctx.fillText(resident.resident_code || "—", rx + labelWidth + X(8), idY);
 
   // QR
   const qx = X(648 - 34 - 245);
-  const qy = Y(95);
+  const qy = Y(135);
   const qw = X(245);
   const qh = Y(205);
 
@@ -422,6 +448,10 @@ export default function ResidentQRPage() {
 
     setDownloadingPdf(true);
     try {
+      if (document.fonts?.ready) {
+        await document.fonts.ready;
+      }
+
       const [frontCanvas, backCanvas] = await Promise.all([
         drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl),
         drawBack(
@@ -733,39 +763,36 @@ export default function ResidentQRPage() {
             onError={(e) => (e.currentTarget.style.display = "none")}
           />
 
-          <div className="absolute top-[165px] left-[35px] w-[235px] z-20">
+          <div className="absolute top-[190px] left-[90px] w-[235px] z-20">
             <p className="text-black text-[16px] font-medium text-left mb-3">
               In Case of Emergency
             </p>
 
             <div className="mb-3">
-              <p className="text-[11px] text-black font-medium">Name</p>
               <p className="text-black text-[14px] font-bold leading-tight break-words w-full uppercase">
                 {emergencyName || "\u00A0"}
               </p>
             </div>
 
             <div className="mb-3">
-              <p className="text-[11px] text-black font-medium">Contact Number</p>
               <p className="text-black text-[14px] font-bold leading-tight break-words w-full">
                 {emergencyContactNo || "\u00A0"}
               </p>
             </div>
 
             <div>
-              <p className="text-[11px] text-black font-medium">Address</p>
               <p className="text-black text-[13px] font-bold leading-tight break-words w-full uppercase">
                 {emergencyAddress || "\u00A0"}
               </p>
             </div>
           </div>
 
-          <div className="absolute top-[30px] right-[34px] flex flex-col items-center z-20 w-[285px]">
-            <div className="w-full mb-2">
-              <p className="text-black font-black text-[24px] uppercase tracking-wide leading-none">
+          <div className="absolute top-[60px] right-[34px] flex flex-col items-center z-20 w-[285px]">
+            <div className="w-full mb-3 flex items-center gap-3 justify-start">
+              <p className="text-black font-black text-[24px] uppercase tracking-wide leading-none whitespace-nowrap">
                 ID NUMBER:
               </p>
-              <p className="text-black font-black text-[20px] tracking-wide mt-2">
+              <p className="text-black font-black text-[24px] tracking-wide leading-none whitespace-nowrap">
                 {resident.resident_code || "—"}
               </p>
             </div>
