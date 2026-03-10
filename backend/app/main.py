@@ -904,6 +904,28 @@ def get_resident_by_code(
 
     return resident
 
+@app.get("/public/residents/code/{resident_code}/qr")
+def get_public_resident_qr(
+    resident_code: str,
+    db: Session = Depends(get_db)
+):
+    resident = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.resident_code == resident_code,
+        models.ResidentProfile.is_deleted == False
+    ).first()
+
+    if not resident:
+        raise HTTPException(status_code=404, detail="Resident not found")
+
+    public_url = f"http://localhost:5173/public/id/{resident.resident_code}"
+    qr = qrcode.make(public_url)
+
+    buffer = BytesIO()
+    qr.save(buffer, format="PNG")
+    buffer.seek(0)
+
+    return StreamingResponse(buffer, media_type="image/png")
+
 @app.get("/public/residents/code/{resident_code}", response_model=schemas.PublicResident)
 def get_public_resident_by_code(
     resident_code: str,
