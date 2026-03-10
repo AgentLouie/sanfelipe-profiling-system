@@ -1,32 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../../api/api";
 import { Loader2, ShieldAlert, Printer, ArrowLeft, Download } from "lucide-react";
 import jsPDF from "jspdf";
-
-const IdField = ({
-  label,
-  value,
-  width,
-  valueClassName = "",
-  valueBoxClassName = "",
-  labelClassName = "",
-}) => (
-  <div className="flex flex-col" style={{ width }}>
-    <div className={`pb-1 text-center flex justify-center ${valueBoxClassName}`}>
-      <p
-        className={`text-black font-bold text-[16px] leading-tight px-1 text-center w-full break-normal ${valueClassName}`}
-      >
-        {value || "\u00A0"}
-      </p>
-    </div>
-    <p
-      className={`text-black text-[13px] text-center font-medium tracking-wide ${labelClassName}`}
-    >
-      {label}
-    </p>
-  </div>
-);
 
 // =========================
 // Canvas helpers
@@ -65,21 +41,19 @@ function wrapText(ctx, text, maxWidth) {
   return lines.length ? lines : [" "];
 }
 
-// Match DOM preview size exactly
+// Match preview size
 const DOM_W = 648;
 const DOM_H = 408;
 
-// 2x export for sharper PDF
+// 2x export for sharper PDF and preview
 const CW = 1296;
 const CH = 816;
 
-const SX = CW / DOM_W;   // = 2
-const SY = CH / DOM_H;   // = 2
+const SX = CW / DOM_W;
+const SY = CH / DOM_H;
 
-// Use SX/SY directly for x/y, and a single uniform scale for fonts
 const X = (n) => n * SX;
 const Y = (n) => n * SY;
-// Font sizes: scale by SX (= 2) to match pixel-perfect 1:1 with DOM px sizes
 const FS = (n) => Math.round(n * SX);
 
 const FONT_FAMILY = "Barlow, Arial, sans-serif";
@@ -100,7 +74,6 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, CW, CH);
 
-  // Background image
   try {
     const bg = await loadImage(bgUrl);
     ctx.save();
@@ -109,7 +82,6 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     ctx.restore();
   } catch (_) {}
 
-  // Watermark logo (bottom-right)
   try {
     const logo = await loadImage(logoUrl);
     ctx.save();
@@ -122,7 +94,6 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     ctx.restore();
   } catch (_) {}
 
-  // Red diagonal banner
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(0, 0);
@@ -134,12 +105,10 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   ctx.fill();
   ctx.restore();
 
-  // Inner white border
   ctx.strokeStyle = "rgba(255,255,255,0.8)";
   ctx.lineWidth = X(1);
   ctx.strokeRect(X(10), Y(10), X(DOM_W - 20), Y(DOM_H - 20));
 
-  // Seal
   try {
     const logo = await loadImage(logoUrl);
     const lx = X(24);
@@ -155,7 +124,6 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     ctx.restore();
   } catch (_) {}
 
-  // Title
   ctx.save();
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
@@ -174,7 +142,6 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   ctx.fillText("RESIDENT ID CARD", CW / 2, Y(85));
   ctx.restore();
 
-  // Photo box
   const px = X(95);
   const py = Y(140);
   const pw = X(155);
@@ -199,18 +166,18 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     ctx.fillText("NO PHOTO", px + pw / 2, py + ph / 2);
   }
 
-  // Resident label
   ctx.fillStyle = "#000";
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
   ctx.font = `${FONT_BLACK} ${FS(28)}px ${FONT_FAMILY}`;
   ctx.fillText("RESIDENT", px + pw / 2, Y(358));
 
-  // -------------------------
-  // RIGHT SIDE FIELDS
-  // -------------------------
   const fx = X(320);
   const fw = X(288);
+
+  const col1 = fw * 0.22;
+  const col2 = fw * 0.42;
+  const col3 = fw * 0.36;
 
   function drawDomField({
     label,
@@ -222,8 +189,9 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     labelFs = 13,
     valueWeight = FONT_BOLD,
     labelWeight = FONT_MEDIUM,
-    boxH = 32,
-    pb = 4,
+    boxH = 26,
+    pb = 1,
+    labelGap = 1,
     nowrap = false,
   }) {
     const safeValue = String(value || "").trim() || " ";
@@ -238,9 +206,8 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     ctx.font = `${valueWeight} ${FS(valueFs)}px ${FONT_FAMILY}`;
 
     const lines = nowrap ? [safeValue] : wrapText(ctx, safeValue, innerWidth);
-    const lineHeight = Math.round(FS(valueFs) * 1.05);
+    const lineHeight = Math.round(FS(valueFs) * 1.02);
 
-    // Bottom-align text inside the value box like `items-end`
     const firstBaseline =
       y + boxHeight - paddingBottom - (lines.length - 1) * lineHeight;
 
@@ -248,21 +215,18 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
       ctx.fillText(line, x + w / 2, firstBaseline + i * lineHeight);
     });
 
-    // Label directly below
-    ctx.fillStyle = "#000";
+    ctx.fillStyle = "#111";
     ctx.font = `${labelWeight} ${FS(labelFs)}px ${FONT_FAMILY}`;
-    const labelBaseline = y + boxHeight + FS(labelFs);
+    const labelBaseline = y + boxHeight + FS(labelFs) + Y(labelGap);
     ctx.fillText(label, x + w / 2, labelBaseline);
 
     ctx.restore();
   }
 
-  // Exact DOM row positions
-  const row1Y = Y(145);
-  const row2Y = Y(225);
-  const row3Y = Y(291);
+  const row1Y = Y(142);
+  const row2Y = Y(218);
+  const row3Y = Y(286);
 
-  // Row 1
   drawDomField({
     label: "Last Name, First Name, M.I",
     value: fullName,
@@ -271,14 +235,10 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     w: fw,
     valueFs: 17,
     labelFs: 13,
-    boxH: 32,
-    pb: 4,
+    boxH: 30,
+    pb: 1,
+    labelGap: 1,
   });
-
-  // Row 2
-  const col1 = fw * 0.22;
-  const col2 = fw * 0.42;
-  const col3 = fw * 0.36;
 
   drawDomField({
     label: "Sex",
@@ -288,8 +248,9 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     w: col1,
     valueFs: 16,
     labelFs: 13,
-    boxH: 28,
-    pb: 4,
+    boxH: 24,
+    pb: 1,
+    labelGap: 1,
   });
 
   drawDomField({
@@ -300,8 +261,9 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     w: col2,
     valueFs: 15,
     labelFs: 13,
-    boxH: 28,
-    pb: 4,
+    boxH: 24,
+    pb: 1,
+    labelGap: 1,
   });
 
   drawDomField({
@@ -312,12 +274,12 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     w: col3,
     valueFs: 14,
     labelFs: 13,
-    boxH: 28,
-    pb: 4,
+    boxH: 24,
+    pb: 1,
+    labelGap: 1,
     nowrap: true,
   });
 
-  // Row 3
   drawDomField({
     label: "Contact No.",
     value: resident.contact_no || "",
@@ -326,8 +288,9 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     w: fw * 0.48,
     valueFs: 16,
     labelFs: 13,
-    boxH: 32,
-    pb: 4,
+    boxH: 26,
+    pb: 1,
+    labelGap: 1,
   });
 
   return canvas;
@@ -354,7 +317,6 @@ async function drawBack(
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, CW, CH);
 
-  // Background image
   try {
     const bg = await loadImage(bgUrl);
     ctx.save();
@@ -363,7 +325,6 @@ async function drawBack(
     ctx.restore();
   } catch (_) {}
 
-  // Watermark
   try {
     const logo = await loadImage(logoUrl);
     ctx.save();
@@ -376,23 +337,20 @@ async function drawBack(
     ctx.restore();
   } catch (_) {}
 
-  // Red triangle — DOM: polygon(0 0, 70% 0, 0 60%)
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(0, 0);
-  ctx.lineTo(X(DOM_W * 0.70), 0);
-  ctx.lineTo(0, Y(DOM_H * 0.60));
+  ctx.lineTo(X(DOM_W * 0.7), 0);
+  ctx.lineTo(0, Y(DOM_H * 0.6));
   ctx.closePath();
   ctx.fillStyle = "#cc0000";
   ctx.fill();
   ctx.restore();
 
-  // Inner border
   ctx.strokeStyle = "rgba(255,255,255,0.8)";
   ctx.lineWidth = X(1);
   ctx.strokeRect(X(10), Y(10), X(DOM_W - 20), Y(DOM_H - 20));
 
-  // Seal
   try {
     const logo = await loadImage(logoUrl);
     const lx = X(24);
@@ -408,57 +366,54 @@ async function drawBack(
     ctx.restore();
   } catch (_) {}
 
-  // ---- Emergency section ----
-  // DOM: top-[190px] left-[90px] w-[235px]
   const leftX = X(90);
   let topY = Y(190);
 
-  // "In Case of Emergency" — DOM: text-[16px] font-medium mb-3
   ctx.fillStyle = "#000";
   ctx.textAlign = "left";
-  ctx.font = `500 ${FS(16)}px Arial, sans-serif`;
+  ctx.textBaseline = "alphabetic";
+  ctx.font = `${FONT_MEDIUM} ${FS(16)}px ${FONT_FAMILY}`;
   ctx.fillText("In Case of Emergency", leftX, topY + FS(16));
-  topY += FS(16) + Y(12); // text height + mb-3 (12px)
+  topY += FS(16) + Y(12);
 
   const maxEmW = X(235);
 
   function drawEmergencyLine(value, fontSize, mb = 12) {
     const val = String(value || " ").toUpperCase();
     ctx.fillStyle = "#000";
-    ctx.font = `bold ${FS(fontSize)}px Arial, sans-serif`;
+    ctx.font = `${FONT_BOLD} ${FS(fontSize)}px ${FONT_FAMILY}`;
     ctx.textAlign = "left";
     const lines = wrapText(ctx, val, maxEmW);
     const lh = FS(fontSize) + Y(3);
+
     lines.forEach((line, i) => {
       ctx.fillText(line, leftX, topY + i * lh + FS(fontSize));
     });
+
     topY += lines.length * lh + Y(mb);
   }
 
-  drawEmergencyLine(emergencyName, 14, 12);        // mb-3
-  drawEmergencyLine(emergencyContactNo, 14, 12);   // mb-3
+  drawEmergencyLine(emergencyName, 14, 12);
+  drawEmergencyLine(emergencyContactNo, 14, 12);
   drawEmergencyLine(emergencyAddress, 13, 0);
 
-  // ---- Right section ----
-  // DOM: top-[60px] right-[34px] w-[285px]
   const rx = X(DOM_W - 34 - 285);
-  let ry = Y(60);
+  const ry = Y(60);
 
-  // ID NUMBER label + value inline
-  // DOM: text-[24px] font-black
   ctx.fillStyle = "#000";
   ctx.textAlign = "left";
-  ctx.font = `900 ${FS(24)}px Arial Black, sans-serif`;
+  ctx.textBaseline = "alphabetic";
+  ctx.font = `${FONT_BLACK} ${FS(24)}px ${FONT_FAMILY}`;
 
   const idLabel = "ID NUMBER:";
   const idLabelW = ctx.measureText(idLabel).width;
   const idY = ry + FS(24);
+
   ctx.fillText(idLabel, rx, idY);
   ctx.fillText(resident.resident_code || "—", rx + idLabelW + X(8), idY);
 
-  // QR box — DOM: w-[245px] h-[205px], positioned after mb-3 from ID row
   const qx = X(DOM_W - 34 - 245);
-  const qy = Y(60) + FS(24) + Y(12); // idY + mb-3
+  const qy = Y(60) + FS(24) + Y(12);
   const qw = X(245);
   const qh = Y(205);
 
@@ -476,17 +431,12 @@ async function drawBack(
     } catch (_) {}
   }
 
-  // QR caption — DOM: text-[11px], mb-3 below QR box
   const captionY = qy + qh + Y(12);
   ctx.textAlign = "center";
   ctx.fillStyle = "#000";
-  ctx.font = `500 ${FS(11)}px Arial, sans-serif`;
+  ctx.font = `${FONT_MEDIUM} ${FS(11)}px ${FONT_FAMILY}`;
   ctx.fillText("This QR Code contains verified resident data.", qx + qw / 2, captionY + FS(11));
-  ctx.fillText(
-    "Scan using authorized LGU devices only.",
-    qx + qw / 2,
-    captionY + FS(11) + Y(14)
-  );
+  ctx.fillText("Scan using authorized LGU devices only.", qx + qw / 2, captionY + FS(11) + Y(14));
 
   return canvas;
 }
@@ -503,6 +453,10 @@ export default function ResidentQRPage() {
   const [qrImage, setQrImage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [renderingPreview, setRenderingPreview] = useState(false);
+
+  const frontPreviewRef = useRef(null);
+  const backPreviewRef = useRef(null);
 
   const logoUrl = "/san_felipe_seal.png";
   const bgUrl = "/sanfe.jpg";
@@ -542,6 +496,7 @@ export default function ResidentQRPage() {
     if (!resident?.birthdate) return " ";
     const date = new Date(resident.birthdate);
     if (isNaN(date.getTime())) return resident.birthdate;
+
     return date.toLocaleDateString("en-US", {
       month: "2-digit",
       day: "2-digit",
@@ -560,12 +515,104 @@ export default function ResidentQRPage() {
   const emergencyContactNo = useMemo(() => resident?.emergency_contact_no || " ", [resident]);
   const emergencyAddress = useMemo(() => resident?.emergency_address || " ", [resident]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const renderPreview = async () => {
+      if (!resident) return;
+
+      setRenderingPreview(true);
+
+      try {
+        if (document.fonts) {
+          await document.fonts.load("700 17px Barlow");
+          await document.fonts.load("700 16px Barlow");
+          await document.fonts.load("700 15px Barlow");
+          await document.fonts.load("700 14px Barlow");
+          await document.fonts.load("500 13px Barlow");
+          await document.fonts.load("500 16px Barlow");
+          await document.fonts.load("500 11px Barlow");
+          await document.fonts.load("900 42px Barlow");
+          await document.fonts.load("900 40px Barlow");
+          await document.fonts.load("900 28px Barlow");
+          await document.fonts.load("900 24px Barlow");
+          await document.fonts.ready;
+        }
+
+        const [frontCanvas, backCanvas] = await Promise.all([
+          drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl),
+          drawBack(
+            resident,
+            emergencyName,
+            emergencyContactNo,
+            emergencyAddress,
+            qrImage,
+            bgUrl,
+            logoUrl
+          ),
+        ]);
+
+        if (cancelled) return;
+
+        const frontEl = frontPreviewRef.current;
+        const backEl = backPreviewRef.current;
+
+        if (frontEl) {
+          const fctx = frontEl.getContext("2d");
+          frontEl.width = CW;
+          frontEl.height = CH;
+          fctx.clearRect(0, 0, CW, CH);
+          fctx.drawImage(frontCanvas, 0, 0);
+        }
+
+        if (backEl) {
+          const bctx = backEl.getContext("2d");
+          backEl.width = CW;
+          backEl.height = CH;
+          bctx.clearRect(0, 0, CW, CH);
+          bctx.drawImage(backCanvas, 0, 0);
+        }
+      } catch (err) {
+        console.error("Preview render failed:", err);
+      } finally {
+        if (!cancelled) setRenderingPreview(false);
+      }
+    };
+
+    renderPreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    resident,
+    qrImage,
+    formattedBirthdate,
+    fullName,
+    emergencyName,
+    emergencyContactNo,
+    emergencyAddress,
+    bgUrl,
+    logoUrl,
+  ]);
+
   const handleDownloadPDF = async () => {
     if (!resident) return;
 
     setDownloadingPdf(true);
     try {
-      if (document.fonts?.ready) {
+      if (document.fonts) {
+        await document.fonts.load("700 17px Barlow");
+        await document.fonts.load("700 16px Barlow");
+        await document.fonts.load("700 15px Barlow");
+        await document.fonts.load("700 14px Barlow");
+        await document.fonts.load("500 13px Barlow");
+        await document.fonts.load("500 16px Barlow");
+        await document.fonts.load("500 11px Barlow");
+        await document.fonts.load("900 42px Barlow");
+        await document.fonts.load("900 40px Barlow");
+        await document.fonts.load("900 28px Barlow");
+        await document.fonts.load("900 24px Barlow");
         await document.fonts.ready;
       }
 
@@ -585,8 +632,6 @@ export default function ResidentQRPage() {
       const CARD_W = 3.375;
       const CARD_H = 2.125;
 
-      // jsPDF with orientation:"landscape" swaps [w,h] to [h,w] internally.
-      // So pass [CARD_H, CARD_W] — after the swap it becomes [CARD_W, CARD_H] correctly.
       const pdf = new jsPDF({
         orientation: "landscape",
         unit: "in",
@@ -630,7 +675,8 @@ export default function ResidentQRPage() {
             Record Not Found
           </h2>
           <p className="text-sm text-stone-500 font-medium mb-8">
-            The requested registry ID is invalid, unauthorized, or has been removed from the system.
+            The requested registry ID is invalid, unauthorized, or has been removed from the
+            system.
           </p>
           <button
             onClick={() => navigate(-1)}
@@ -648,10 +694,6 @@ export default function ResidentQRPage() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-stone-200 p-6 font-sans">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800;900&display=swap');
-
-        .id-card {
-          font-family: 'Barlow', sans-serif;
-        }
 
         @media print {
           * {
@@ -693,7 +735,7 @@ export default function ResidentQRPage() {
             padding: 0 !important;
           }
 
-          #qr-print-area > .id-card {
+          #qr-print-area > .print-canvas-wrap {
             width: 648px !important;
             height: 408px !important;
             zoom: 0.5;
@@ -707,11 +749,18 @@ export default function ResidentQRPage() {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
             transform: none !important;
+            background: white !important;
           }
 
-          #qr-print-area > .id-card:last-child {
+          #qr-print-area > .print-canvas-wrap:last-child {
             page-break-after: auto !important;
             break-after: auto !important;
+          }
+
+          .print-canvas {
+            width: 648px !important;
+            height: 408px !important;
+            display: block !important;
           }
 
           .print\\:hidden,
@@ -725,223 +774,26 @@ export default function ResidentQRPage() {
         Resident ID Card Preview — Print Both Sides
       </p>
 
-      <div
-        id="qr-print-area"
-        className="flex flex-col gap-8 items-center print:gap-0 print:flex-col"
-      >
-        {/* FRONT */}
-        <div className="id-card relative w-[648px] h-[408px] rounded-2xl overflow-hidden shadow-2xl border border-stone-400 bg-white flex-shrink-0 print:w-[3.375in] print:h-[2.125in] print:rounded-none print:shadow-none print:border-0 print:break-after-page">
-          <div className="absolute inset-0 z-0">
-            <img
-              src={bgUrl}
-              alt=""
-              className="w-full h-full object-cover grayscale-[40%] brightness-110"
-              style={{ opacity: 0.3 }}
-            />
-          </div>
+      {renderingPreview && (
+        <div className="mb-4 flex items-center gap-2 text-stone-600 text-sm font-semibold print:hidden">
+          <Loader2 size={16} className="animate-spin" />
+          Rendering preview...
+        </div>
+      )}
 
-          <img
-            src={logoUrl}
-            alt=""
-            className="absolute z-0 pointer-events-none object-contain"
-            style={{
-              width: 420,
-              height: 420,
-              right: -55,
-              bottom: -70,
-              opacity: 0.12,
-            }}
+      <div id="qr-print-area" className="flex flex-col gap-8 items-center print:gap-0 print:flex-col">
+        <div className="print-canvas-wrap rounded-2xl overflow-hidden shadow-2xl border border-stone-400 bg-white print:rounded-none print:shadow-none print:border-0">
+          <canvas
+            ref={frontPreviewRef}
+            className="print-canvas block w-[648px] h-[408px]"
           />
-
-          <div
-            className="absolute inset-0 z-10"
-            style={{ filter: "drop-shadow(0px 6px 8px rgba(0,0,0,0.35))" }}
-          >
-            <div
-              className="absolute inset-0 bg-[#cc0000]"
-              style={{ clipPath: "polygon(0 0, 100% 0, 72% 0, 0 63%)" }}
-            />
-          </div>
-
-          <div className="absolute inset-[10px] border border-white/80 z-10" />
-
-          <img
-            src={logoUrl}
-            alt="San Felipe Seal"
-            className="absolute top-6 left-6 w-[88px] h-[88px] z-20 drop-shadow-md rounded-full"
-            onError={(e) => (e.currentTarget.style.display = "none")}
-          />
-
-          <div className="absolute top-[14px] left-1/2 -translate-x-1/2 z-20 text-center leading-none w-full pointer-events-none">
-            <h1
-              className="text-[42px] font-black uppercase tracking-wide text-[#d40000]"
-              style={{
-                WebkitTextStroke: "2px white",
-                textShadow: "0 3px 6px rgba(0,0,0,0.4)",
-                lineHeight: "0.92",
-              }}
-            >
-              SAN FELIPE
-            </h1>
-            <h2
-              className="mt-[-4px] text-[40px] font-black uppercase tracking-wide text-[#d40000]"
-              style={{
-                WebkitTextStroke: "2px white",
-                textShadow: "0 3px 6px rgba(0,0,0,0.4)",
-                lineHeight: "0.92",
-              }}
-            >
-              RESIDENT ID CARD
-            </h2>
-          </div>
-
-          <div className="absolute top-[140px] left-[95px] flex flex-col items-center z-20">
-            <div className="w-[155px] h-[180px] bg-[#efefef] border-[3px] border-black flex items-center justify-center overflow-hidden">
-              {resident.photo_url ? (
-                <img
-                  src={resident.photo_url}
-                  alt="Resident"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span className="text-stone-400 font-bold text-sm">NO PHOTO</span>
-              )}
-            </div>
-            <p className="text-black font-black text-[28px] mt-3 tracking-wide uppercase">
-              Resident
-            </p>
-          </div>
-
-          <div className="absolute top-[145px] left-[320px] right-[40px] flex flex-col gap-5 z-20">
-            <IdField
-              label="Last Name, First Name, M.I"
-              value={fullName}
-              width="100%"
-              valueClassName="text-[17px]"
-              valueBoxClassName="min-h-[32px] items-end"
-            />
-
-            <div className="flex gap-4 w-full">
-              <IdField
-                label="Sex"
-                value={resident.sex}
-                width="22%"
-                valueBoxClassName="h-[28px] items-end"
-                labelClassName="mt-0"
-              />
-              <IdField
-                label="Date of Birth"
-                value={formattedBirthdate}
-                width="42%"
-                valueClassName="text-[15px]"
-                valueBoxClassName="h-[28px] items-end"
-                labelClassName="mt-0"
-              />
-              <IdField
-                label="Civil Status"
-                value={(resident.civil_status || "").replace("Live-in Partner", "Live-in\u00A0Partner")}
-                width="36%"
-                valueClassName="text-[14px] whitespace-nowrap"
-                valueBoxClassName="h-[28px] items-end"
-                labelClassName="mt-0"
-              />
-            </div>
-            <div className="flex w-full">
-              <IdField label="Contact No." value={resident.contact_no} width="48%" />
-            </div>
-          </div>
         </div>
 
-        {/* BACK */}
-        <div className="id-card relative w-[648px] h-[408px] rounded-2xl overflow-hidden shadow-2xl border border-stone-400 bg-white flex-shrink-0 print:w-[3.375in] print:h-[2.125in] print:rounded-none print:shadow-none print:border-0 print:break-inside-avoid">
-          <div className="absolute inset-0 z-0">
-            <img
-              src={bgUrl}
-              alt=""
-              className="w-full h-full object-cover grayscale-[40%] brightness-110"
-              style={{ opacity: 0.3 }}
-            />
-          </div>
-
-          <img
-            src={logoUrl}
-            alt=""
-            className="absolute z-0 pointer-events-none object-contain"
-            style={{
-              width: 420,
-              height: 420,
-              right: -55,
-              bottom: -70,
-              opacity: 0.12,
-            }}
+        <div className="print-canvas-wrap rounded-2xl overflow-hidden shadow-2xl border border-stone-400 bg-white print:rounded-none print:shadow-none print:border-0">
+          <canvas
+            ref={backPreviewRef}
+            className="print-canvas block w-[648px] h-[408px]"
           />
-          <div
-            className="absolute inset-0 z-10"
-            style={{ filter: "drop-shadow(0px 6px 8px rgba(0,0,0,0.35))" }}
-          >
-            <div
-              className="absolute inset-0 bg-[#cc0000]"
-              style={{ clipPath: "polygon(0 0, 70% 0, 0 60%)" }}
-            />
-          </div>
-
-          <div className="absolute inset-[10px] border border-white/80 z-10" />
-
-          <img
-            src={logoUrl}
-            alt="San Felipe Seal"
-            className="absolute top-6 left-6 w-[88px] h-[88px] z-20 drop-shadow-md rounded-full"
-            onError={(e) => (e.currentTarget.style.display = "none")}
-          />
-
-          <div className="absolute top-[190px] left-[90px] w-[235px] z-20">
-            <p className="text-black text-[16px] font-medium text-left mb-3">
-              In Case of Emergency
-            </p>
-
-            <div className="mb-3">
-              <p className="text-black text-[14px] font-bold leading-tight break-words w-full uppercase">
-                {emergencyName || "\u00A0"}
-              </p>
-            </div>
-
-            <div className="mb-3">
-              <p className="text-black text-[14px] font-bold leading-tight break-words w-full uppercase">
-                {emergencyContactNo || "\u00A0"}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-black text-[13px] font-bold leading-tight break-words w-full uppercase">
-                {emergencyAddress || "\u00A0"}
-              </p>
-            </div>
-          </div>
-
-          <div className="absolute top-[60px] right-[34px] flex flex-col items-center z-20 w-[285px]">
-            <div className="w-full mb-3 flex items-center gap-3 justify-start">
-              <p className="text-black font-black text-[24px] uppercase tracking-wide leading-none whitespace-nowrap">
-                ID NUMBER:
-              </p>
-              <p className="text-black font-black text-[24px] tracking-wide leading-none whitespace-nowrap">
-                {resident.resident_code || "—"}
-              </p>
-            </div>
-
-            <div className="w-[245px] h-[205px] bg-[#efefef] border-[3px] border-black flex items-center justify-center p-2 mb-3">
-              {qrImage ? (
-                <img src={qrImage} alt="QR Code" className="w-full h-full object-contain" />
-              ) : (
-                <Loader2 className="animate-spin text-stone-300 w-10 h-10" />
-              )}
-            </div>
-
-            <p className="text-black text-[11px] leading-[1.15] text-center font-medium tracking-wide w-[260px]">
-              This QR Code contains verified resident data.
-              <br />
-              Scan using authorized LGU devices only.
-            </p>
-          </div>
         </div>
       </div>
 

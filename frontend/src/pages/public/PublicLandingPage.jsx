@@ -250,8 +250,7 @@ export default function PublicLandingPage() {
                 Resident Verification
               </h1>
               <p className="mx-auto mt-5 max-w-xl text-sm leading-relaxed text-red-200 md:text-[15px] opacity-70">
-                Search and verify official resident records through the
-                secure public access portal.
+                Search and verify official resident records.
               </p>
             </div>
 
@@ -296,7 +295,7 @@ export default function PublicLandingPage() {
             {/* Hint */}
             <p className="mt-4 text-center text-xs text-red-300 opacity-70">
               <ScanLine size={12} className="inline mr-1.5 text-red-400" />
-              Use the resident's complete name or official resident code for accurate results.
+              Use the resident's complete name for accurate results.
             </p>
           </div>
         </div>
