@@ -119,10 +119,17 @@ class PublicResident(BaseModel):
     first_name: str
     middle_name: Optional[str] = None
     ext_name: Optional[str] = None
+
     barangay: Optional[str] = None
     purok: Optional[str] = None
     house_no: Optional[str] = None
     photo_url: Optional[str] = None
+
+    sex: Optional[str] = None
+    birthdate: Optional[date] = None
+    civil_status: Optional[str] = None
+    contact_no: Optional[str] = None
+
     emergency_name: Optional[str] = None
     emergency_contact_no: Optional[str] = None
     emergency_address: Optional[str] = None
