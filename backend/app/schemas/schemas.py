@@ -112,6 +112,20 @@ class ResidentBase(BaseModel):
     # Summary
     sector_summary: Optional[str] = None
     other_sector_details: Optional[str] = None
+    
+class PublicResident(BaseModel):
+    resident_code: str
+    last_name: str
+    first_name: str
+    middle_name: Optional[str] = None
+    ext_name: Optional[str] = None
+    barangay: Optional[str] = None
+    purok: Optional[str] = None
+    house_no: Optional[str] = None
+    photo_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 class ResidentCreate(ResidentBase):
     sector_ids: List[int] = []

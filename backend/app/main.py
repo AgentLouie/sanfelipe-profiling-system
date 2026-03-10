@@ -904,6 +904,21 @@ def get_resident_by_code(
 
     return resident
 
+@app.get("/public/residents/code/{resident_code}", response_model=schemas.PublicResident)
+def get_public_resident_by_code(
+    resident_code: str,
+    db: Session = Depends(get_db)
+):
+    resident = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.resident_code == resident_code,
+        models.ResidentProfile.is_deleted == False
+    ).first()
+
+    if not resident:
+        raise HTTPException(status_code=404, detail="Resident not found")
+
+    return resident
+
 @app.delete("/residents/{resident_id}")
 def soft_delete_resident(
     resident_id: int,
