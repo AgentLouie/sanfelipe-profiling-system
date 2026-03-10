@@ -435,16 +435,19 @@ export default function ResidentQRPage() {
         ),
       ]);
 
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "px",
-        format: [CW, CH],
-        compress: true,
-      });
+      const CARD_W = 3.375;
+      const CARD_H = 2.125;
 
-      pdf.addImage(frontCanvas.toDataURL("image/png"), "PNG", 0, 0, CW, CH);
-      pdf.addPage([CW, CH], "landscape");
-      pdf.addImage(backCanvas.toDataURL("image/png"), "PNG", 0, 0, CW, CH);
+      const pdf = new jsPDF({
+      orientation: "landscape",
+      unit: "in",
+      format: [CARD_W, CARD_H],
+      compress: true,
+    });
+
+    pdf.addImage(frontCanvas.toDataURL("image/png"), "PNG", 0, 0, CARD_W, CARD_H);
+    pdf.addPage([CARD_W, CARD_H], "landscape");
+    pdf.addImage(backCanvas.toDataURL("image/png"), "PNG", 0, 0, CARD_W, CARD_H);
 
       pdf.save(`ResidentID_${resident?.resident_code || "card"}.pdf`);
     } catch (err) {
