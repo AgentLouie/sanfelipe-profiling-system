@@ -123,6 +123,9 @@ class PublicResident(BaseModel):
     purok: Optional[str] = None
     house_no: Optional[str] = None
     photo_url: Optional[str] = None
+    emergency_name: Optional[str] = None
+    emergency_contact_no: Optional[str] = None
+    emergency_address: Optional[str] = None
 
     class Config:
         from_attributes = True
