@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing import List, Union
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sqlalchemy import text, func, inspect
+from sqlalchemy import text, func, inspect, or_
 from services.import_service import process_excel_import
 import io
 import qrcode
@@ -918,6 +918,36 @@ def get_public_resident_by_code(
         raise HTTPException(status_code=404, detail="Resident not found")
 
     return resident
+
+@app.get("/public/residents/search", response_model=list[schemas.PublicResidentListItem])
+def public_search_residents(
+    q: str = Query(..., min_length=1),
+    db: Session = Depends(get_db)
+):
+    search = q.strip()
+
+    residents = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.is_deleted == False,
+        models.ResidentProfile.is_active == True,
+        or_(
+            models.ResidentProfile.last_name.ilike(f"%{search}%"),
+            models.ResidentProfile.first_name.ilike(f"%{search}%"),
+            models.ResidentProfile.resident_code.ilike(f"%{search}%"),
+            func.concat(
+                func.coalesce(models.ResidentProfile.last_name, ""), " ",
+                func.coalesce(models.ResidentProfile.first_name, "")
+            ).ilike(f"%{search}%"),
+            func.concat(
+                func.coalesce(models.ResidentProfile.first_name, ""), " ",
+                func.coalesce(models.ResidentProfile.last_name, "")
+            ).ilike(f"%{search}%"),
+        )
+    ).order_by(
+        func.upper(models.ResidentProfile.last_name).asc(),
+        func.upper(models.ResidentProfile.first_name).asc()
+    ).limit(30).all()
+
+    return residents
 
 @app.delete("/residents/{resident_id}")
 def soft_delete_resident(
