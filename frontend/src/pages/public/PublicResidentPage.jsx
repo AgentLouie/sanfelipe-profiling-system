@@ -182,7 +182,8 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     ctx.textAlign = "center";
     ctx.font = `bold ${FS(valueFs)}px Arial, sans-serif`;
 
-    const lines = wrapText(ctx, String(value || "").toUpperCase(), w - X(8));
+    // No toUpperCase — display value as-is
+    const lines = wrapText(ctx, String(value || ""), w - X(8));
     const lineHeight = FS(valueFs) + Y(2);
     lines.forEach((line, i) => {
       ctx.fillText(line, x + w / 2, y + i * lineHeight);
@@ -293,6 +294,7 @@ async function drawBack(
   topY += Y(28);
 
   function drawEmergencyBlock(value, y, valueFs = 14, maxWidth = 235) {
+    // Keep toUpperCase for back card emergency fields
     const val = String(value || " ").toUpperCase();
     ctx.fillStyle = "#000";
     ctx.font = `bold ${FS(valueFs)}px Arial, sans-serif`;
@@ -376,10 +378,10 @@ export default function ResidentQRPage() {
 
     const fetchData = async () => {
       try {
-        const response = await api.get(`/residents/code/${code}`);
+        const response = await api.get(`/public/residents/code/${code}`);
         setResident(response.data);
 
-        const qrResponse = await api.get(`/residents/code/${code}/qr`, {
+        const qrResponse = await api.get(`/public/residents/code/${code}/qr`, {
           responseType: "blob",
         });
 
@@ -449,16 +451,18 @@ export default function ResidentQRPage() {
       const CARD_W = 3.375;
       const CARD_H = 2.125;
 
+      // jsPDF with orientation:"landscape" swaps [w,h] to [h,w] internally.
+      // So pass [CARD_H, CARD_W] — after the swap it becomes [CARD_W, CARD_H] correctly.
       const pdf = new jsPDF({
-      orientation: "landscape",
-      unit: "in",
-      format: [CARD_W, CARD_H],
-      compress: true,
-    });
+        orientation: "landscape",
+        unit: "in",
+        format: [CARD_H, CARD_W],
+        compress: true,
+      });
 
-    pdf.addImage(frontCanvas.toDataURL("image/png"), "PNG", 0, 0, CARD_W, CARD_H);
-    pdf.addPage([CARD_W, CARD_H], "landscape");
-    pdf.addImage(backCanvas.toDataURL("image/png"), "PNG", 0, 0, CARD_W, CARD_H);
+      pdf.addImage(frontCanvas.toDataURL("image/png"), "PNG", 0, 0, CARD_W, CARD_H);
+      pdf.addPage([CARD_H, CARD_W], "landscape");
+      pdf.addImage(backCanvas.toDataURL("image/png"), "PNG", 0, 0, CARD_W, CARD_H);
 
       pdf.save(`ResidentID_${resident?.resident_code || "card"}.pdf`);
     } catch (err) {
@@ -683,29 +687,29 @@ export default function ResidentQRPage() {
             />
 
             <div className="flex gap-4 w-full">
-            <IdField
+              <IdField
                 label="Sex"
                 value={resident.sex}
                 width="22%"
                 valueBoxClassName="h-[28px] items-end"
                 labelClassName="mt-0"
-            />
-            <IdField
+              />
+              <IdField
                 label="Date of Birth"
                 value={formattedBirthdate}
                 width="42%"
                 valueClassName="text-[15px]"
                 valueBoxClassName="h-[28px] items-end"
                 labelClassName="mt-0"
-            />
-            <IdField
+              />
+              <IdField
                 label="Civil Status"
                 value={(resident.civil_status || "").replace("Live-in Partner", "Live-in\u00A0Partner")}
                 width="36%"
                 valueClassName="text-[14px] whitespace-nowrap"
                 valueBoxClassName="h-[28px] items-end"
                 labelClassName="mt-0"
-            />
+              />
             </div>
             <div className="flex w-full">
               <IdField label="Contact No." value={resident.contact_no} width="48%" />
@@ -767,7 +771,7 @@ export default function ResidentQRPage() {
             </div>
 
             <div className="mb-3">
-              <p className="text-black text-[14px] font-bold leading-tight break-words w-full">
+              <p className="text-black text-[14px] font-bold leading-tight break-words w-full uppercase">
                 {emergencyContactNo || "\u00A0"}
               </p>
             </div>

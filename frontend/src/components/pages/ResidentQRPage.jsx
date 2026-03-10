@@ -65,7 +65,7 @@ function wrapText(ctx, text, maxWidth) {
   return lines.length ? lines : [" "];
 }
 
-// Match DOM preview size proportions
+// Match DOM preview size exactly
 const DOM_W = 648;
 const DOM_H = 408;
 
@@ -73,13 +73,19 @@ const DOM_H = 408;
 const CW = 1296;
 const CH = 816;
 
-const SX = CW / DOM_W;
-const SY = CH / DOM_H;
-const SCALE_AVG = (SX + SY) / 2;
+const SX = CW / DOM_W;   // = 2
+const SY = CH / DOM_H;   // = 2
 
+// Use SX/SY directly for x/y, and a single uniform scale for fonts
 const X = (n) => n * SX;
 const Y = (n) => n * SY;
-const FS = (n) => Math.round(n * SCALE_AVG);
+// Font sizes: scale by SX (= 2) to match pixel-perfect 1:1 with DOM px sizes
+const FS = (n) => Math.round(n * SX);
+
+const FONT_FAMILY = "Barlow, Arial, sans-serif";
+const FONT_BLACK = "900";
+const FONT_BOLD = "700";
+const FONT_MEDIUM = "500";
 
 // =========================
 // FRONT canvas
@@ -103,28 +109,26 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     ctx.restore();
   } catch (_) {}
 
-  // Watermark
+  // Watermark logo (bottom-right)
   try {
-  const logo = await loadImage(logoUrl);
-  ctx.save();
-  ctx.globalAlpha = 0.12;
-
-  const wmW = X(420);
-  const wmH = Y(420);
-  const wmX = CW - wmW + X(55);
-  const wmY = CH - wmH + Y(70);
-
-  ctx.drawImage(logo, wmX, wmY, wmW, wmH);
-  ctx.restore();
-} catch (_) {}
+    const logo = await loadImage(logoUrl);
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    const wmW = X(420);
+    const wmH = Y(420);
+    const wmX = CW - wmW + X(55);
+    const wmY = CH - wmH + Y(70);
+    ctx.drawImage(logo, wmX, wmY, wmW, wmH);
+    ctx.restore();
+  } catch (_) {}
 
   // Red diagonal banner
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(CW, 0);
-  ctx.lineTo(X(466.56), 0); // 72% of 648
-  ctx.lineTo(0, Y(257.04)); // 63% of 408
+  ctx.lineTo(X(DOM_W * 0.72), 0);
+  ctx.lineTo(0, Y(DOM_H * 0.63));
   ctx.closePath();
   ctx.fillStyle = "#cc0000";
   ctx.fill();
@@ -133,49 +137,49 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   // Inner white border
   ctx.strokeStyle = "rgba(255,255,255,0.8)";
   ctx.lineWidth = X(1);
-  ctx.strokeRect(X(10), Y(10), X(648 - 20), Y(408 - 20));
+  ctx.strokeRect(X(10), Y(10), X(DOM_W - 20), Y(DOM_H - 20));
 
   // Seal
   try {
-  const logo = await loadImage(logoUrl);
-  const lx = X(24);
-  const ly = Y(24);
-  const lw = X(88);
-  const lh = Y(88);
+    const logo = await loadImage(logoUrl);
+    const lx = X(24);
+    const ly = Y(24);
+    const lw = X(88);
+    const lh = Y(88);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(lx + lw / 2, ly + lh / 2, Math.min(lw, lh) / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(logo, lx, ly, lw, lh);
+    ctx.restore();
+  } catch (_) {}
 
+  // Title
   ctx.save();
-  ctx.beginPath();
-  ctx.arc(lx + lw / 2, ly + lh / 2, Math.min(lw, lh) / 2, 0, Math.PI * 2);
-  ctx.closePath();
-  ctx.clip();
-  ctx.drawImage(logo, lx, ly, lw, lh);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "#d40000";
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.lineWidth = X(2);
+
+  ctx.font = `${FONT_BLACK} ${FS(42)}px ${FONT_FAMILY}`;
+  ctx.strokeText("SAN FELIPE", CW / 2, Y(52));
+  ctx.fillText("SAN FELIPE", CW / 2, Y(52));
+
+  ctx.font = `${FONT_BLACK} ${FS(40)}px ${FONT_FAMILY}`;
+  ctx.strokeText("RESIDENT ID CARD", CW / 2, Y(85));
+  ctx.fillText("RESIDENT ID CARD", CW / 2, Y(85));
   ctx.restore();
-} catch (_) {}
 
-  // Titles - match website more closely
-ctx.save();
-ctx.textAlign = "center";
-ctx.fillStyle = "#d40000";
-ctx.strokeStyle = "#ffffff";
-ctx.lineJoin = "round";
-ctx.lineCap = "round";
+  // Photo box
+  const px = X(95);
+  const py = Y(140);
+  const pw = X(155);
+  const ph = Y(180);
 
-ctx.lineWidth = X(1.8);
-
-// top line
-ctx.font = `900 ${FS(36)}px Barlow, Arial Black, sans-serif`;
-ctx.strokeText("SAN FELIPE", CW / 2, Y(48));
-ctx.fillText("SAN FELIPE", CW / 2, Y(48));
-
-// second line
-ctx.font = `900 ${FS(34)}px Barlow, Arial Black, sans-serif`;
-ctx.strokeText("RESIDENT ID CARD", CW / 2, Y(84));
-ctx.fillText("RESIDENT ID CARD", CW / 2, Y(84));
-
-ctx.restore();
-
-  // Photo
-  const px = X(95), py = Y(140), pw = X(155), ph = Y(180);
   ctx.fillStyle = "#efefef";
   ctx.fillRect(px, py, pw, ph);
   ctx.strokeStyle = "#000";
@@ -189,50 +193,142 @@ ctx.restore();
     } catch (_) {}
   } else {
     ctx.fillStyle = "#888";
-    ctx.font = `bold ${FS(12)}px Arial`;
     ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `${FONT_BOLD} ${FS(14)}px ${FONT_FAMILY}`;
     ctx.fillText("NO PHOTO", px + pw / 2, py + ph / 2);
   }
 
   // Resident label
   ctx.fillStyle = "#000";
-  ctx.font = `900 ${FS(28)}px Arial Black, sans-serif`;
   ctx.textAlign = "center";
-  ctx.fillText("RESIDENT", px + pw / 2, Y(356));
+  ctx.textBaseline = "alphabetic";
+  ctx.font = `${FONT_BLACK} ${FS(28)}px ${FONT_FAMILY}`;
+  ctx.fillText("RESIDENT", px + pw / 2, Y(358));
 
-  function drawField(label, value, x, y, w, valueFs = 16, labelFs = 13) {
-    ctx.fillStyle = "#000";
+  // -------------------------
+  // RIGHT SIDE FIELDS
+  // -------------------------
+  const fx = X(320);
+  const fw = X(288);
+
+  function drawDomField({
+    label,
+    value,
+    x,
+    y,
+    w,
+    valueFs = 16,
+    labelFs = 13,
+    valueWeight = FONT_BOLD,
+    labelWeight = FONT_MEDIUM,
+    boxH = 32,
+    pb = 4,
+    nowrap = false,
+  }) {
+    const safeValue = String(value || "").trim() || " ";
+    const boxHeight = Y(boxH);
+    const paddingBottom = Y(pb);
+    const innerWidth = w - X(8);
+
+    ctx.save();
     ctx.textAlign = "center";
-    ctx.font = `bold ${FS(valueFs)}px Arial, sans-serif`;
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "#000";
+    ctx.font = `${valueWeight} ${FS(valueFs)}px ${FONT_FAMILY}`;
 
-    const lines = wrapText(ctx, String(value || "").toUpperCase(), w - X(8));
-    const lineHeight = FS(valueFs) + Y(2);
+    const lines = nowrap ? [safeValue] : wrapText(ctx, safeValue, innerWidth);
+    const lineHeight = Math.round(FS(valueFs) * 1.05);
+
+    // Bottom-align text inside the value box like `items-end`
+    const firstBaseline =
+      y + boxHeight - paddingBottom - (lines.length - 1) * lineHeight;
+
     lines.forEach((line, i) => {
-      ctx.fillText(line, x + w / 2, y + i * lineHeight);
+      ctx.fillText(line, x + w / 2, firstBaseline + i * lineHeight);
     });
 
-    ctx.fillStyle = "#222";
-    ctx.font = `500 ${FS(labelFs)}px Arial, sans-serif`;
-    ctx.fillText(label, x + w / 2, y + lineHeight * lines.length + Y(16));
+    // Label directly below
+    ctx.fillStyle = "#000";
+    ctx.font = `${labelWeight} ${FS(labelFs)}px ${FONT_FAMILY}`;
+    const labelBaseline = y + boxHeight + FS(labelFs);
+    ctx.fillText(label, x + w / 2, labelBaseline);
+
+    ctx.restore();
   }
 
-  const fx = X(320);
-  const fw = X(648 - 320 - 40);
-  let fy = Y(145);
+  // Exact DOM row positions
+  const row1Y = Y(145);
+  const row2Y = Y(225);
+  const row3Y = Y(291);
 
-  drawField("Last Name, First Name, M.I", fullName, fx, fy, fw, 17, 13);
-  fy += Y(72);
+  // Row 1
+  drawDomField({
+    label: "Last Name, First Name, M.I",
+    value: fullName,
+    x: fx,
+    y: row1Y,
+    w: fw,
+    valueFs: 17,
+    labelFs: 13,
+    boxH: 32,
+    pb: 4,
+  });
 
+  // Row 2
   const col1 = fw * 0.22;
   const col2 = fw * 0.42;
   const col3 = fw * 0.36;
 
-  drawField("Sex", resident.sex || "", fx, fy, col1, 16, 13);
-  drawField("Date of Birth", formattedBirthdate || "", fx + col1, fy, col2, 15, 13);
-  drawField("Civil Status", resident.civil_status || "", fx + col1 + col2, fy, col3, 16, 13);
+  drawDomField({
+    label: "Sex",
+    value: resident.sex || "",
+    x: fx,
+    y: row2Y,
+    w: col1,
+    valueFs: 16,
+    labelFs: 13,
+    boxH: 28,
+    pb: 4,
+  });
 
-  fy += Y(66);
-  drawField("Contact No.", resident.contact_no || "", fx, fy, fw * 0.48, 16, 13);
+  drawDomField({
+    label: "Date of Birth",
+    value: formattedBirthdate || "",
+    x: fx + col1,
+    y: row2Y,
+    w: col2,
+    valueFs: 15,
+    labelFs: 13,
+    boxH: 28,
+    pb: 4,
+  });
+
+  drawDomField({
+    label: "Civil Status",
+    value: (resident.civil_status || "").replace("Live-in Partner", "Live-in Partner"),
+    x: fx + col1 + col2,
+    y: row2Y,
+    w: col3,
+    valueFs: 14,
+    labelFs: 13,
+    boxH: 28,
+    pb: 4,
+    nowrap: true,
+  });
+
+  // Row 3
+  drawDomField({
+    label: "Contact No.",
+    value: resident.contact_no || "",
+    x: fx,
+    y: row3Y,
+    w: fw * 0.48,
+    valueFs: 16,
+    labelFs: 13,
+    boxH: 32,
+    pb: 4,
+  });
 
   return canvas;
 }
@@ -269,25 +365,23 @@ async function drawBack(
 
   // Watermark
   try {
-  const logo = await loadImage(logoUrl);
-  ctx.save();
-  ctx.globalAlpha = 0.12;
+    const logo = await loadImage(logoUrl);
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    const wmW = X(420);
+    const wmH = Y(420);
+    const wmX = CW - wmW + X(55);
+    const wmY = CH - wmH + Y(70);
+    ctx.drawImage(logo, wmX, wmY, wmW, wmH);
+    ctx.restore();
+  } catch (_) {}
 
-  const wmW = X(420);
-  const wmH = Y(420);
-  const wmX = CW - wmW + X(55);
-  const wmY = CH - wmH + Y(70);
-
-  ctx.drawImage(logo, wmX, wmY, wmW, wmH);
-  ctx.restore();
-} catch (_) {}
-
-  // Red triangle
+  // Red triangle — DOM: polygon(0 0, 70% 0, 0 60%)
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(0, 0);
-  ctx.lineTo(X(648 * 0.7), 0);
-  ctx.lineTo(0, Y(408 * 0.6));
+  ctx.lineTo(X(DOM_W * 0.70), 0);
+  ctx.lineTo(0, Y(DOM_H * 0.60));
   ctx.closePath();
   ctx.fillStyle = "#cc0000";
   ctx.fill();
@@ -296,71 +390,75 @@ async function drawBack(
   // Inner border
   ctx.strokeStyle = "rgba(255,255,255,0.8)";
   ctx.lineWidth = X(1);
-  ctx.strokeRect(X(10), Y(10), X(648 - 20), Y(408 - 20));
+  ctx.strokeRect(X(10), Y(10), X(DOM_W - 20), Y(DOM_H - 20));
 
   // Seal
   try {
-  const logo = await loadImage(logoUrl);
-  const lx = X(24);
-  const ly = Y(24);
-  const lw = X(88);
-  const lh = Y(88);
+    const logo = await loadImage(logoUrl);
+    const lx = X(24);
+    const ly = Y(24);
+    const lw = X(88);
+    const lh = Y(88);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(lx + lw / 2, ly + lh / 2, Math.min(lw, lh) / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(logo, lx, ly, lw, lh);
+    ctx.restore();
+  } catch (_) {}
 
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(lx + lw / 2, ly + lh / 2, Math.min(lw, lh) / 2, 0, Math.PI * 2);
-  ctx.closePath();
-  ctx.clip();
-  ctx.drawImage(logo, lx, ly, lw, lh);
-  ctx.restore();
-} catch (_) {}
-
-  // Emergency section
-  const leftX = X(120);
+  // ---- Emergency section ----
+  // DOM: top-[190px] left-[90px] w-[235px]
+  const leftX = X(90);
   let topY = Y(190);
 
+  // "In Case of Emergency" — DOM: text-[16px] font-medium mb-3
   ctx.fillStyle = "#000";
   ctx.textAlign = "left";
   ctx.font = `500 ${FS(16)}px Arial, sans-serif`;
-  ctx.fillText("In Case of Emergency", leftX, topY);
-  topY += Y(28);
+  ctx.fillText("In Case of Emergency", leftX, topY + FS(16));
+  topY += FS(16) + Y(12); // text height + mb-3 (12px)
 
-  function drawEmergencyBlock(value, y, valueFs = 14, maxWidth = 235) {
-  const val = String(value || " ").toUpperCase();
-  ctx.fillStyle = "#000";
-  ctx.font = `bold ${FS(valueFs)}px Arial, sans-serif`;
-  const lines = wrapText(ctx, val, X(maxWidth));
-  const lineHeight = FS(valueFs) + Y(3);
+  const maxEmW = X(235);
 
-  lines.forEach((line, i) => {
-    ctx.fillText(line, leftX, y + i * lineHeight);
-  });
-
-  return y + lines.length * lineHeight + Y(14);
+  function drawEmergencyLine(value, fontSize, mb = 12) {
+    const val = String(value || " ").toUpperCase();
+    ctx.fillStyle = "#000";
+    ctx.font = `bold ${FS(fontSize)}px Arial, sans-serif`;
+    ctx.textAlign = "left";
+    const lines = wrapText(ctx, val, maxEmW);
+    const lh = FS(fontSize) + Y(3);
+    lines.forEach((line, i) => {
+      ctx.fillText(line, leftX, topY + i * lh + FS(fontSize));
+    });
+    topY += lines.length * lh + Y(mb);
   }
 
-  topY = drawEmergencyBlock(emergencyName, topY, 14, 210);
-  topY = drawEmergencyBlock(emergencyContactNo, topY, 14, 210);
-  drawEmergencyBlock(emergencyAddress, topY, 13, 210);
+  drawEmergencyLine(emergencyName, 14, 12);        // mb-3
+  drawEmergencyLine(emergencyContactNo, 14, 12);   // mb-3
+  drawEmergencyLine(emergencyAddress, 13, 0);
 
-  // Right section
-  const rx = X(648 - 34 - 285);
+  // ---- Right section ----
+  // DOM: top-[60px] right-[34px] w-[285px]
+  const rx = X(DOM_W - 34 - 285);
   let ry = Y(60);
 
+  // ID NUMBER label + value inline
+  // DOM: text-[24px] font-black
   ctx.fillStyle = "#000";
   ctx.textAlign = "left";
-  ctx.font = `900 ${FS(22)}px Arial Black, sans-serif`;
+  ctx.font = `900 ${FS(24)}px Arial Black, sans-serif`;
 
-  const idY = ry + Y(30);
-  const label = "ID NUMBER:";
-  ctx.fillText(label, rx, idY);
+  const idLabel = "ID NUMBER:";
+  const idLabelW = ctx.measureText(idLabel).width;
+  const idY = ry + FS(24);
+  ctx.fillText(idLabel, rx, idY);
+  ctx.fillText(resident.resident_code || "—", rx + idLabelW + X(8), idY);
 
-  const labelWidth = ctx.measureText(label).width;
-  ctx.fillText(resident.resident_code || "—", rx + labelWidth + X(8), idY);
-
-  // QR
-  const qx = X(648 - 34 - 245);
-  const qy = Y(135);
+  // QR box — DOM: w-[245px] h-[205px], positioned after mb-3 from ID row
+  const qx = X(DOM_W - 34 - 245);
+  const qy = Y(60) + FS(24) + Y(12); // idY + mb-3
   const qw = X(245);
   const qh = Y(205);
 
@@ -373,23 +471,21 @@ async function drawBack(
   if (qrSrc) {
     try {
       const qr = await loadImage(qrSrc);
-      ctx.drawImage(qr, qx + X(8), qy + Y(8), qw - X(16), qh - Y(16));
+      const pad = X(8);
+      ctx.drawImage(qr, qx + pad, qy + pad, qw - pad * 2, qh - pad * 2);
     } catch (_) {}
   }
 
-  // Caption
+  // QR caption — DOM: text-[11px], mb-3 below QR box
+  const captionY = qy + qh + Y(12);
   ctx.textAlign = "center";
   ctx.fillStyle = "#000";
   ctx.font = `500 ${FS(11)}px Arial, sans-serif`;
-  ctx.fillText(
-    "This QR Code contains verified resident data.",
-    qx + qw / 2,
-    qy + qh + Y(20)
-  );
+  ctx.fillText("This QR Code contains verified resident data.", qx + qw / 2, captionY + FS(11));
   ctx.fillText(
     "Scan using authorized LGU devices only.",
     qx + qw / 2,
-    qy + qh + Y(35)
+    captionY + FS(11) + Y(14)
   );
 
   return canvas;
@@ -489,16 +585,18 @@ export default function ResidentQRPage() {
       const CARD_W = 3.375;
       const CARD_H = 2.125;
 
+      // jsPDF with orientation:"landscape" swaps [w,h] to [h,w] internally.
+      // So pass [CARD_H, CARD_W] — after the swap it becomes [CARD_W, CARD_H] correctly.
       const pdf = new jsPDF({
-      orientation: "landscape",
-      unit: "in",
-      format: [CARD_W, CARD_H],
-      compress: true,
-    });
+        orientation: "landscape",
+        unit: "in",
+        format: [CARD_H, CARD_W],
+        compress: true,
+      });
 
-    pdf.addImage(frontCanvas.toDataURL("image/png"), "PNG", 0, 0, CARD_W, CARD_H);
-    pdf.addPage([CARD_W, CARD_H], "landscape");
-    pdf.addImage(backCanvas.toDataURL("image/png"), "PNG", 0, 0, CARD_W, CARD_H);
+      pdf.addImage(frontCanvas.toDataURL("image/png"), "PNG", 0, 0, CARD_W, CARD_H);
+      pdf.addPage([CARD_H, CARD_W], "landscape");
+      pdf.addImage(backCanvas.toDataURL("image/png"), "PNG", 0, 0, CARD_W, CARD_H);
 
       pdf.save(`ResidentID_${resident?.resident_code || "card"}.pdf`);
     } catch (err) {
@@ -724,30 +822,30 @@ export default function ResidentQRPage() {
             />
 
             <div className="flex gap-4 w-full">
-            <IdField
-              label="Sex"
-              value={resident.sex}
-              width="22%"
-              valueBoxClassName="h-[28px] items-end"
-              labelClassName="mt-0"
-            />
-            <IdField
-              label="Date of Birth"
-              value={formattedBirthdate}
-              width="42%"
-              valueClassName="text-[15px]"
-              valueBoxClassName="h-[28px] items-end"
-              labelClassName="mt-0"
-            />
-            <IdField
-              label="Civil Status"
-              value={(resident.civil_status || "").replace("Live-in Partner", "Live-in\u00A0Partner")}
-              width="36%"
-              valueClassName="text-[14px] whitespace-nowrap"
-              valueBoxClassName="h-[28px] items-end"
-              labelClassName="mt-0"
-            />
-          </div>
+              <IdField
+                label="Sex"
+                value={resident.sex}
+                width="22%"
+                valueBoxClassName="h-[28px] items-end"
+                labelClassName="mt-0"
+              />
+              <IdField
+                label="Date of Birth"
+                value={formattedBirthdate}
+                width="42%"
+                valueClassName="text-[15px]"
+                valueBoxClassName="h-[28px] items-end"
+                labelClassName="mt-0"
+              />
+              <IdField
+                label="Civil Status"
+                value={(resident.civil_status || "").replace("Live-in Partner", "Live-in\u00A0Partner")}
+                width="36%"
+                valueClassName="text-[14px] whitespace-nowrap"
+                valueBoxClassName="h-[28px] items-end"
+                labelClassName="mt-0"
+              />
+            </div>
             <div className="flex w-full">
               <IdField label="Contact No." value={resident.contact_no} width="48%" />
             </div>
@@ -808,7 +906,7 @@ export default function ResidentQRPage() {
             </div>
 
             <div className="mb-3">
-              <p className="text-black text-[14px] font-bold leading-tight break-words w-full">
+              <p className="text-black text-[14px] font-bold leading-tight break-words w-full uppercase">
                 {emergencyContactNo || "\u00A0"}
               </p>
             </div>
