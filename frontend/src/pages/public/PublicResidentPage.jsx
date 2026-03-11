@@ -407,9 +407,10 @@ async function drawBack(
   return canvas;
 }
 
-export default function ResidentQRPage() {
+export default function PublicResidentPage() {
   const { code } = useParams();
   const navigate = useNavigate();
+  const token = new URLSearchParams(window.location.search).get("token");
 
   const [resident, setResident] = useState(null);
   const [qrImage, setQrImage] = useState(null);
@@ -426,19 +427,28 @@ export default function ResidentQRPage() {
   useEffect(() => {
     if (!code) return;
 
+    if (!token) {
+      setResident(null);
+      setLoading(false);
+      return;
+    }
+
     const fetchData = async () => {
       try {
-        const response = await api.get(`/public/residents/code/${code}`);
+        const response = await api.get(`/public/residents/code/${code}/card`, {
+          params: { token },
+        });
         setResident(response.data);
 
         const qrResponse = await api.get(`/public/residents/code/${code}/qr`, {
+          params: { token },
           responseType: "blob",
         });
 
         const imageUrl = URL.createObjectURL(qrResponse.data);
         setQrImage(imageUrl);
       } catch (err) {
-        console.error("Failed to fetch QR", err);
+        console.error("Failed to fetch public resident card", err);
         setResident(null);
       } finally {
         setLoading(false);
@@ -446,7 +456,7 @@ export default function ResidentQRPage() {
     };
 
     fetchData();
-  }, [code]);
+  }, [code, token]);
 
   useEffect(() => {
     return () => {
