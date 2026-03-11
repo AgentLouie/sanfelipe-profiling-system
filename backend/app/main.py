@@ -160,6 +160,40 @@ async def get_current_user(
 
     return user
 
+def create_public_unlock_token(resident_code: str):
+    expire = datetime.utcnow() + timedelta(minutes=5)
+
+    payload = {
+        "sub": resident_code,
+        "type": "public_unlock",
+        "exp": expire,
+    }
+
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+def verify_public_unlock_token(token: str):
+    credentials_exception = HTTPException(
+        status_code=401,
+        detail="Invalid or expired unlock token"
+    )
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
+        if payload.get("type") != "public_unlock":
+            raise credentials_exception
+
+        resident_code = payload.get("sub")
+        if not resident_code:
+            raise credentials_exception
+
+        return resident_code
+
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Unlock token expired")
+    except JWTError:
+        raise credentials_exception
+
 # ---------------------------------------------------
 # LOGIN
 # ---------------------------------------------------
@@ -176,14 +210,14 @@ def login(
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect username or password")
 
-    # 🔒 Check if account is locked
+    # Check if account is locked
     if user.locked_until and user.locked_until > datetime.utcnow():
         raise HTTPException(
             status_code=403,
             detail="Account locked. Try again later."
         )
 
-    # 🔐 Check password
+    # Check password
     if not verify_password(form_data.password, user.hashed_password):
 
         user.failed_attempts += 1
@@ -197,7 +231,7 @@ def login(
 
         raise HTTPException(status_code=401, detail="Incorrect username or password")
 
-    # ✅ Successful login
+    # Successful login
     user.failed_attempts = 0
     user.locked_until = None
     db.commit()
@@ -349,6 +383,32 @@ def reset_password(
     db.commit()
 
     return {"message": f"Password reset for {user_to_edit.username}"}
+
+@app.post("/public/residents/unlock", response_model=schemas.PublicUnlockResponse)
+def unlock_public_resident(
+    payload: schemas.PublicUnlockRequest,
+    db: Session = Depends(get_db)
+):
+    resident = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.resident_code == payload.resident_code,
+        models.ResidentProfile.is_deleted == False
+    ).first()
+
+    if not resident:
+        raise HTTPException(status_code=404, detail="Resident not found")
+
+    if not resident.birthdate:
+        raise HTTPException(status_code=400, detail="Resident birthdate not available")
+
+    if resident.birthdate != payload.birthdate:
+        raise HTTPException(status_code=401, detail="Invalid birthdate")
+
+    token = create_public_unlock_token(resident.resident_code)
+
+    return {
+        "access_token": token,
+        "token_type": "bearer"
+    }
 
 
 # ---------------------------------------------------
@@ -907,11 +967,18 @@ def get_resident_by_code(
 @app.get("/public/residents/code/{resident_code}/qr")
 def get_public_resident_qr(
     resident_code: str,
+    token: str = Query(...),
     db: Session = Depends(get_db)
 ):
+    unlocked_code = verify_public_unlock_token(token)
+
+    if unlocked_code != resident_code:
+        raise HTTPException(status_code=403, detail="Token does not match resident")
+
     resident = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.resident_code == resident_code,
-        models.ResidentProfile.is_deleted == False
+        models.ResidentProfile.is_deleted == False,
+        models.ResidentProfile.is_active == True
     ).first()
 
     if not resident:
@@ -926,14 +993,37 @@ def get_public_resident_qr(
 
     return StreamingResponse(buffer, media_type="image/png")
 
-@app.get("/public/residents/code/{resident_code}", response_model=schemas.PublicResident)
+@app.get("/public/residents/code/{resident_code}", response_model=schemas.PublicResidentListItem)
 def get_public_resident_by_code(
     resident_code: str,
     db: Session = Depends(get_db)
 ):
     resident = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.resident_code == resident_code,
-        models.ResidentProfile.is_deleted == False
+        models.ResidentProfile.is_deleted == False,
+        models.ResidentProfile.is_active == True
+    ).first()
+
+    if not resident:
+        raise HTTPException(status_code=404, detail="Resident not found")
+
+    return resident
+
+@app.get("/public/residents/code/{resident_code}/card", response_model=schemas.PublicResident)
+def get_public_resident_card(
+    resident_code: str,
+    token: str = Query(...),
+    db: Session = Depends(get_db)
+):
+    unlocked_code = verify_public_unlock_token(token)
+
+    if unlocked_code != resident_code:
+        raise HTTPException(status_code=403, detail="Token does not match resident")
+
+    resident = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.resident_code == resident_code,
+        models.ResidentProfile.is_deleted == False,
+        models.ResidentProfile.is_active == True
     ).first()
 
     if not resident:

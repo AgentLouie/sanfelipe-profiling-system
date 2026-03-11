@@ -223,6 +223,15 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+    
+class PublicUnlockRequest(BaseModel):
+    resident_code: str
+    birthdate: date
+
+
+class PublicUnlockResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
 
 # =======================
 # DASHBOARD STATS
