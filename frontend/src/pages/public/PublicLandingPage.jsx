@@ -190,7 +190,6 @@ export default function PublicLandingPage() {
     setTimeout(() => {
       setCurrentPage(newPage);
       setPageLoading(false);
-      window.scrollTo({ top: 0, behavior: "smooth" });
     }, 350);
   };
 
