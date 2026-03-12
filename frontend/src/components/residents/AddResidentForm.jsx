@@ -454,7 +454,23 @@ useEffect(() => {
       let response;
 
       if (residentToEdit) {
-        response = await api.put(`/residents/${residentToEdit.id}`, formData);
+        const payload = {
+          ...formData,
+          barangay_id: formData.barangay_id ? Number(formData.barangay_id) : null,
+          sector_ids: Array.isArray(formData.sector_ids)
+            ? formData.sector_ids.map(Number)
+            : [],
+          family_members: (formData.family_members || []).map((m) => ({
+            first_name: m.first_name || "",
+            middle_name: m.middle_name || "",
+            last_name: m.last_name || "",
+            relationship: m.relationship || "",
+          })),
+        };
+
+        console.log("UPDATE PAYLOAD:", payload);
+
+        response = await api.put(`/residents/${residentToEdit.id}`, payload);
 
         if (photoFile) {
           const form = new FormData();
@@ -470,7 +486,23 @@ useEffect(() => {
         setTimeout(onSuccess, 1000);
 
       } else {
-        response = await api.post('/residents/', formData);
+        const payload = {
+          ...formData,
+          barangay_id: formData.barangay_id ? Number(formData.barangay_id) : null,
+          sector_ids: Array.isArray(formData.sector_ids)
+            ? formData.sector_ids.map(Number)
+            : [],
+          family_members: (formData.family_members || []).map((m) => ({
+            first_name: m.first_name || "",
+            middle_name: m.middle_name || "",
+            last_name: m.last_name || "",
+            relationship: m.relationship || "",
+          })),
+        };
+
+        console.log("CREATE PAYLOAD:", payload);
+
+        response = await api.post('/residents/', payload);
         const newResident = response.data;
 
         if (photoFile && newResident?.id) {
