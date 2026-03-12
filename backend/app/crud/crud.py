@@ -183,6 +183,8 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
     if not db_resident:
         return None
 
+    raw_data = resident_data.model_dump(exclude_unset=True)
+
     update_data = resident_data.model_dump(
         exclude_unset=True,
         exclude={"sector_ids", "family_members", "resident_code", "barangay_id"}
@@ -213,11 +215,14 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
         db.rollback()
         raise ValueError("Resident already registered.")
 
-    if resident_data.sector_ids is not None:
+    if "sector_ids" in raw_data:
+        new_sector_ids = resident_data.sector_ids or []
+
         db_resident.sectors.clear()
-        if resident_data.sector_ids:
+
+        if new_sector_ids:
             new_sectors = db.query(models.Sector).filter(
-                models.Sector.id.in_(resident_data.sector_ids)
+                models.Sector.id.in_(new_sector_ids)
             ).all()
             db_resident.sectors = new_sectors
             db_resident.sector_summary = ", ".join(
@@ -226,12 +231,12 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
         else:
             db_resident.sector_summary = "None"
 
-    if resident_data.family_members is not None:
+    if "family_members" in raw_data:
         db.query(models.FamilyMember).filter(
             models.FamilyMember.profile_id == resident_id
         ).delete(synchronize_session=False)
 
-        for fm_data in resident_data.family_members:
+        for fm_data in (resident_data.family_members or []):
             db.add(models.FamilyMember(**fm_data.model_dump(), profile_id=resident_id))
 
     try:
