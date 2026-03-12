@@ -224,6 +224,7 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
             new_sectors = db.query(models.Sector).filter(
                 models.Sector.id.in_(new_sector_ids)
             ).all()
+
             db_resident.sectors = new_sectors
             db_resident.sector_summary = ", ".join(
                 [" ".join(s.name.strip().upper().split()) for s in new_sectors]
@@ -243,9 +244,14 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
         db.commit()
         db.refresh(db_resident)
         return db_resident
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
+        print("UPDATE RESIDENT INTEGRITY ERROR:", str(e))
         raise ValueError("Database constraint error while updating resident.")
+    except Exception as e:
+        db.rollback()
+        print("UPDATE RESIDENT ERROR:", repr(e))
+        raise
 
 
 # =====================================================
