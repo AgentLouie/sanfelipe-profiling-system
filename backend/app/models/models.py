@@ -6,9 +6,10 @@ from datetime import datetime
 
 # --- ASSOCIATION TABLE (Many-to-Many) ---
 resident_sectors = Table(
-    'resident_sectors', Base.metadata,
-    Column('resident_id', Integer, ForeignKey('resident_profiles.id')),
-    Column('sector_id', Integer, ForeignKey('sectors.id'))
+    "resident_sectors",
+    Base.metadata,
+    Column("resident_id", Integer, ForeignKey("resident_profiles.id"), primary_key=True),
+    Column("sector_id", Integer, ForeignKey("sectors.id"), primary_key=True),
 )
 
 class User(Base):

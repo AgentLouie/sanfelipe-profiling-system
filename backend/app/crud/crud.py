@@ -216,9 +216,13 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
         raise ValueError("Resident already registered.")
 
     if "sector_ids" in raw_data:
-        new_sector_ids = resident_data.sector_ids or []
+        new_sector_ids = list(set(resident_data.sector_ids or []))
 
-        db_resident.sectors.clear()
+        db.execute(
+            models.resident_sectors.delete().where(
+                models.resident_sectors.c.resident_id == resident_id
+            )
+        )
 
         if new_sector_ids:
             new_sectors = db.query(models.Sector).filter(
