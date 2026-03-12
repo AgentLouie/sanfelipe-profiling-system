@@ -16,6 +16,7 @@ import {
   ScanLine,
 } from "lucide-react";
 
+
 const SITIO_TO_PUROK = {
   "Sitio Sagpat": 6,
   "Sitio Tektek": 6,
@@ -44,38 +45,65 @@ const formatPurok = (p) => {
   return /^\d+$/.test(low) ? `PUROK ${raw}`.toUpperCase() : raw.toUpperCase();
 };
 
-/* ─── Skeleton Card ─────────────────────────────────────────────── */
+/* ─── Skeleton Card with shimmer ─────────────────────────────────── */
 const SkeletonCard = () => (
-  <div className="relative overflow-hidden rounded-2xl bg-white border border-red-100 shadow-sm">
+  <div className="relative overflow-hidden rounded-2xl bg-white border border-red-100/50 shadow-sm">
     <div className="h-1 w-full bg-red-100" />
-    <div className="p-6 space-y-4 animate-pulse">
+    <div className="p-6 space-y-4">
       <div className="flex items-center gap-4">
-        <div className="h-[72px] w-[72px] rounded-xl bg-red-50 shrink-0" />
+        <div className="h-[72px] w-[72px] rounded-xl bg-red-50/70 shrink-0 shimmer" />
         <div className="flex-1 space-y-2">
-          <div className="h-2.5 w-20 rounded bg-red-50" />
-          <div className="h-4 w-36 rounded bg-red-50" />
-          <div className="h-3 w-24 rounded bg-red-50" />
+          <div className="h-2.5 w-20 rounded bg-red-50/70 shimmer" />
+          <div className="h-4 w-36 rounded bg-red-50/70 shimmer" />
+          <div className="h-3 w-24 rounded bg-red-50/70 shimmer" />
         </div>
       </div>
-      <div className="h-9 w-full rounded-xl bg-red-50" />
-      <div className="h-10 w-full rounded-xl bg-red-50" />
+      <div className="h-9 w-full rounded-xl bg-red-50/70 shimmer" />
+      <div className="h-10 w-full rounded-xl bg-red-50/70 shimmer" />
     </div>
+    <style jsx>{`
+      .shimmer {
+        background: linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0) 0%,
+          rgba(254, 226, 226, 0.3) 50%,
+          rgba(255, 255, 255, 0) 100%
+        );
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+      }
+      @keyframes shimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+      }
+    `}</style>
   </div>
 );
 
 /* ─── Resident Card ─────────────────────────────────────────────── */
 const ResidentCard = ({ resident, onOpen, index }) => (
   <div
-    className="group relative overflow-hidden rounded-2xl bg-white shadow-sm hover:shadow-xl hover:shadow-red-900/5 transition-all duration-300 hover:-translate-y-1 border border-red-100"
-    style={{ animationDelay: `${index * 60}ms` }}
+    className="group relative overflow-hidden rounded-2xl bg-white shadow-md hover:shadow-2xl hover:shadow-red-900/10 transition-all duration-500 hover:-translate-y-1 border border-red-100/50 hover:border-red-200"
+    style={{ animationDelay: `${index * 60}ms`, animation: 'fadeInUp 0.5s ease-out both' }}
   >
-    {/* Premium vibrant top border */}
+    <style jsx>{`
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    `}</style>
+
+    {/* Animated gradient border on hover */}
+    <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none">
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-red-900/20 via-red-600/20 to-red-900/20 blur-xl" />
+    </div>
+
     <div className="h-1 w-full bg-gradient-to-r from-red-900 via-red-800 to-red-600" />
 
     <div className="relative p-6">
       <div className="flex items-center gap-4">
         <div className="relative shrink-0">
-          <div className="h-[72px] w-[72px] rounded-xl overflow-hidden border border-red-100 bg-red-50 shadow-inner">
+          <div className="h-[72px] w-[72px] rounded-xl overflow-hidden border border-red-100 bg-red-50/50 shadow-inner ring-1 ring-white/50">
             {resident.photo_url ? (
               <img src={resident.photo_url} alt="" className="h-full w-full object-cover" />
             ) : (
@@ -84,7 +112,7 @@ const ResidentCard = ({ resident, onOpen, index }) => (
               </div>
             )}
           </div>
-          <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-700 shadow-sm ring-2 ring-white">
+          <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-700 shadow-md ring-2 ring-white">
             <BadgeCheck size={12} className="text-white" strokeWidth={2.5} />
           </div>
         </div>
@@ -102,7 +130,7 @@ const ResidentCard = ({ resident, onOpen, index }) => (
         </div>
       </div>
 
-      <div className="mt-5 flex items-center gap-2 rounded-xl bg-red-50/50 border border-red-50 px-3 py-2.5">
+      <div className="mt-5 flex items-center gap-2 rounded-xl bg-red-50/30 border border-red-100/50 px-3 py-2.5 backdrop-blur-sm">
         <MapPin size={13} className="shrink-0 text-red-700" />
         <span className="text-xs font-semibold text-slate-600 truncate">
           {resident.barangay} · {formatPurok(resident.purok)}
@@ -111,10 +139,10 @@ const ResidentCard = ({ resident, onOpen, index }) => (
 
       <button
         onClick={() => onOpen(resident.resident_code)}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-red-900 px-4 py-3 text-sm font-bold text-white transition-all duration-200 hover:bg-red-800 hover:shadow-md hover:shadow-red-900/20 hover:gap-3 active:scale-[0.98]"
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-red-900 px-4 py-3 text-sm font-bold text-white transition-all duration-300 hover:bg-red-800 hover:shadow-lg hover:shadow-red-900/30 hover:gap-3 active:scale-[0.97] focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
       >
         View Digital ID
-        <ArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />
+        <ArrowRight size={15} className="transition-transform group-hover:translate-x-1" />
       </button>
     </div>
   </div>
@@ -125,11 +153,11 @@ const PaginationButton = ({ children, active = false, disabled = false, onClick,
   <button
     onClick={onClick}
     disabled={disabled || loading}
-    className={`flex h-9 min-w-[36px] items-center justify-center rounded-lg px-3 text-sm font-semibold transition-all duration-150 ${
+    className={`flex h-9 min-w-[36px] items-center justify-center rounded-lg px-3 text-sm font-semibold transition-all duration-200 ${
       active
-        ? "bg-red-900 text-white shadow-md shadow-red-900/20"
-        : "bg-white border border-red-100 text-red-800 hover:bg-red-50 hover:border-red-200"
-    } ${disabled || loading ? "cursor-not-allowed opacity-40" : ""}`}
+        ? "bg-red-900 text-white shadow-md shadow-red-900/30 ring-1 ring-red-800"
+        : "bg-white border border-red-100 text-red-800 hover:bg-red-50 hover:border-red-200 hover:shadow-sm"
+    } ${disabled || loading ? "cursor-not-allowed opacity-40" : ""} focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2`}
   >
     {loading ? <Loader2 size={13} className="animate-spin" /> : children}
   </button>
@@ -235,10 +263,10 @@ export default function PublicLandingPage() {
   }, [currentPage, totalPages]);
 
   return (
-    <div className="min-h-screen bg-[#faf8f8] font-sans text-slate-800">
+    <div className="min-h-screen bg-[#faf8f8] font-sans text-slate-800 antialiased">
 
       {/* ── Official Banner ── */}
-      <div className="bg-red-950 py-2.5 text-center text-[11px] font-bold tracking-[0.15em] uppercase text-red-100/90 shadow-sm relative z-10">
+      <div className="bg-red-950 py-3 text-center text-[11px] font-bold tracking-[0.2em] uppercase text-red-100/90 shadow-sm relative z-10 backdrop-blur-sm bg-opacity-95">
         <span className="inline-flex items-center gap-2">
           <ShieldCheck size={14} className="text-red-400" />
           Official Public Verification · Municipality of San Felipe
@@ -247,33 +275,29 @@ export default function PublicLandingPage() {
 
       {/* ── Hero Header ── */}
       <header className="relative overflow-hidden">
-        {/* Background: Municipal Hall photo */}
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-105 transition-transform duration-[20s] hover:scale-110"
           style={{ backgroundImage: "url('/hero.jpg')" }}
         />
-        {/* Premium blended red overlay */}
-        <div className="absolute inset-0 bg-red-950/60 mix-blend-multiply" />
-        <div className="absolute inset-0 bg-gradient-to-t from-red-950/90 via-red-900/40 to-transparent" />
+        <div className="absolute inset-0 bg-red-950/70 mix-blend-multiply backdrop-blur-[2px]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-red-950 via-red-900/40 to-transparent" />
 
         <div className="relative mx-auto max-w-5xl px-6 py-16 md:py-24">
           <div className="mx-auto max-w-3xl">
 
-            {/* Logo + Org */}
-            <div className="flex flex-col items-center gap-5 mb-8">
+            <div className="flex flex-col items-center gap-5 mb-8 animate-fade-in">
               <img
                 src="/san_felipe_seal.png"
                 alt="Municipality Seal"
-                className="h-24 w-24 object-contain drop-shadow-2xl rounded-full"
+                className="h-24 w-24 object-contain drop-shadow-2xl rounded-full ring-4 ring-white/20"
               />
-              <div className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.2em] text-red-200">
+              <div className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.2em] text-red-200 bg-black/10 px-4 py-1.5 rounded-full backdrop-blur-sm">
                 <Building2 size={14} />
                 Municipality of San Felipe
               </div>
             </div>
 
-            {/* Headline */}
-            <div className="text-center mb-10">
+            <div className="text-center mb-10 animate-slide-up">
               <h1 className="text-4xl font-extrabold tracking-tight text-white md:text-[52px] leading-[1.1] drop-shadow-md">
                 Resident Verification
               </h1>
@@ -282,16 +306,16 @@ export default function PublicLandingPage() {
               </p>
             </div>
 
-            {/* Search Bar */}
+            {/* Modern Search Bar with floating label effect */}
             <div className="relative group max-w-2xl mx-auto">
               <div
                 className={`absolute inset-0 rounded-2xl transition-all duration-300 ${
-                  focused ? "shadow-[0_8px_30px_rgb(153,27,27,0.2)]" : "shadow-xl"
+                  focused ? "shadow-[0_8px_30px_rgba(153,27,27,0.3)]" : "shadow-xl"
                 }`}
               />
               <div
-                className={`relative flex items-center bg-white/95 backdrop-blur-sm rounded-2xl overflow-hidden border transition-colors duration-300 ${
-                  focused ? "border-red-700" : "border-transparent"
+                className={`relative flex items-center bg-white/95 backdrop-blur-sm rounded-2xl overflow-hidden border-2 transition-all duration-300 ${
+                  focused ? "border-red-700" : "border-transparent hover:border-red-200"
                 }`}
               >
                 <div className="flex items-center pl-5 pr-3 shrink-0">
@@ -300,23 +324,32 @@ export default function PublicLandingPage() {
                   ) : (
                     <Search
                       size={20}
-                      className={`transition-colors ${focused ? "text-red-800" : "text-slate-400"}`}
+                      className={`transition-colors ${focused ? "text-red-800" : "text-slate-400 group-hover:text-red-600"}`}
                     />
                   )}
                 </div>
                 <input
                   type="text"
-                  placeholder="Search by full name or resident code…"
+                  placeholder=" "
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onFocus={() => setFocused(true)}
                   onBlur={() => setFocused(false)}
-                  className="h-[60px] flex-1 bg-transparent pr-5 text-[16px] text-slate-800 outline-none placeholder:text-slate-400 font-medium"
+                  className="h-[60px] flex-1 bg-transparent pr-5 text-[16px] text-slate-800 outline-none placeholder:text-slate-400 font-medium peer"
                 />
+                <label
+                  className={`absolute left-12 text-slate-400 transition-all pointer-events-none ${
+                    focused || query
+                      ? "text-xs -top-2 left-4 bg-white px-2 py-0.5 rounded text-red-700 font-medium"
+                      : "text-base top-1/2 -translate-y-1/2"
+                  }`}
+                >
+                  Search by full name or resident code…
+                </label>
                 {query && (
                   <button
                     onClick={() => setQuery("")}
-                    className="mr-3 shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold text-red-800 hover:text-red-950 hover:bg-red-50 transition-colors"
+                    className="mr-3 shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold text-red-800 hover:text-red-950 hover:bg-red-50 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
                   >
                     Clear
                   </button>
@@ -324,15 +357,13 @@ export default function PublicLandingPage() {
               </div>
             </div>
 
-            {/* Hint */}
-            <p className="mt-5 text-center text-xs font-medium text-red-200/60 drop-shadow-sm">
+            <p className="mt-5 text-center text-xs font-medium text-red-200/60 drop-shadow-sm animate-fade-in">
               <ScanLine size={13} className="inline mr-1.5 text-red-400" />
               Use the resident's complete name for accurate results.
             </p>
           </div>
         </div>
 
-        {/* Wave divider - matching the slightly off-white body background */}
         <div className="absolute bottom-0 left-0 right-0 overflow-hidden leading-none">
           <svg viewBox="0 0 1440 40" className="w-full fill-[#faf8f8]" preserveAspectRatio="none" height="40">
             <path d="M0,20 C360,40 1080,0 1440,20 L1440,40 L0,40 Z" />
@@ -340,14 +371,13 @@ export default function PublicLandingPage() {
         </div>
       </header>
 
-      {/* ── Results ── */}
       <main className="mx-auto max-w-6xl px-6 py-12">
 
         {loading ? (
           <div className="space-y-6">
-            <div className="flex items-center justify-between rounded-2xl bg-white border border-red-100 px-5 py-4 shadow-sm animate-pulse">
-              <div className="h-4 w-48 rounded bg-red-50" />
-              <div className="h-4 w-20 rounded bg-red-50" />
+            <div className="flex items-center justify-between rounded-2xl bg-white border border-red-100 px-5 py-4 shadow-sm">
+              <div className="h-4 w-48 rounded bg-red-50 shimmer" />
+              <div className="h-4 w-20 rounded bg-red-50 shimmer" />
             </div>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
@@ -355,7 +385,7 @@ export default function PublicLandingPage() {
           </div>
 
         ) : !query.trim() ? (
-          <div className="rounded-3xl bg-white border border-red-100 py-24 text-center shadow-sm">
+          <div className="rounded-3xl bg-white border border-red-100 py-24 text-center shadow-sm hover:shadow-md transition-shadow">
             <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 text-red-300 border border-red-100/50">
               <UserSearch size={32} />
             </div>
@@ -368,7 +398,6 @@ export default function PublicLandingPage() {
         ) : results.length > 0 ? (
           <div className="space-y-6">
 
-            {/* Result meta row */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl bg-white border border-red-100 px-5 py-4 shadow-sm">
               <p className="text-sm font-medium text-slate-500">
                 Showing{" "}
@@ -385,7 +414,6 @@ export default function PublicLandingPage() {
               </div>
             </div>
 
-            {/* Grid — dim + skeleton while page is changing */}
             {pageLoading ? (
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {Array.from({ length: ITEMS_PER_PAGE }).map((_, i) => <SkeletonCard key={i} />)}
@@ -403,7 +431,6 @@ export default function PublicLandingPage() {
               </div>
             )}
 
-            {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex flex-wrap items-center justify-center gap-2 pt-6">
                 <PaginationButton
@@ -459,7 +486,7 @@ export default function PublicLandingPage() {
           </div>
 
         ) : (
-          <div className="rounded-3xl bg-white border border-red-100 p-16 text-center shadow-sm">
+          <div className="rounded-3xl bg-white border border-red-100 p-16 text-center shadow-sm hover:shadow-md transition-shadow">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-300 border border-red-100/50">
               <Search size={26} />
             </div>
@@ -471,15 +498,14 @@ export default function PublicLandingPage() {
         )}
       </main>
 
-      {/* ── Unlock Modal ── */}
       {unlockModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-          <div className="w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl shadow-black/20 border border-red-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md px-4 animate-fade-in">
+          <div className="w-full max-w-md rounded-3xl bg-white/95 backdrop-blur-xl p-7 shadow-2xl shadow-black/30 border border-red-100/50 animate-scale-in">
             <h3 className="text-xl font-extrabold text-slate-800 mb-2">
               Verify Digital ID
             </h3>
             <p className="text-sm text-slate-500 mb-6">
-              Enter the resident&apos;s birthdate to access the digital ID.
+              Enter the resident's birthdate to access the digital ID.
             </p>
 
             <div className="space-y-5">
@@ -503,12 +529,12 @@ export default function PublicLandingPage() {
                   type="date"
                   value={birthdate}
                   onChange={(e) => setBirthdate(e.target.value)}
-                  className="w-full rounded-xl border border-red-200 bg-white px-4 py-3.5 text-sm font-medium text-slate-800 outline-none focus:border-red-700 focus:ring-1 focus:ring-red-700 transition-shadow"
+                  className="w-full rounded-xl border border-red-200 bg-white px-4 py-3.5 text-sm font-medium text-slate-800 outline-none focus:border-red-700 focus:ring-2 focus:ring-red-700/20 transition-all"
                 />
               </div>
 
               {unlockError && (
-                <p className="text-sm text-red-600 font-semibold">{unlockError}</p>
+                <p className="text-sm text-red-600 font-semibold animate-shake">{unlockError}</p>
               )}
             </div>
 
@@ -519,7 +545,7 @@ export default function PublicLandingPage() {
                   setBirthdate("");
                   setUnlockError("");
                 }}
-                className="flex-1 rounded-xl border border-red-100 bg-white px-4 py-3 text-sm font-bold text-slate-600 hover:bg-red-50 hover:text-red-900 transition-colors"
+                className="flex-1 rounded-xl border border-red-100 bg-white px-4 py-3 text-sm font-bold text-slate-600 hover:bg-red-50 hover:text-red-900 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
               >
                 Cancel
               </button>
@@ -527,7 +553,7 @@ export default function PublicLandingPage() {
               <button
                 onClick={handleUnlock}
                 disabled={unlocking || !birthdate}
-                className="flex-1 rounded-xl bg-red-900 px-4 py-3 text-sm font-bold text-white hover:bg-red-800 hover:shadow-md hover:shadow-red-900/20 transition-all disabled:opacity-60 disabled:hover:bg-red-900 disabled:hover:shadow-none"
+                className="flex-1 rounded-xl bg-red-900 px-4 py-3 text-sm font-bold text-white hover:bg-red-800 hover:shadow-lg hover:shadow-red-900/30 transition-all disabled:opacity-60 disabled:hover:bg-red-900 disabled:hover:shadow-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
               >
                 {unlocking ? "Verifying..." : "Unlock ID"}
               </button>
@@ -536,8 +562,7 @@ export default function PublicLandingPage() {
         </div>
       )}
 
-      {/* ── Footer ── */}
-      <footer className="mt-12 border-t border-red-100 bg-white py-8 text-center">
+      <footer className="mt-12 border-t border-red-100 bg-white/80 backdrop-blur-sm py-8 text-center">
         <p className="text-sm font-medium text-slate-500">
           © {new Date().getFullYear()} Municipality of San Felipe
         </p>
@@ -545,6 +570,52 @@ export default function PublicLandingPage() {
           All resident data is protected under applicable privacy laws.
         </p>
       </footer>
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes scaleIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+          20%, 40%, 60%, 80% { transform: translateX(2px); }
+        }
+        .animate-fade-in {
+          animation: fadeIn 0.5s ease-out;
+        }
+        .animate-slide-up {
+          animation: slideUp 0.6s ease-out;
+        }
+        .animate-scale-in {
+          animation: scaleIn 0.3s ease-out;
+        }
+        .animate-shake {
+          animation: shake 0.4s ease-in-out;
+        }
+        .shimmer {
+          background: linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(254, 226, 226, 0.3) 50%,
+            rgba(255, 255, 255, 0) 100%
+          );
+          background-size: 200% 100%;
+          animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+      `}</style>
     </div>
   );
 }
