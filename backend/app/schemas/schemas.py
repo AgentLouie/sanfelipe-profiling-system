@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Optional, Dict
-from datetime import date, datetime  # <--- FIX: Added datetime here
+from datetime import date, datetime
 
 # =======================
 # REFERENCE DATA SCHEMAS
@@ -157,8 +157,40 @@ class ResidentCreate(ResidentBase):
     family_members: List[FamilyMemberCreate] = []
 
 class ResidentUpdate(ResidentBase):
-    sector_ids: Optional[List[int]] = []
-    family_members: Optional[List[FamilyMemberCreate]] = []
+    last_name: Optional[str] = None
+    first_name: Optional[str] = None
+    middle_name: Optional[str] = None
+    ext_name: Optional[str] = None
+
+    house_no: Optional[str] = None
+    purok: Optional[str] = None
+    barangay: Optional[str] = None
+    barangay_id: Optional[int] = None
+    sitio: Optional[str] = None
+
+    emergency_name: Optional[str] = None
+    emergency_contact_no: Optional[str] = None
+    emergency_address: Optional[str] = None
+
+    sex: Optional[str] = None
+    birthdate: Optional[date] = None
+    civil_status: Optional[str] = None
+    religion: Optional[str] = None
+    occupation: Optional[str] = None
+
+    spouse_last_name: Optional[str] = None
+    spouse_first_name: Optional[str] = None
+    spouse_middle_name: Optional[str] = None
+    spouse_ext_name: Optional[str] = None
+
+    contact_no: Optional[str] = None
+    precinct_no: Optional[str] = None
+
+    sector_summary: Optional[str] = None
+    other_sector_details: Optional[str] = None
+
+    sector_ids: Optional[List[int]] = None
+    family_members: Optional[List[FamilyMemberCreate]] = None
 
 class Resident(ResidentBase):
     id: int

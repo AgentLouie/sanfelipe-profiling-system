@@ -70,7 +70,6 @@ def apply_sector_filter(query, sector: str):
         "BRGY OFFICIAL": "BRGY. OFFICIAL/EMPLOYEE",
         "BRGY OFFICIAL/EMPLOYEE": "BRGY. OFFICIAL/EMPLOYEE",
         "BRGY. OFFICIAL/EMPLOYEE": "BRGY. OFFICIAL/EMPLOYEE",
-        "4PS": "4P'S",
     }
 
     normalized = sector_aliases.get(normalized, normalized)
@@ -184,13 +183,18 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
     if not db_resident:
         return None
 
-    update_data = resident_data.model_dump(exclude={"sector_ids", "family_members", "resident_code"})
+    update_data = resident_data.model_dump(
+        exclude_unset=True,
+        exclude={"sector_ids", "family_members", "resident_code", "barangay_id"}
+    )
+
     for key, value in update_data.items():
         setattr(db_resident, key, value)
 
     for field in ["first_name", "middle_name", "last_name"]:
         value = getattr(db_resident, field)
-        setattr(db_resident, field, value.strip().upper() if value else "")
+        if value is not None:
+            setattr(db_resident, field, value.strip().upper())
 
     if not db_resident.birthdate:
         raise ValueError("Birthdate is required.")
@@ -201,6 +205,7 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
         func.upper(func.coalesce(models.ResidentProfile.middle_name, "")) == db_resident.middle_name,
         func.upper(func.coalesce(models.ResidentProfile.last_name, "")) == db_resident.last_name,
         models.ResidentProfile.birthdate == db_resident.birthdate,
+        models.ResidentProfile.barangay == db_resident.barangay,
         models.ResidentProfile.is_deleted == False
     ).first()
 
@@ -208,64 +213,34 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
         db.rollback()
         raise ValueError("Resident already registered.")
 
-    db_resident.sectors.clear()
-    if resident_data.sector_ids:
-        new_sectors = db.query(models.Sector).filter(models.Sector.id.in_(resident_data.sector_ids)).all()
-        db_resident.sectors = new_sectors
-        db_resident.sector_summary = ", ".join([" ".join(s.name.strip().upper().split()) for s in new_sectors])
-    else:
-        db_resident.sector_summary = "None"
+    if resident_data.sector_ids is not None:
+        db_resident.sectors.clear()
+        if resident_data.sector_ids:
+            new_sectors = db.query(models.Sector).filter(
+                models.Sector.id.in_(resident_data.sector_ids)
+            ).all()
+            db_resident.sectors = new_sectors
+            db_resident.sector_summary = ", ".join(
+                [" ".join(s.name.strip().upper().split()) for s in new_sectors]
+            )
+        else:
+            db_resident.sector_summary = "None"
 
-    db.query(models.FamilyMember).filter(
-        models.FamilyMember.profile_id == resident_id
-    ).delete(synchronize_session=False)
+    if resident_data.family_members is not None:
+        db.query(models.FamilyMember).filter(
+            models.FamilyMember.profile_id == resident_id
+        ).delete(synchronize_session=False)
 
-    if resident_data.family_members:
         for fm_data in resident_data.family_members:
             db.add(models.FamilyMember(**fm_data.model_dump(), profile_id=resident_id))
 
-    db.commit()
-    db.refresh(db_resident)
-    return db_resident
-
-
-# =====================================================
-# PROMOTE FAMILY MEMBER TO HEAD
-# =====================================================
-def promote_family_member_to_head(db: Session, resident_id: int, new_head_member_id: int, reason: str):
-    current_head = db.query(models.ResidentProfile).filter(
-        models.ResidentProfile.id == resident_id
-    ).first()
-
-    if not current_head:
-        return None
-
-    current_head.status = reason
-    current_head.is_deleted = True
-    current_head.is_family_head = False
-
-    member = db.query(models.FamilyMember).filter(
-        models.FamilyMember.id == new_head_member_id
-    ).first()
-
-    if not member:
-        return None
-
-    new_head = models.ResidentProfile(
-        first_name=member.first_name,
-        last_name=member.last_name,
-        barangay=current_head.barangay,
-        house_no=current_head.house_no,
-        purok=current_head.purok,
-        is_family_head=True,
-        status="Active"
-    )
-
-    db.add(new_head)
-    db.delete(member)
-    db.commit()
-    db.refresh(new_head)
-    return new_head
+    try:
+        db.commit()
+        db.refresh(db_resident)
+        return db_resident
+    except IntegrityError:
+        db.rollback()
+        raise ValueError("Database constraint error while updating resident.")
 
 
 # =====================================================

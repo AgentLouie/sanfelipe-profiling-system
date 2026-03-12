@@ -454,13 +454,6 @@ def update_resident(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-
-    db_resident = crud.update_resident(
-        db,
-        resident_id=resident_id,
-        resident_data=resident
-    )
-    
     if current_user.role not in ["admin", "admin_limited"]:
         username_lower = current_user.username.lower()
         official_name = None
@@ -470,7 +463,7 @@ def update_resident(
                 break
         resident.barangay = official_name or current_user.username.replace("_", " ").title()
         resident.barangay_id = None
-    
+
     if resident.barangay_id and not resident.barangay:
         b = db.execute(
             text("SELECT name FROM barangays WHERE id = :id"),
@@ -481,6 +474,15 @@ def update_resident(
             raise HTTPException(status_code=400, detail="Invalid barangay_id")
 
         resident.barangay = b["name"]
+
+    try:
+        db_resident = crud.update_resident(
+            db,
+            resident_id=resident_id,
+            resident_data=resident
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     if not db_resident:
         raise HTTPException(status_code=404, detail="Resident not found")
