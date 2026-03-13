@@ -1043,6 +1043,9 @@ def public_search_residents(
     residents = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.is_deleted == False,
         models.ResidentProfile.is_active == True,
+        models.ResidentProfile.updated_at.isnot(None),
+        models.ResidentProfile.created_at.isnot(None),
+        models.ResidentProfile.updated_at > models.ResidentProfile.created_at,
         or_(
             models.ResidentProfile.last_name.ilike(f"%{search}%"),
             models.ResidentProfile.first_name.ilike(f"%{search}%"),
