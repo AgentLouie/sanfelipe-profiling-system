@@ -100,8 +100,6 @@ BARANGAY_MAPPING = {
     "san rafael": "SAN RAFAEL",
 }
 
-SUPER_ADMIN_ALLOWED_SECTORS = {"HC", "C", "M"}
-
 def rows_to_dicts(rows):
     # rows from .mappings().all() are already dict-like
     return [dict(r) for r in rows]
@@ -109,6 +107,8 @@ def rows_to_dicts(rows):
 # ---------------------------------------------------
 # SUPER ADMIN SECTOR ACCESS HELPERS
 # ---------------------------------------------------
+
+SUPER_ADMIN_ALLOWED_SECTORS = {"HC", "C", "M"}
 
 def get_allowed_sector_names_for_user(current_user: models.User):
     if current_user.role == "super_admin":
