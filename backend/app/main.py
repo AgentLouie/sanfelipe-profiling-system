@@ -349,24 +349,12 @@ def delete_user(
                 detail="Cannot delete the last administrator"
             )
 
-    if user_to_delete.role == "super_admin":
-        super_admin_count = db.query(models.User).filter(
-            models.User.role == "super_admin",
-            models.User.is_archived == False
-        ).count()
-
-        if super_admin_count <= 1:
-            raise HTTPException(
-                status_code=400,
-                detail="Cannot delete the last super administrator"
-            )
-
     user_to_delete.is_archived = True
     user_to_delete.archived_at = datetime.utcnow()
 
     db.commit()
 
-    return {"message": f"User '{user_to_delete.username}' Deleted Successfully"}
+    return {"message": f"User '{user_to_delete.username}' Delete successfully"}
 
 class UserPasswordReset(BaseModel):
     new_password: str
