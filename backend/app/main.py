@@ -307,7 +307,7 @@ def create_user(
 def get_users(db: Session = Depends(get_db),
               current_user: models.User = Depends(get_current_user)):
 
-    if current_user.role not in ["admin"]:
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access only")
 
     return db.query(models.User).filter(models.User.is_archived == False).all()
@@ -347,7 +347,7 @@ def delete_user(
     current_user: models.User = Depends(get_current_user)
 ):
     # Only admin can delete
-    if current_user.role != "admin":
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Only admins can delete users")
 
     user_to_delete = db.query(models.User).filter(
@@ -389,7 +389,7 @@ def reset_password(
     current_user: models.User = Depends(get_current_user)
 ):
     # Only admin can reset
-    if current_user.role != "admin":
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Only admins can reset passwords")
 
     user_to_edit = db.query(models.User).filter(
@@ -652,7 +652,7 @@ async def upload_resident_photo(
 def get_archived_residents(db: Session = Depends(get_db),
                            current_user: models.User = Depends(get_current_user)):
 
-    if current_user.role != "admin":
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403)
 
     return db.query(models.ResidentProfile).filter(
@@ -690,7 +690,7 @@ def backup_data_zip(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    if current_user.role != "admin":
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin only")
 
     ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
@@ -748,7 +748,7 @@ def backup_data_zip(
 def backup_photos_zip(
     current_user: models.User = Depends(get_current_user),
 ):
-    if current_user.role != "admin":
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin only")
 
     try:
@@ -1011,7 +1011,7 @@ def generate_resident_qr(
     current_user: models.User = Depends(get_current_user)
 ):
     # ✅ Restrict to admin only
-    if current_user.role != "admin":
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin only")
 
     resident = db.query(models.ResidentProfile).filter(
@@ -1036,7 +1036,7 @@ def get_resident_by_code(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    if current_user.role != "admin":
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access only")
 
     resident = db.query(models.ResidentProfile).filter(
