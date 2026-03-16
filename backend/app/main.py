@@ -100,44 +100,9 @@ BARANGAY_MAPPING = {
     "san rafael": "SAN RAFAEL",
 }
 
-SUPER_ADMIN_ALLOWED_SECTORS = {"HC", "C", "M"}
-
 def rows_to_dicts(rows):
     # rows from .mappings().all() are already dict-like
     return [dict(r) for r in rows]
-
-# ---------------------------------------------------
-# SUPER ADMIN SECTOR ACCESS HELPERS
-# ---------------------------------------------------
-
-def get_allowed_sector_names_for_user(current_user: models.User):
-    if current_user.role == "super_admin":
-        return list(SUPER_ADMIN_ALLOWED_SECTORS)
-    return None
-
-def ensure_super_admin_can_access_resident(
-    current_user: models.User,
-    resident: models.ResidentProfile | None
-):
-    if not resident:
-        raise HTTPException(status_code=404, detail="Resident not found")
-
-    if current_user.role != "super_admin":
-        return
-
-    resident_sector_names = {
-        (s.name or "").strip().upper()
-        for s in getattr(resident, "sectors", [])
-    }
-
-    summary = (resident.sector_summary or "").upper()
-
-    allowed = bool(
-        resident_sector_names.intersection(SUPER_ADMIN_ALLOWED_SECTORS)
-    ) or any(name in summary for name in SUPER_ADMIN_ALLOWED_SECTORS)
-
-    if not allowed:
-        raise HTTPException(status_code=403, detail="Not allowed")
 
 # ---------------------------------------------------
 # AUTH HELPERS
@@ -148,6 +113,7 @@ def verify_password(plain_password, hashed_password):
 
 def create_access_token(data: dict):
     to_encode = data.copy()
+
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
     to_encode.update({
@@ -155,6 +121,9 @@ def create_access_token(data: dict):
         "type": "access"
     })
 
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+    to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 async def get_current_user(
@@ -296,7 +265,7 @@ def create_user(
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
 
-    allowed_roles = {"barangay", "admin_limited", "admin", "super_admin"}
+    allowed_roles = {"barangay", "admin_limited", "admin"}  # add others if you have
     if user.role not in allowed_roles:
         raise HTTPException(status_code=400, detail=f"Invalid role. Allowed: {sorted(list(allowed_roles))}")
 
@@ -451,7 +420,7 @@ def create_resident(resident: schemas.ResidentCreate,
                     db: Session = Depends(get_db),
                     current_user: models.User = Depends(get_current_user)):
     
-    if current_user.role not in ["admin", "admin_limited", "super_admin"]:
+    if current_user.role not in ["admin", "admin_limited"]:
         username_lower = current_user.username.lower()
         official_name = None
         for key in BARANGAY_MAPPING:
@@ -471,20 +440,7 @@ def create_resident(resident: schemas.ResidentCreate,
             raise HTTPException(status_code=400, detail="Invalid barangay_id")
 
         resident.barangay = b["name"]
-    
-    if current_user.role == "super_admin" and resident.sector_ids:
-        allowed_sector_ids = {
-            s.id for s in db.query(models.Sector).filter(
-                func.upper(func.trim(models.Sector.name)).in_(SUPER_ADMIN_ALLOWED_SECTORS)
-            ).all()
-        }
 
-        invalid_ids = [sid for sid in resident.sector_ids if sid not in allowed_sector_ids]
-        if invalid_ids:
-            raise HTTPException(
-                status_code=403,
-                detail="Super admin can only assign sectors HC, C, M"
-            )
     try:
         return crud.create_resident(db=db, resident=resident)
     except ValueError as e:
@@ -498,7 +454,7 @@ def update_resident(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    if current_user.role not in ["admin", "admin_limited", "super_admin"]:
+    if current_user.role not in ["admin", "admin_limited"]:
         username_lower = current_user.username.lower()
         official_name = None
         for key in BARANGAY_MAPPING:
@@ -518,20 +474,6 @@ def update_resident(
             raise HTTPException(status_code=400, detail="Invalid barangay_id")
 
         resident.barangay = b["name"]
-    
-    if current_user.role == "super_admin" and resident.sector_ids is not None:
-        allowed_sector_ids = {
-            s.id for s in db.query(models.Sector).filter(
-                func.upper(func.trim(models.Sector.name)).in_(SUPER_ADMIN_ALLOWED_SECTORS)
-            ).all()
-        }
-
-        invalid_ids = [sid for sid in resident.sector_ids if sid not in allowed_sector_ids]
-        if invalid_ids:
-            raise HTTPException(
-                status_code=403,
-                detail="Super admin can only assign sectors HC, C, M"
-            )
 
     try:
         db_resident = crud.update_resident(
@@ -554,22 +496,8 @@ def create_assistance(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    if current_user.role not in ["admin", "admin_limited", "super_admin"]:
+    if current_user.role not in ["admin", "admin_limited"]:
         raise HTTPException(status_code=403, detail="Not allowed")
-
-    if current_user.role == "super_admin":
-        resident = crud.get_resident(db, resident_id)
-        ensure_super_admin_can_access_resident(current_user, resident)
-        if not resident:
-            raise HTTPException(status_code=404, detail="Resident not found")
-
-        resident_sector_names = {
-            (s.name or "").strip().upper()
-            for s in resident.sectors
-        }
-
-        if not resident_sector_names.intersection(SUPER_ADMIN_ALLOWED_SECTORS):
-            raise HTTPException(status_code=403, detail="Not allowed")
 
     return crud.add_assistance(db, resident_id, assistance)
 
@@ -580,19 +508,8 @@ def edit_assistance(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    if current_user.role not in ["admin", "admin_limited", "super_admin"]:
+    if current_user.role not in ["admin", "admin_limited"]:
         raise HTTPException(status_code=403, detail="Not allowed")
-
-    if current_user.role == "super_admin":
-        assistance_row = db.query(models.ResidentAssistance).filter(
-            models.ResidentAssistance.id == assistance_id
-        ).first()
-
-        if not assistance_row:
-            raise HTTPException(status_code=404, detail="Assistance not found")
-
-        resident = crud.get_resident(db, assistance_row.resident_id)
-        ensure_super_admin_can_access_resident(current_user, resident)
 
     result = crud.update_assistance(db, assistance_id, assistance)
 
@@ -608,19 +525,8 @@ def remove_assistance(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    if current_user.role not in ["admin", "admin_limited", "super_admin"]:
+    if current_user.role not in ["admin", "admin_limited"]:
         raise HTTPException(status_code=403, detail="Not allowed")
-
-    if current_user.role == "super_admin":
-        assistance_row = db.query(models.ResidentAssistance).filter(
-            models.ResidentAssistance.id == assistance_id
-        ).first()
-
-        if not assistance_row:
-            raise HTTPException(status_code=404, detail="Assistance not found")
-
-        resident = crud.get_resident(db, assistance_row.resident_id)
-        ensure_super_admin_can_access_resident(current_user, resident)
 
     result = crud.delete_assistance(db, assistance_id)
 
@@ -637,7 +543,7 @@ async def upload_resident_photo(
     current_user: models.User = Depends(get_current_user)
 ):
     # 🔒 Allow admin, admin_limited, and barangay to upload photo
-    allowed_roles = ["admin", "admin_limited", "barangay", "super_admin"]
+    allowed_roles = ["admin", "admin_limited", "barangay"]
     if current_user.role not in allowed_roles:
         raise HTTPException(status_code=403, detail="Not allowed")
 
@@ -645,8 +551,6 @@ async def upload_resident_photo(
         models.ResidentProfile.id == resident_id,
         models.ResidentProfile.is_deleted == False
     ).first()
-    
-    ensure_super_admin_can_access_resident(current_user, resident)
 
     if not resident:
         raise HTTPException(status_code=404, detail="Resident not found")
@@ -983,7 +887,7 @@ def read_residents(skip: int = 0,
 
     filter_barangay = barangay
 
-    if current_user.role not in ["admin", "admin_limited", "super_admin"]:
+    if current_user.role not in ["admin", "admin_limited"]:
         username_lower = current_user.username.lower()
         official_name = None
         for key in BARANGAY_MAPPING:
@@ -991,14 +895,12 @@ def read_residents(skip: int = 0,
                 official_name = BARANGAY_MAPPING[key]
                 break
         filter_barangay = official_name or current_user.username.replace("_", " ").title()
-        
-    allowed_sector_names = get_allowed_sector_names_for_user(current_user)
-    
-    total = crud.get_resident_count(db, search, filter_barangay, sector, allowed_sector_names=allowed_sector_names)
+
+    total = crud.get_resident_count(db, search, filter_barangay, sector)
 
     residents = crud.get_residents(
         db, skip, limit, search, filter_barangay, sector,
-        sort_by=sort_by, sort_order=sort_order, allowed_sector_names=allowed_sector_names
+        sort_by=sort_by, sort_order=sort_order
     )
 
     return {
@@ -1009,24 +911,13 @@ def read_residents(skip: int = 0,
     }
 
 @app.get("/residents/{resident_id}", response_model=schemas.Resident)
-def read_resident(
-    resident_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
+def read_resident(resident_id: int,
+                  db: Session = Depends(get_db),
+                  current_user: models.User = Depends(get_current_user)):
+
     resident = crud.get_resident(db, resident_id)
-    ensure_super_admin_can_access_resident(current_user, resident)
     if not resident:
         raise HTTPException(status_code=404)
-
-    if current_user.role == "super_admin":
-        resident_sector_names = {
-            (s.name or "").strip().upper()
-            for s in resident.sectors
-        }
-
-        if not resident_sector_names.intersection(SUPER_ADMIN_ALLOWED_SECTORS):
-            raise HTTPException(status_code=403, detail="Not allowed")
 
     return resident
 
@@ -1062,8 +953,8 @@ def get_resident_by_code(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    if current_user.role not in ["admin", "super_admin"]:
-        raise HTTPException(status_code=403, detail="Not allowed")
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access only")
 
     resident = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.resident_code == resident_code,
@@ -1073,7 +964,6 @@ def get_resident_by_code(
     if not resident:
         raise HTTPException(status_code=404, detail="Resident not found")
 
-    ensure_super_admin_can_access_resident(current_user, resident)
     return resident
 
 @app.get("/public/residents/code/{resident_code}/qr")
@@ -1226,11 +1116,10 @@ def restore_resident(
 def get_stats(db: Session = Depends(get_db),
               current_user: models.User = Depends(get_current_user)):
 
-    if current_user.role not in ["admin", "admin_limited", "super_admin"]:
+    if current_user.role not in ["admin", "admin_limited"]:
         raise HTTPException(status_code=403, detail="Not allowed")
 
-    allowed_sector_names = get_allowed_sector_names_for_user(current_user)
-    return crud.get_dashboard_stats(db, allowed_sector_names=allowed_sector_names) 
+    return crud.get_dashboard_stats(db)
 
 # ---------------------------------------------------
 # Import/Export
@@ -1245,7 +1134,7 @@ def export_residents_excel(
     # Restrict barangay automatically for non-admin
     target_barangay = barangay
 
-    if current_user.role not in ["admin", "admin_limited", "super_admin"]:
+    if current_user.role not in ["admin", "admin_limited"]:
         official_name = BARANGAY_MAPPING.get(current_user.username.lower())
 
         if official_name:
@@ -1283,7 +1172,7 @@ def export_residents_excel(
     # Restrict barangay automatically for non-admin
     target_barangay = barangay
 
-    if current_user.role not in ["admin", "admin_limited", "super_admin"]:
+    if current_user.role not in ["admin", "admin_limited"]:
         official_name = BARANGAY_MAPPING.get(current_user.username.lower())
 
         if official_name:
@@ -1330,15 +1219,8 @@ def get_puroks(db: Session = Depends(get_db),
     return db.query(models.Purok).all()
 
 @app.get("/sectors/")
-def get_sectors(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    if current_user.role == "super_admin":
-        return db.query(models.Sector).filter(
-            func.upper(func.trim(models.Sector.name)).in_(SUPER_ADMIN_ALLOWED_SECTORS)
-        ).all()
-
+def get_sectors(db: Session = Depends(get_db),
+                current_user: models.User = Depends(get_current_user)):
     return db.query(models.Sector).all()
 
 @app.get("/relationships/")
@@ -1392,7 +1274,7 @@ def get_me(
 ):
     barangay_name = None
 
-    if current_user.role not in ["admin", "admin_limited", "super_admin"]:
+    if current_user.role not in ["admin", "admin_limited"]:
         username_lower = current_user.username.lower()
         official_name = None
         for key in BARANGAY_MAPPING:
