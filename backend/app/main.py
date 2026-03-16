@@ -1306,14 +1306,7 @@ def get_puroks(db: Session = Depends(get_db),
 @app.get("/sectors/")
 def get_sectors(db: Session = Depends(get_db),
                 current_user: models.User = Depends(get_current_user)):
-    query = db.query(models.Sector)
-
-    if current_user.role == "super_admin":
-        query = query.filter(
-            func.upper(func.trim(models.Sector.name)).in_(SUPER_ADMIN_ALLOWED_SECTORS)
-        )
-
-    return query.order_by(func.upper(models.Sector.name).asc()).all()
+    return db.query(models.Sector).order_by(func.upper(models.Sector.name).asc()).all()
 
 @app.get("/relationships/")
 def get_relationships(db: Session = Depends(get_db),
