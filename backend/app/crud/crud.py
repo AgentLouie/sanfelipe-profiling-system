@@ -256,6 +256,24 @@ def update_resident(db: Session, resident_id: int, resident_data: schemas.Reside
         db.rollback()
         print("UPDATE RESIDENT ERROR:", repr(e))
         raise
+    
+def apply_role_sector_filter(query, allowed_sector_names: list[str] | None):
+    if not allowed_sector_names:
+        return query
+
+    normalized = [s.strip().upper() for s in allowed_sector_names]
+
+    return query.filter(
+        or_(
+            models.ResidentProfile.sectors.any(
+                func.upper(func.trim(models.Sector.name)).in_(normalized)
+            ),
+            or_(*[
+                func.upper(func.coalesce(models.ResidentProfile.sector_summary, "")).like(f"%{name}%")
+                for name in normalized
+            ])
+        )
+    )
 
 
 # =====================================================
@@ -357,7 +375,8 @@ def get_resident_count(
     db: Session,
     search: str = None,
     barangay: str = None,
-    sector: str = None
+    sector: str = None,
+    allowed_sector_names: list[str] | None = None
 ):
     query = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.is_deleted == False
@@ -366,6 +385,7 @@ def get_resident_count(
     query = apply_search_filter(query, search)
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
+    query = apply_role_sector_filter(query, allowed_sector_names)
 
     return query.count()
 
@@ -381,7 +401,8 @@ def get_residents(
     barangay: str = None,
     sector: str = None,
     sort_by: str = "last_name",
-    sort_order: str = "asc"
+    sort_order: str = "asc",
+    allowed_sector_names: list[str] | None = None
 ):
     query = db.query(models.ResidentProfile).options(
         subqueryload(models.ResidentProfile.family_members),
@@ -392,6 +413,7 @@ def get_residents(
     query = apply_search_filter(query, search)
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
+    query = apply_role_sector_filter(query, allowed_sector_names)
 
     if sort_order.lower() == "desc":
         query = query.order_by(
@@ -410,14 +432,15 @@ def get_residents(
 # =====================================================
 # DASHBOARD STATS
 # =====================================================
-def get_dashboard_stats(db: Session):
+def get_dashboard_stats(db: Session, allowed_sector_names: list[str] | None = None):
     base_query = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.is_deleted == False
     )
+    base_query = apply_role_sector_filter(base_query, allowed_sector_names)
 
     total_residents = base_query.count() or 0
 
-    total_households = db.query(
+    household_query = db.query(
         func.count(
             func.distinct(
                 func.trim(models.ResidentProfile.barangay) +
@@ -425,7 +448,9 @@ def get_dashboard_stats(db: Session):
                 func.coalesce(func.trim(models.ResidentProfile.house_no), "")
             )
         )
-    ).filter(models.ResidentProfile.is_deleted == False).scalar() or 0
+    ).filter(models.ResidentProfile.is_deleted == False)
+    household_query = apply_role_sector_filter(household_query, allowed_sector_names)
+    total_households = household_query.scalar() or 0
 
     total_male = base_query.filter(
         func.lower(models.ResidentProfile.sex).in_(["male", "m"])
@@ -435,23 +460,29 @@ def get_dashboard_stats(db: Session):
         func.lower(models.ResidentProfile.sex).in_(["female", "f"])
     ).count() or 0
 
-    barangay_counts = db.query(
+    barangay_query = db.query(
         func.upper(func.trim(models.ResidentProfile.barangay)).label("barangay"),
         func.count(models.ResidentProfile.id)
     ).filter(
         models.ResidentProfile.is_deleted == False
-    ).group_by(
+    )
+    barangay_query = apply_role_sector_filter(barangay_query, allowed_sector_names)
+
+    barangay_counts = barangay_query.group_by(
         func.upper(func.trim(models.ResidentProfile.barangay))
     ).all()
 
     stats_barangay = {b: count for b, count in barangay_counts if b}
 
-    sector_counts = db.query(
+    sector_query = db.query(
         models.ResidentProfile.sector_summary,
         func.count(models.ResidentProfile.id)
     ).filter(
         models.ResidentProfile.is_deleted == False
-    ).group_by(
+    )
+    sector_query = apply_role_sector_filter(sector_query, allowed_sector_names)
+
+    sector_counts = sector_query.group_by(
         models.ResidentProfile.sector_summary
     ).all()
 
