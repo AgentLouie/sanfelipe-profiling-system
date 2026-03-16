@@ -324,7 +324,6 @@ def delete_user(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # Only admin can delete
     if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Only admins can delete users")
 
@@ -335,14 +334,13 @@ def delete_user(
     if not user_to_delete:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Prevent admin from deleting themselves
     if user_to_delete.id == current_user.id:
         raise HTTPException(status_code=400, detail="You cannot delete your own account")
 
-    # Prevent deleting last admin
     if user_to_delete.role == "admin":
         admin_count = db.query(models.User).filter(
-            models.User.role == "admin"
+            models.User.role == "admin",
+            models.User.is_archived == False
         ).count()
 
         if admin_count <= 1:
@@ -351,10 +349,24 @@ def delete_user(
                 detail="Cannot delete the last administrator"
             )
 
-    db.delete(user_to_delete)
+    if user_to_delete.role == "super_admin":
+        super_admin_count = db.query(models.User).filter(
+            models.User.role == "super_admin",
+            models.User.is_archived == False
+        ).count()
+
+        if super_admin_count <= 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot delete the last super administrator"
+            )
+
+    user_to_delete.is_archived = True
+    user_to_delete.archived_at = datetime.utcnow()
+
     db.commit()
 
-    return {"message": f"User '{user_to_delete.username}' deleted successfully"}
+    return {"message": f"User '{user_to_delete.username}' Deleted Successfully"}
 
 class UserPasswordReset(BaseModel):
     new_password: str
