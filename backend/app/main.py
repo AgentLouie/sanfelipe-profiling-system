@@ -600,7 +600,7 @@ def get_archived_residents(db: Session = Depends(get_db),
 def archive_resident(
     resident_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role(["admin"]))
+    current_user: models.User = Depends(require_role(["admin", "super_admin"]))
 ):
     result = crud.archive_resident(db, resident_id, current_user.id)
     if not result:
@@ -1086,7 +1086,7 @@ def public_search_residents(
 def soft_delete_resident(
     resident_id: int,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role(["admin"]))):
+    _: models.User = Depends(require_role(["admin", "super_admin"]))):
 
     result = crud.soft_delete_resident(db, resident_id)
     if not result:
@@ -1098,7 +1098,7 @@ def soft_delete_resident(
 def permanently_delete_resident(
     resident_id: int,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role(["admin"]))
+    _: models.User = Depends(require_role(["admin", "super_admin"]))
 ):
 
     result = crud.permanently_delete_resident(db, resident_id)
@@ -1116,7 +1116,7 @@ def permanently_delete_resident(
 def restore_resident(
     resident_id: int,
     db: Session = Depends(get_db),
-    _: models.User = Depends(require_role(["admin"]))  # ✅ admin only
+    _: models.User = Depends(require_role(["admin", "super_admin"]))
 ):
     result = crud.restore_resident(db, resident_id)
     if not result:
