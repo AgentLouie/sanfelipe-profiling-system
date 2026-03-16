@@ -317,7 +317,7 @@ def create_user(
 def get_users(db: Session = Depends(get_db),
               current_user: models.User = Depends(get_current_user)):
 
-    if current_user.role not in ["admin"]:
+    if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access only")
 
     return db.query(models.User).filter(models.User.is_archived == False).all()
