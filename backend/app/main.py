@@ -110,28 +110,6 @@ def rows_to_dicts(rows):
 SUPER_ADMIN_ALLOWED_SECTORS = ["HC", "C", "M"]
 
 # ---------------------------------------------------
-# VALIDATORS
-# ---------------------------------------------------
-def validate_super_admin_sector_ids(sector_ids: list[int], db: Session):
-    allowed_names = set(SUPER_ADMIN_ALLOWED_SECTORS)
-
-    selected_sectors = db.query(models.Sector).filter(
-        models.Sector.id.in_(sector_ids or [])
-    ).all()
-
-    selected_names = {
-        " ".join((s.name or "").strip().upper().split())
-        for s in selected_sectors
-    }
-
-    invalid = selected_names - allowed_names
-    if invalid:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Super admin can only assign sectors: {sorted(list(allowed_names))}"
-        )
-
-# ---------------------------------------------------
 # AUTH HELPERS
 # ---------------------------------------------------
 
@@ -464,26 +442,6 @@ def create_resident(resident: schemas.ResidentCreate,
 
         resident.barangay = b["name"]
 
-    if current_user.role == "super_admin":
-        validate_super_admin_sector_ids(resident.sector_ids or [], db)
-        allowed_names = set(SUPER_ADMIN_ALLOWED_SECTORS)
-
-        selected_sectors = db.query(models.Sector).filter(
-            models.Sector.id.in_(resident.sector_ids or [])
-        ).all()
-
-        selected_names = {
-            " ".join((s.name or "").strip().upper().split())
-            for s in selected_sectors
-        }
-
-        invalid = selected_names - allowed_names
-        if invalid:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Super admin can only assign sectors: {sorted(list(allowed_names))}"
-            )
-
     try:
         return crud.create_resident(db=db, resident=resident)
     except ValueError as e:
@@ -496,8 +454,6 @@ def update_resident(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    if current_user.role == "super_admin" and resident.sector_ids is not None:
-        validate_super_admin_sector_ids(resident.sector_ids or [], db)
         
     if current_user.role not in ["admin", "admin_limited", "super_admin"]:
         username_lower = current_user.username.lower()
@@ -519,25 +475,6 @@ def update_resident(
             raise HTTPException(status_code=400, detail="Invalid barangay_id")
 
         resident.barangay = b["name"]
-
-    if current_user.role == "super_admin" and resident.sector_ids is not None:
-        allowed_names = set(SUPER_ADMIN_ALLOWED_SECTORS)
-
-        selected_sectors = db.query(models.Sector).filter(
-            models.Sector.id.in_(resident.sector_ids or [])
-        ).all()
-
-        selected_names = {
-            " ".join((s.name or "").strip().upper().split())
-            for s in selected_sectors
-        }
-
-        invalid = selected_names - allowed_names
-        if invalid:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Super admin can only assign sectors: {sorted(list(allowed_names))}"
-            )
 
     try:
         db_resident = crud.update_resident(
