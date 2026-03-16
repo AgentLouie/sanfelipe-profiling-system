@@ -1338,3 +1338,41 @@ def get_me(
         "barangay_id": barangay_id,
         "barangay": barangay_name
     }
+    
+# ---------------------------------------------------
+# Permanent Delete Users
+# ---------------------------------------------------
+@app.delete("/users/{user_id}/permanent", status_code=200)
+def permanently_delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if current_user.role not in ["admin", "super_admin"]:
+        raise HTTPException(status_code=403, detail="Only admins can permanently delete users")
+
+    user_to_delete = db.query(models.User).filter(
+        models.User.id == user_id
+    ).first()
+
+    if not user_to_delete:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user_to_delete.id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot permanently delete your own account")
+
+    audit_log_exists = db.execute(
+        text("SELECT 1 FROM audit_logs WHERE user_id = :user_id LIMIT 1"),
+        {"user_id": user_id}
+    ).first()
+
+    if audit_log_exists:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot permanently delete this user because audit logs still exist"
+        )
+
+    db.delete(user_to_delete)
+    db.commit()
+
+    return {"message": f"User '{user_to_delete.username}' permanently deleted"}
