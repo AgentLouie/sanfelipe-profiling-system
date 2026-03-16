@@ -139,8 +139,14 @@ def apply_allowed_sector_filter(query, allowed_sector_names: list[str] | None = 
         func.upper(func.trim(models.Sector.name)).in_(normalized_allowed)
     )
 
+    normalized_summary = func.concat(
+        ",",
+        func.replace(func.upper(func.coalesce(models.ResidentProfile.sector_summary, "")), ", ", ","),
+        ","
+    )
+
     summary_match = or_(*[
-        func.upper(func.coalesce(models.ResidentProfile.sector_summary, "")).like(f"%{name}%")
+        normalized_summary.like(f"%,{name},%")
         for name in normalized_allowed
     ])
 
