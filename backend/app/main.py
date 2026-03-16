@@ -1202,9 +1202,7 @@ def get_stats(db: Session = Depends(get_db),
     if current_user.role not in ["admin", "admin_limited", "super_admin"]:
         raise HTTPException(status_code=403, detail="Not allowed")
 
-    allowed_sectors = SUPER_ADMIN_ALLOWED_SECTORS if current_user.role == "super_admin" else None
-
-    return crud.get_dashboard_stats(db, allowed_sector_names=allowed_sectors)
+    return crud.get_dashboard_stats(db)
 
 # ---------------------------------------------------
 # Import/Export
