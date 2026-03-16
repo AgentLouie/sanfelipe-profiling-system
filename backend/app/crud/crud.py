@@ -1,7 +1,7 @@
 from unicodedata import name
 
 from sqlalchemy.orm import Session, joinedload, subqueryload
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, case
 from app import models, schemas
 from datetime import datetime
 from app.core.audit import log_action
@@ -123,6 +123,15 @@ def normalize_sector_name(name: str) -> str:
     }
 
     return sector_aliases.get(normalized, normalized)
+
+def normalize_barangay_name_expr():
+    raw = func.upper(func.trim(func.coalesce(models.ResidentProfile.barangay, "")))
+
+    return case(
+        (raw.in_(["STO NIÑO", "STO. NIÑO", "SANTO NIÑO", "SANTO NINO", "STO NINO"]), "STO NIÑO"),
+        (raw.in_(["SAN RAFAEL", "SANRAFAEL"]), "SAN RAFAEL"),
+        else_=raw
+    )
 
 
 def apply_allowed_sector_filter(query, allowed_sector_names: list[str] | None = None):
@@ -512,8 +521,15 @@ def get_dashboard_stats(
 
     barangay_query = apply_allowed_sector_filter(barangay_query, allowed_sector_names)
 
-    barangay_counts = barangay_query.group_by(
-        func.upper(func.trim(models.ResidentProfile.barangay))
+    normalized_barangay = normalize_barangay_name_expr()
+
+    barangay_counts = db.query(
+        normalized_barangay.label("barangay"),
+        func.count(models.ResidentProfile.id)
+    ).filter(
+        models.ResidentProfile.is_deleted == False
+    ).group_by(
+        normalized_barangay
     ).all()
 
     stats_barangay = {b: count for b, count in barangay_counts if b}
