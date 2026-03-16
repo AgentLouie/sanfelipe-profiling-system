@@ -1361,16 +1361,10 @@ def permanently_delete_user(
     if user_to_delete.id == current_user.id:
         raise HTTPException(status_code=400, detail="You cannot permanently delete your own account")
 
-    audit_log_exists = db.execute(
-        text("SELECT 1 FROM audit_logs WHERE user_id = :user_id LIMIT 1"),
+    db.execute(
+        text("DELETE FROM audit_logs WHERE user_id = :user_id"),
         {"user_id": user_id}
-    ).first()
-
-    if audit_log_exists:
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot permanently delete this user because audit logs still exist"
-        )
+    )
 
     db.delete(user_to_delete)
     db.commit()
