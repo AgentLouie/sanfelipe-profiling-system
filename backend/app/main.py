@@ -100,6 +100,8 @@ BARANGAY_MAPPING = {
     "san rafael": "SAN RAFAEL",
 }
 
+SUPER_ADMIN_ALLOWED_SECTORS = {"HC", "C", "M"}
+
 def rows_to_dicts(rows):
     # rows from .mappings().all() are already dict-like
     return [dict(r) for r in rows]
@@ -107,8 +109,6 @@ def rows_to_dicts(rows):
 # ---------------------------------------------------
 # SUPER ADMIN SECTOR ACCESS HELPERS
 # ---------------------------------------------------
-
-SUPER_ADMIN_ALLOWED_SECTORS = {"HC", "C", "M"}
 
 def get_allowed_sector_names_for_user(current_user: models.User):
     if current_user.role == "super_admin":
@@ -293,10 +293,8 @@ def create_user(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    print("DEBUG /users role =", current_user.role, "username =", current_user.username)
-    
-    if current_user.role not in ["admin", "super_admin"]:
-        raise HTTPException(status_code=403, detail="Admin access only")
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
 
     allowed_roles = {"barangay", "admin_limited", "admin", "super_admin"}
     if user.role not in allowed_roles:
@@ -317,7 +315,7 @@ def create_user(
 def get_users(db: Session = Depends(get_db),
               current_user: models.User = Depends(get_current_user)):
 
-    if current_user.role not in ["admin", "super_admin"]:
+    if current_user.role not in ["admin"]:
         raise HTTPException(status_code=403, detail="Admin access only")
 
     return db.query(models.User).filter(models.User.is_archived == False).all()
@@ -357,8 +355,8 @@ def delete_user(
     current_user: models.User = Depends(get_current_user)
 ):
     # Only admin can delete
-    if current_user.role not in ["admin", "super_admin"]:
-        raise HTTPException(status_code=403, detail="Admin only")
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can delete users")
 
     user_to_delete = db.query(models.User).filter(
         models.User.id == user_id
@@ -399,7 +397,7 @@ def reset_password(
     current_user: models.User = Depends(get_current_user)
 ):
     # Only admin can reset
-    if current_user.role not in ["admin", "super_admin"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admins can reset passwords")
 
     user_to_edit = db.query(models.User).filter(
@@ -686,7 +684,7 @@ async def upload_resident_photo(
 def get_archived_residents(db: Session = Depends(get_db),
                            current_user: models.User = Depends(get_current_user)):
 
-    if current_user.role not in ["admin", "super_admin"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403)
 
     return db.query(models.ResidentProfile).filter(
@@ -724,7 +722,7 @@ def backup_data_zip(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    if current_user.role not in ["admin", "super_admin"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
 
     ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
@@ -782,7 +780,7 @@ def backup_data_zip(
 def backup_photos_zip(
     current_user: models.User = Depends(get_current_user),
 ):
-    if current_user.role not in ["admin", "super_admin"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
 
     try:
@@ -1039,7 +1037,7 @@ def generate_resident_qr(
     current_user: models.User = Depends(get_current_user)
 ):
     # ✅ Restrict to admin only
-    if current_user.role not in ["admin", "super_admin"]:
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
 
     resident = db.query(models.ResidentProfile).filter(
@@ -1336,16 +1334,12 @@ def get_sectors(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    all_sectors = db.query(models.Sector).all()
-
     if current_user.role == "super_admin":
-        filtered = [
-            s for s in all_sectors
-            if (s.name or "").strip().upper() in SUPER_ADMIN_ALLOWED_SECTORS
-        ]
-        return [{"id": s.id, "name": s.name} for s in filtered]
+        return db.query(models.Sector).filter(
+            func.upper(func.trim(models.Sector.name)).in_(SUPER_ADMIN_ALLOWED_SECTORS)
+        ).all()
 
-    return [{"id": s.id, "name": s.name} for s in all_sectors]
+    return db.query(models.Sector).all()
 
 @app.get("/relationships/")
 def get_relationships(db: Session = Depends(get_db),
