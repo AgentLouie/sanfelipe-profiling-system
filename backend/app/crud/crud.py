@@ -1,7 +1,7 @@
 from unicodedata import name
 
 from sqlalchemy.orm import Session, joinedload, subqueryload
-from sqlalchemy import or_, func, case
+from sqlalchemy import or_, func, case, and_
 from app import models, schemas
 from datetime import datetime
 from app.core.audit import log_action
@@ -40,6 +40,49 @@ def apply_search_filter(query, search: str):
         )
 
     return query
+
+# =====================================================
+# HIDDEN SECTOR FILTER
+# =====================================================
+HIDDEN_SECTOR_NAMES = ["HC", "C", "M"]
+
+def normalize_sector_name(name: str) -> str:
+    return " ".join((name or "").strip().upper().split())
+
+def apply_hidden_sector_filter(query, hidden_sector_names: list[str] | None = None):
+    if not hidden_sector_names:
+        return query
+
+    normalized_hidden = [normalize_sector_name(name) for name in hidden_sector_names]
+
+    # Match residents linked through resident_sectors table
+    hidden_sector_table_match = models.ResidentProfile.sectors.any(
+        func.upper(func.trim(models.Sector.name)).in_(normalized_hidden)
+    )
+
+    # Match old records stored only in sector_summary
+    normalized_summary = func.concat(
+        ",",
+        func.regexp_replace(
+            func.upper(func.coalesce(models.ResidentProfile.sector_summary, "")),
+            r"\s*,\s*",
+            ",",
+            "g"
+        ),
+        ","
+    )
+
+    hidden_summary_match = or_(*[
+        normalized_summary.like(f"%,{name},%")
+        for name in normalized_hidden
+    ])
+
+    return query.filter(
+        ~or_(
+            hidden_sector_table_match,
+            hidden_summary_match
+        )
+    )
 
 
 # =====================================================
@@ -393,7 +436,7 @@ def permanently_delete_resident(db: Session, resident_id: int):
 def get_resident(
     db: Session,
     resident_id: int,
-    allowed_sector_names: list[str] | None = None
+    hidden_sector_names: list[str] | None = None
 ):
     query = (
         db.query(models.ResidentProfile)
@@ -408,7 +451,7 @@ def get_resident(
         )
     )
 
-    query = apply_allowed_sector_filter(query, allowed_sector_names)
+    query = apply_hidden_sector_filter(query, hidden_sector_names)
 
     return query.first()
 
@@ -421,16 +464,16 @@ def get_resident_count(
     search: str = None,
     barangay: str = None,
     sector: str = None,
-    allowed_sector_names: list[str] | None = None
+    hidden_sector_names: list[str] | None = None
 ):
     query = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.is_deleted == False
     )
 
+    query = apply_hidden_sector_filter(query, hidden_sector_names)
     query = apply_search_filter(query, search)
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
-    query = apply_allowed_sector_filter(query, allowed_sector_names)
 
     return query.count()
 
@@ -447,7 +490,7 @@ def get_residents(
     sector: str = None,
     sort_by: str = "last_name",
     sort_order: str = "asc",
-    allowed_sector_names: list[str] | None = None
+    hidden_sector_names: list[str] | None = None
 ):
     query = db.query(models.ResidentProfile).options(
         subqueryload(models.ResidentProfile.family_members),
@@ -455,10 +498,10 @@ def get_residents(
         subqueryload(models.ResidentProfile.assistances)
     ).filter(models.ResidentProfile.is_deleted == False)
 
+    query = apply_hidden_sector_filter(query, hidden_sector_names)
     query = apply_search_filter(query, search)
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
-    query = apply_allowed_sector_filter(query, allowed_sector_names)
 
     if sort_order.lower() == "desc":
         query = query.order_by(

@@ -2,7 +2,8 @@ import io
 import pandas as pd
 from datetime import date
 from sqlalchemy.orm import Session
-from app import models
+from app import models, crud
+from sqlalchemy import func
 
 
 # --------------------------------------------------
@@ -26,6 +27,25 @@ def excel_col_letter(col_idx):
         letter = chr(col_idx % 26 + 65) + letter
         col_idx = col_idx // 26 - 1
     return letter
+
+# --------------------------------------------------
+# HIDE HC,M,C
+# --------------------------------------------------
+def generate_household_excel(db, barangay_name=None, hidden_sector_names=None):
+    query = db.query(models.ResidentProfile).filter(
+        models.ResidentProfile.is_deleted == False
+    )
+
+    if barangay_name:
+        query = query.filter(
+            func.lower(models.ResidentProfile.barangay).like(f"%{barangay_name.lower()}%")
+        )
+
+    query = crud.apply_hidden_sector_filter(query, hidden_sector_names)
+
+    residents = query.all()
+
+    # continue building workbook...
 
 
 # --------------------------------------------------
