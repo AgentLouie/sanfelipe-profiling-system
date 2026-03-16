@@ -57,22 +57,7 @@ def apply_sector_filter(query, sector: str):
     if not sector:
         return query
 
-    normalized = " ".join(sector.strip().upper().split())
-
-    # Canonical names only for sectors you want treated as the same
-    sector_aliases = {
-        "FARMER": "FARMERS",
-        "FARMERS": "FARMERS",
-        "GOV EMPLOYEE": "LGU EMPLOYEE",
-        "LGU EMPLOYEE": "LGU EMPLOYEE",
-        "BRGY BNS/BHW": "BRGY. BNS/BHW",
-        "BRGY. BNS/BHW": "BRGY. BNS/BHW",
-        "BRGY OFFICIAL": "BRGY. OFFICIAL/EMPLOYEE",
-        "BRGY OFFICIAL/EMPLOYEE": "BRGY. OFFICIAL/EMPLOYEE",
-        "BRGY. OFFICIAL/EMPLOYEE": "BRGY. OFFICIAL/EMPLOYEE",
-    }
-
-    normalized = sector_aliases.get(normalized, normalized)
+    normalized = normalize_sector_name(sector)
 
     if normalized == "OTHERS":
         return query.filter(
@@ -93,14 +78,25 @@ def apply_sector_filter(query, sector: str):
         ],
     }
 
-    variants = sector_variants.get(normalized, [normalized])
+    variants = [normalize_sector_name(v) for v in sector_variants.get(normalized, [normalized])]
 
     sector_table_match = models.ResidentProfile.sectors.any(
         func.upper(func.trim(models.Sector.name)).in_(variants)
     )
 
+    normalized_summary = func.concat(
+        ",",
+        func.regexp_replace(
+            func.upper(func.coalesce(models.ResidentProfile.sector_summary, "")),
+            r"\s*,\s*",
+            ",",
+            "g"
+        ),
+        ","
+    )
+
     summary_match = or_(*[
-        func.upper(func.coalesce(models.ResidentProfile.sector_summary, "")).like(f"%{variant}%")
+        normalized_summary.like(f"%,{variant},%")
         for variant in variants
     ])
 
