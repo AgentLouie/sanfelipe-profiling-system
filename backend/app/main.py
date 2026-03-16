@@ -293,6 +293,8 @@ def create_user(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    print("DEBUG /users role =", current_user.role, "username =", current_user.username)
+    
     if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access only")
 
