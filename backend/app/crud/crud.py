@@ -521,8 +521,15 @@ def get_dashboard_stats(
 
     barangay_query = apply_allowed_sector_filter(barangay_query, allowed_sector_names)
 
-    barangay_counts = barangay_query.group_by(
-        func.upper(func.trim(models.ResidentProfile.barangay))
+    normalized_barangay = normalize_barangay_name_expr()
+
+    barangay_counts = db.query(
+        normalized_barangay.label("barangay"),
+        func.count(models.ResidentProfile.id)
+    ).filter(
+        models.ResidentProfile.is_deleted == False
+    ).group_by(
+        normalized_barangay
     ).all()
 
     stats_barangay = {b: count for b, count in barangay_counts if b}
