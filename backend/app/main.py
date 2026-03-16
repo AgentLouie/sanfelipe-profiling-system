@@ -1336,12 +1336,16 @@ def get_sectors(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    if current_user.role == "super_admin":
-        return db.query(models.Sector).filter(
-            func.upper(func.trim(models.Sector.name)).in_(SUPER_ADMIN_ALLOWED_SECTORS)
-        ).all()
+    all_sectors = db.query(models.Sector).all()
 
-    return db.query(models.Sector).all()
+    if current_user.role == "super_admin":
+        filtered = [
+            s for s in all_sectors
+            if (s.name or "").strip().upper() in SUPER_ADMIN_ALLOWED_SECTORS
+        ]
+        return [{"id": s.id, "name": s.name} for s in filtered]
+
+    return [{"id": s.id, "name": s.name} for s in all_sectors]
 
 @app.get("/relationships/")
 def get_relationships(db: Session = Depends(get_db),
