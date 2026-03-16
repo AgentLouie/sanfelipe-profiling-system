@@ -192,7 +192,10 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
   const [photoPreview, setPhotoPreview] = useState(null);
   
   const userRole = (localStorage.getItem('role') || 'staff').toLowerCase();
-  const isAdminLike = userRole === "admin" || userRole === "admin_limited";
+  const isAdmin = userRole === "admin";
+  const isSuperAdmin = userRole === "super_admin";
+  const isAdminLimited = userRole === "admin_limited";
+  const isAdminLike = isAdmin || isSuperAdmin || isAdminLimited;
   const isBarangayUser = userRole === "barangay";
 
   const relationshipOptions = [
@@ -722,21 +725,35 @@ useEffect(() => {
                   return 0;
                 })
                 .map((s) => (
-                 <label 
-                   key={s.id} 
-                   className={`
-                     flex flex-col items-center justify-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all h-28 text-center select-none
-                     ${formData.sector_ids.includes(s.id) 
-                       ? 'bg-slate-900 border-slate-900 text-white shadow-md transform scale-[1.02]' 
-                       : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
-                     }
-                   `}
-                 >
-                   <input type="checkbox" className="hidden" checked={formData.sector_ids.includes(s.id)} onChange={() => handleSectorToggle(s.id)} />
-                   {formData.sector_ids.includes(s.id) ? <Check size={24} className="text-white" strokeWidth={2} /> : <div className="w-5 h-5 rounded-md border-2 border-slate-200"></div>}
-                   <span className="text-xs font-normal uppercase tracking-wide leading-tight">{s.name}</span>
-                 </label>
-               ))}
+                <label
+                  key={s.id}
+                  className={`
+                    flex flex-col items-center justify-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all h-28 text-center select-none
+                    ${
+                      formData.sector_ids.includes(s.id)
+                        ? 'bg-slate-900 border-slate-900 text-white shadow-md transform scale-[1.02]'
+                        : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
+                    }
+                  `}
+                >
+                  <input
+                    type="checkbox"
+                    className="hidden"
+                    checked={formData.sector_ids.includes(s.id)}
+                    onChange={() => handleSectorToggle(s.id)}
+                  />
+
+                  {formData.sector_ids.includes(s.id) ? (
+                    <Check size={24} className="text-white" strokeWidth={2} />
+                  ) : (
+                    <div className="w-5 h-5 rounded-md border-2 border-slate-200"></div>
+                  )}
+
+                  <span className="text-xs font-normal uppercase tracking-wide leading-tight">
+                    {s.name}
+                  </span>
+                </label>
+              ))}
              </div>
              {isOtherSelected && (
                <div className="mt-6 animate-in slide-in-from-top-4 duration-300">

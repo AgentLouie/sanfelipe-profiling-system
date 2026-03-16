@@ -36,7 +36,12 @@ export default function ResidentList({ userRole, onEdit }) {
   const [sortBy, setSortBy] = useState("last_name");
   const [sortOrder, setSortOrder] = useState("asc");
 
-  const isAdminLike = userRole === "admin" || userRole === "admin_limited";
+  const role = (userRole || "").toLowerCase();
+  const isAdmin = role === "admin";
+  const isSuperAdmin = role === "super_admin";
+  const isAdminLimited = role === "admin_limited";
+  const isAdminLike = isAdmin || isSuperAdmin || isAdminLimited;
+  const [sectorList, setSectorList] = useState([]);
 
   // --- HELPERS ---
   const calculateAge = (dob) => {
@@ -188,6 +193,20 @@ export default function ResidentList({ userRole, onEdit }) {
     };
     fetchBarangays();
   }, []);
+
+  useEffect(() => {
+  const fetchSectors = async () => {
+    try {
+      const res = await api.get("/sectors/");
+      setSectorList(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("Failed to fetch sectors", err);
+      setSectorList([]);
+    }
+  };
+
+  fetchSectors();
+}, []);
 
   useEffect(() => {
     fetchResidents(searchTerm, selectedBarangay, selectedSector, currentPage, itemsPerPage, sortBy, sortOrder);
@@ -388,7 +407,7 @@ export default function ResidentList({ userRole, onEdit }) {
                             {a.amount ? `₱${a.amount.toLocaleString()}` : "-"}
                           </td>
                           <td className="py-3 px-2 text-right">
-                            {isAdminLike && (
+                            {(isAdmin || isSuperAdmin) && (
                               <div className="flex justify-end gap-2">
                                 <button onClick={() => setAssistanceModal({ isOpen: true, resident: r, assistance: a })} className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-600 hover:text-white rounded-md transition-colors border border-rose-100">
                                   <Edit size={14} />
@@ -619,7 +638,7 @@ export default function ResidentList({ userRole, onEdit }) {
            <h1 className="text-3xl font-medium text-stone-900 tracking-tight">Registered Residents</h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {(userRole === "admin" || userRole === "admin_limited") && (
+          {(isAdmin || isSuperAdmin) && (
            <ImportButton onSuccess={handleImportSuccess} className="bg-white border-2 border-stone-300 text-stone-700 font-medium hover:bg-stone-100 rounded-xl shadow-sm transition-all" />
            )}
            <ExportButton barangay={selectedBarangay} className="bg-stone-900 text-white font-medium hover:bg-stone-800 rounded-xl shadow-md transition-all" />
@@ -650,37 +669,23 @@ export default function ResidentList({ userRole, onEdit }) {
 
             {/* Sector Filter */}
             <div className="relative w-48 hidden md:block">
-               <select value={selectedSector} onChange={handleSectorFilter} className="w-full appearance-none pl-4 pr-10 py-3 bg-white border border-stone-300 rounded-xl text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all cursor-pointer shadow-sm uppercase">
+               <select
+                value={selectedSector}
+                onChange={handleSectorFilter}
+                className="w-full appearance-none pl-4 pr-10 py-3 bg-white border border-stone-300 rounded-xl text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all cursor-pointer shadow-sm uppercase"
+              >
                 <option value="">ALL SECTORS</option>
-                <option value="4P'S">4P'S</option>
-                <option value="ATV'S/UTV'S OWNER">ATV'S/UTV'S OWNER</option>
-                <option value="BANANA BOAT/DRAGON BOAT OWNER">BANANA BOAT/DRAGON BOAT OWNER</option>
-                <option value="BANCA OWNER">BANCA OWNER</option>
-                <option value="BRGY. OFFICIAL/EMPLOYEE">BRGY. OFFICIAL/EMPLOYEE</option>
-                <option value="BRGY. BNS/BHW">BRGY. BNS/BHW</option>
-                <option value="GOV EMPLOYEE">GOV EMPLOYEE</option>
-                <option value="FAMILY HEADS">FAMILY HEADS</option>
-                <option value="FARMERS">FARMERS</option>
-                <option value="FISHERFOLK">FISHERFOLK</option>
-                <option value="FISHERMAN">FISHERMAN</option>
-                <option value="INDIGENOUS PEOPLE">INDIGENOUS PEOPLE</option>
-                <option value="LIFEGUARD">LIFEGUARD</option>
-                <option value="LGU EMPLOYEE">LGU EMPLOYEE</option>
-                <option value="OFW">OFW</option>
-                <option value="PHILHEALTH MEMBER">PHILHEALTH MEMBER</option>
-                <option value="PWD">PWD</option>
-                <option value="SENIOR CITIZEN">SENIOR CITIZEN</option>
-                <option value="SFAO">SFAO</option>
-                <option value="SOLO PARENT">SOLO PARENT</option>
-                <option value="STUDENT">STUDENT</option>
-                <option value="TODA">TODA</option>
-                <option value="OTHERS">OTHERS</option>
-               </select>
+                {sectorList.map((sector) => (
+                  <option key={sector.id} value={sector.name}>
+                    {sector.name}
+                  </option>
+                ))}
+              </select>
                <ChevronDown className="absolute right-4 top-3.5 text-stone-400 pointer-events-none" size={18} strokeWidth={2} />
             </div>
 
             {/* Admin Filter */}
-            {isAdminLike && (
+            {(isAdmin || isSuperAdmin) && (
               <div className="relative w-48 hidden md:block">
                  <select value={selectedBarangay} onChange={handleBarangayFilter} className="w-full appearance-none pl-4 pr-10 py-3 bg-white border border-stone-300 rounded-xl text-sm font-normal text-stone-700 hover:border-stone-400 focus:outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-100 transition-all cursor-pointer shadow-sm uppercase">
                    <option value="">ALL BARANGAYS</option>
@@ -812,7 +817,7 @@ export default function ResidentList({ userRole, onEdit }) {
                           <button onClick={() => onEdit(r)} className="p-2.5 bg-stone-100 text-stone-500 hover:bg-rose-600 hover:text-white rounded-lg transition-all shadow-sm border border-stone-200 hover:border-rose-600" title="Edit Resident">
                               <Edit size={16} strokeWidth={2} />
                           </button>
-                          {isAdminLike && (
+                          {(isAdmin || isSuperAdmin) && (
                             <>
                               <button
                                 onClick={() => setAssistanceModal({ isOpen: true, resident: r })}
@@ -823,7 +828,7 @@ export default function ResidentList({ userRole, onEdit }) {
                               </button>
 
                               {/* keep these ADMIN ONLY */}
-                              {userRole === "admin" && (
+                              {(isAdmin || isSuperAdmin) && (
                                 <>
                                   <button
                                     onClick={() => navigate(`/dashboard/residents/${r.resident_code}/qr`)}

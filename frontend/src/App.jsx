@@ -90,7 +90,7 @@ export default function App() {
         <Route
           path="overview"
           element={
-            role === "admin" || role === "admin_limited"
+            role === "admin" || role === "admin_limited" || role === "super_admin"
               ? <DashboardStats userRole={role} />
               : <Navigate to="/dashboard/residents" replace />
           }
@@ -114,7 +114,7 @@ export default function App() {
         <Route
           path="residents/:code/qr"
           element={
-            role?.toLowerCase() === "admin"
+            role?.toLowerCase() === "admin" || role?.toLowerCase() === "super_admin"
               ? <ResidentQRPage />
               : <Navigate to="/dashboard/residents" replace />
           }
@@ -131,7 +131,7 @@ export default function App() {
         <Route
           path="scan"
           element={
-            role?.toLowerCase() === "admin"
+            role?.toLowerCase() === "admin" || role?.toLowerCase() === "super_admin"
               ? <QRScanner />
               : <Navigate to="/dashboard/residents" replace />
           }

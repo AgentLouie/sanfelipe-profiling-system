@@ -22,27 +22,29 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
 
   const role = (userRole || "").toLowerCase();
   const isAdmin = role === "admin";
+  const isSuperAdmin = role === "super_admin";
   const isAdminLimited = role === "admin_limited";
-  const isAdminLike = isAdmin || isAdminLimited;
+  const isAdminLike = isAdmin || isSuperAdmin || isAdminLimited;
 
   const roleLabel =
-  role === "admin" ? "Admin" :
-  role === "admin_limited" ? "Admin" :
-  role === "barangay" ? "Barangay" :
-  "User";
+    role === "super_admin" ? "Admin" :
+    role === "admin" ? "Admin" :
+    role === "admin_limited" ? "Admin" :
+    role === "barangay" ? "Barangay" :
+    "User";
 
   const allMenuItems = [
-    { label: 'Overview', path: '/dashboard/overview', Icon: LayoutDashboard, role: 'admin_like' }, 
+    { label: 'Overview', path: '/dashboard/overview', Icon: LayoutDashboard, role: 'admin_like' },
     { label: 'Resident Database', path: '/dashboard/residents', Icon: Users, role: 'all' },
     { label: 'Register Resident', path: '/dashboard/create', Icon: UserPlus, role: 'all' },
-    { label: 'Scan QR', path: '/dashboard/scan', Icon: QrCode, role: 'admin' },
-    { label: 'Archived Residents', path: '/dashboard/archived', Icon: ArchiveRestore, role: 'admin' },
+    { label: 'Scan QR', path: '/dashboard/scan', Icon: QrCode, role: 'admin_plus' },
+    { label: 'Archived Residents', path: '/dashboard/archived', Icon: ArchiveRestore, role: 'admin_plus' },
   ];
 
   const menuItems = allMenuItems.filter(item => {
     if (item.role === 'all') return true;
-    if (item.role === 'admin' && userRole?.toLowerCase() === 'admin') return true;
     if (item.role === 'admin_like' && isAdminLike) return true;
+    if (item.role === 'admin_plus' && (isAdmin || isSuperAdmin)) return true;
     return false;
   });
 
@@ -76,9 +78,9 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
           {label}
         </span>
         {active && (
-          <ChevronRight 
-            size={16} 
-            className="ml-auto text-red-500 opacity-70 animate-in fade-in slide-in-from-left-2" 
+          <ChevronRight
+            size={16}
+            className="ml-auto text-red-500 opacity-70 animate-in fade-in slide-in-from-left-2"
           />
         )}
       </button>
@@ -87,7 +89,6 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
 
   return (
     <>
-      {/* MOBILE HEADER - Added Glassmorphism */}
       <div className="lg:hidden fixed top-0 left-0 w-full h-16 bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-4 z-40 supports-[backdrop-filter]:bg-white/60">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shadow-sm border border-red-100/50">
@@ -95,30 +96,27 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
           </div>
           <span className="text-sm font-bold text-slate-800 tracking-tight">San Felipe</span>
         </div>
-        <button 
-          onClick={() => setIsOpen(true)} 
+        <button
+          onClick={() => setIsOpen(true)}
           className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all active:scale-95"
         >
           <Menu size={20} />
         </button>
       </div>
 
-      {/* MOBILE OVERLAY */}
       {isOpen && (
-        <div 
-          onClick={() => setIsOpen(false)} 
-          className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 lg:hidden transition-opacity" 
+        <div
+          onClick={() => setIsOpen(false)}
+          className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 lg:hidden transition-opacity"
         />
       )}
 
-      {/* SIDEBAR CONTAINER */}
       <aside className={`fixed top-0 left-0 h-full w-[280px] bg-white border-r border-slate-100 z-50 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 flex flex-col shadow-2xl lg:shadow-none`}>
-        
-        {/* BRANDING HEADER */}
+
         <div className="h-20 flex items-center px-6 mt-2 lg:mt-0">
           <div className="flex items-center gap-3.5">
             <div className="w-11 h-11 bg-gradient-to-br from-red-50 to-white rounded-2xl flex items-center justify-center border border-red-100 shadow-sm">
-                <img src={logoUrl} alt="San Felipe Seal" className="w-7 h-7 object-contain drop-shadow-sm" onError={(e) => (e.target.style.display = 'none')} />
+              <img src={logoUrl} alt="San Felipe Seal" className="w-7 h-7 object-contain drop-shadow-sm" onError={(e) => (e.target.style.display = 'none')} />
             </div>
             <div>
               <h1 className="text-[15px] font-bold text-slate-900 leading-tight tracking-tight">LGU San Felipe</h1>
@@ -130,14 +128,15 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
           </button>
         </div>
 
-        {/* NAVIGATION */}
         <nav className="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar">
           <div className="mb-3 px-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Main Menu</div>
           <div className="space-y-1">
-            {menuItems.map((item) => <NavItem key={item.path} label={item.label} path={item.path} Icon={item.Icon} />)}
+            {menuItems.map((item) => (
+              <NavItem key={item.path} label={item.label} path={item.path} Icon={item.Icon} />
+            ))}
           </div>
-          
-          {userRole?.toLowerCase() === 'admin' && (
+
+          {(isAdmin || isSuperAdmin) && (
             <div className="mt-8">
               <div className="mb-3 px-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Administration</div>
               <NavItem label="User Management" path="/dashboard/users" Icon={Settings} />
@@ -145,7 +144,6 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
           )}
         </nav>
 
-        {/* USER PROFILE & LOGOUT */}
         <div className="p-4 m-4 mt-0 bg-slate-50 rounded-2xl border border-slate-100">
           <div className="flex items-center gap-3 mb-4 px-1">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-red-700 text-white flex items-center justify-center text-sm font-bold shadow-md shadow-red-600/20 uppercase ring-2 ring-white">
@@ -162,11 +160,11 @@ export default function Sidebar({ userRole = 'staff', onLogout, onLinkClick }) {
               </div>
             </div>
           </div>
-          <button 
-            onClick={onLogout} 
+          <button
+            onClick={onLogout}
             className="w-full group flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all duration-200 shadow-sm"
           >
-            <LogOut size={16} className="text-slate-400 group-hover:text-red-500 transition-colors" /> 
+            <LogOut size={16} className="text-slate-400 group-hover:text-red-500 transition-colors" />
             Sign Out
           </button>
         </div>

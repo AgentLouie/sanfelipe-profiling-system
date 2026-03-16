@@ -9,8 +9,11 @@ import toast, { Toaster } from 'react-hot-toast';
 import { createPortal } from 'react-dom';
 
 export default function UserManagement() {
-  const role = localStorage.getItem("role");
-  if (role !== "admin") {
+  const role = (localStorage.getItem("role") || "").toLowerCase();
+  const isAdmin = role === "admin";
+  const isSuperAdmin = role === "super_admin";
+
+  if (!isAdmin && !isSuperAdmin) {
     return (
       <div className="max-w-5xl mx-auto p-6">
         <p className="text-slate-600">Not allowed.</p>
@@ -180,6 +183,7 @@ export default function UserManagement() {
                   >
                     <option value="barangay">Barangay Staff</option>
                     <option value="admin_limited">Admin (Limited)</option>
+                    <option value="super_admin">Admin</option>
                     <option value="admin">System Admin</option>
                   </select>
                   <ChevronDown className="absolute right-3.5 top-3.5 text-slate-400 pointer-events-none" size={16} />
@@ -226,14 +230,18 @@ export default function UserManagement() {
                       <div className="flex items-center gap-3.5">
                         <div
                           className={`w-10 h-10 rounded-full flex items-center justify-center border shadow-sm ${
-                            u.role === "admin"
+                            u.role === "super_admin"
+                              ? "bg-purple-50 text-purple-600 border-purple-100"
+                              : u.role === "admin"
                               ? "bg-red-50 text-red-500 border-red-100"
                               : u.role === "admin_limited"
                               ? "bg-amber-50 text-amber-600 border-amber-100"
                               : "bg-slate-50 text-slate-400 border-slate-200"
                           }`}
                         >
-                          {u.role === "admin" ? (
+                          {u.role === "super_admin" ? (
+                            <ShieldCheck size={18} strokeWidth={2} />
+                          ) : u.role === "admin" ? (
                             <Shield size={18} strokeWidth={2} />
                           ) : u.role === "admin_limited" ? (
                             <ShieldCheck size={18} strokeWidth={2} />
@@ -247,14 +255,18 @@ export default function UserManagement() {
                     <td className="p-4">
                       <span
                         className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-normal tracking-tight border ${
-                          u.role === "admin"
+                          u.role === "super_admin"
+                            ? "bg-purple-50 text-purple-700 border-purple-100/60"
+                            : u.role === "admin"
                             ? "bg-red-50 text-red-600 border-red-100/50"
                             : u.role === "admin_limited"
                             ? "bg-amber-50 text-amber-700 border-amber-100/60"
                             : "bg-slate-100 text-slate-500 border-slate-200/50"
                         }`}
                       >
-                        {u.role === "admin"
+                        {u.role === "super_admin"
+                          ? "Super Admin"
+                          : u.role === "admin"
                           ? "Administrator"
                           : u.role === "admin_limited"
                           ? "Admin (Limited)"
