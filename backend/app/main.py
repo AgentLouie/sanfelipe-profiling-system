@@ -1135,7 +1135,18 @@ def get_stats(db: Session = Depends(get_db),
     if current_user.role not in ["admin", "admin_limited", "super_admin"]:
         raise HTTPException(status_code=403, detail="Not allowed")
 
-    return crud.get_dashboard_stats(db)
+    stats = crud.get_dashboard_stats(db)
+
+    if current_user.role != "super_admin":
+        hidden_sector_names = {"HC", "C", "M"}
+
+        stats["population_by_sector"] = {
+            k: v
+            for k, v in (stats.get("population_by_sector") or {}).items()
+            if str(k).strip().upper() not in hidden_sector_names
+        }
+
+    return stats
 
 # ---------------------------------------------------
 # Import/Export
