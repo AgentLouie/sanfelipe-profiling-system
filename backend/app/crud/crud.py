@@ -116,19 +116,22 @@ def apply_hidden_sector_filter(query, hidden_sector_names: list[str] | None):
     if not normalized:
         return query
 
-    not_in_sector_table = ~models.ResidentProfile.sectors.any(
+    sector_table_hidden = models.ResidentProfile.sectors.any(
         func.upper(func.trim(models.Sector.name)).in_(normalized)
     )
 
-    not_in_summary = True
-    for name in normalized:
-        not_in_summary = not_in_summary & ~func.upper(
-            func.coalesce(models.ResidentProfile.sector_summary, "")
-        ).like(f"%{name}%")
+    summary_hidden_conditions = [
+        func.upper(func.coalesce(models.ResidentProfile.sector_summary, "")).like(f"%{name}%")
+        for name in normalized
+    ]
+
+    summary_hidden = or_(*summary_hidden_conditions) if summary_hidden_conditions else False
 
     return query.filter(
-        not_in_sector_table,
-        not_in_summary
+        ~or_(
+            sector_table_hidden,
+            summary_hidden
+        )
     )
 
 
