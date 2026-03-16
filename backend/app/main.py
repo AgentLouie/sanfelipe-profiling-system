@@ -887,12 +887,9 @@ def read_residents(skip: int = 0,
                    current_user: models.User = Depends(get_current_user)):
 
     filter_barangay = barangay
-    hidden_sectors = None
+    allowed_sectors = None
 
-    if current_user.role != "super_admin":
-        hidden_sectors = ["HC", "C", "M"]
-
-    if current_user.role == "barangay":
+    if current_user.role not in ["admin", "admin_limited", "super_admin"]:
         username_lower = current_user.username.lower()
         official_name = None
         for key in BARANGAY_MAPPING:
@@ -906,7 +903,7 @@ def read_residents(skip: int = 0,
         search=search,
         barangay=filter_barangay,
         sector=sector,
-        hidden_sector_names=hidden_sectors
+        allowed_sector_names=allowed_sectors
     )
 
     residents = crud.get_residents(
@@ -918,7 +915,7 @@ def read_residents(skip: int = 0,
         sector=sector,
         sort_by=sort_by,
         sort_order=sort_order,
-        hidden_sector_names=hidden_sectors
+        allowed_sector_names=allowed_sectors
     )
 
     return {
@@ -933,13 +930,7 @@ def read_resident(resident_id: int,
                   db: Session = Depends(get_db),
                   current_user: models.User = Depends(get_current_user)):
 
-    hidden_sectors = None if current_user.role == "super_admin" else ["HC", "C", "M"]
-
-    resident = crud.get_resident(
-        db,
-        resident_id,
-        hidden_sector_names=hidden_sectors
-    )
+    resident = crud.get_resident(db, resident_id)
 
     if not resident:
         raise HTTPException(status_code=404)
@@ -952,22 +943,25 @@ def generate_resident_qr(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    # ✅ Restrict to admin only
     if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin only")
 
-    hidden_sectors = None if current_user.role == "super_admin" else ["HC", "C", "M"]
-
-    query = db.query(models.ResidentProfile).filter(
+    resident = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.resident_code == resident_code,
         models.ResidentProfile.is_deleted == False
-    )
-
-    query = crud.apply_hidden_sector_filter(query, hidden_sectors)
-
-    resident = query.first()
+    ).first()
 
     if not resident:
         raise HTTPException(status_code=404, detail="Resident not found")
+
+    qr = qrcode.make(resident.resident_code)
+
+    buffer = BytesIO()
+    qr.save(buffer, format="PNG")
+    buffer.seek(0)
+
+    return StreamingResponse(buffer, media_type="image/png")
 
 @app.get("/residents/code/{resident_code}", response_model=schemas.Resident)
 def get_resident_by_code(
@@ -978,16 +972,10 @@ def get_resident_by_code(
     if current_user.role not in ["admin", "super_admin"]:
         raise HTTPException(status_code=403, detail="Admin access only")
 
-    hidden_sectors = None if current_user.role == "super_admin" else ["HC", "C", "M"]
-
-    query = db.query(models.ResidentProfile).filter(
+    resident = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.resident_code == resident_code,
         models.ResidentProfile.is_deleted == False
-    )
-
-    query = crud.apply_hidden_sector_filter(query, hidden_sectors)
-
-    resident = query.first()
+    ).first()
 
     if not resident:
         raise HTTPException(status_code=404, detail="Resident not found")
@@ -1170,10 +1158,10 @@ def export_residents_excel(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    # Restrict barangay automatically for non-admin
     target_barangay = barangay
-    hidden_sectors = None if current_user.role == "super_admin" else ["HC", "C", "M"]
 
-    if current_user.role == "barangay":
+    if current_user.role not in ["admin", "admin_limited", "super_admin"]:
         official_name = BARANGAY_MAPPING.get(current_user.username.lower())
 
         if official_name:
@@ -1184,8 +1172,45 @@ def export_residents_excel(
     try:
         excel_file = report_service.generate_household_excel(
             db,
-            barangay_name=target_barangay,
-            hidden_sector_names=hidden_sectors
+            barangay_name=target_barangay
+        )
+
+        clean_name = (
+            target_barangay.replace(" ", "_")
+            if target_barangay else "All"
+        )
+
+        filename = f"SanFelipe_Households_{clean_name}.xlsx"
+
+        return StreamingResponse(
+            iter([excel_file.getvalue()]),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/export/excel")
+def export_residents_excel(
+    barangay: str = Query(None),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Restrict barangay automatically for non-admin
+    target_barangay = barangay
+
+    if current_user.role not in ["admin", "admin_limited", "super_admin"]:
+        official_name = BARANGAY_MAPPING.get(current_user.username.lower())
+
+        if official_name:
+            target_barangay = official_name
+        else:
+            target_barangay = current_user.username.replace("_", " ").title()
+
+    try:
+        excel_file = report_service.generate_household_excel(
+            db,
+            barangay_name=target_barangay
         )
 
         clean_name = (
