@@ -265,7 +265,7 @@ export default function UserManagement() {
                         }`}
                       >
                         {u.role === "super_admin"
-                          ? "Super Admin"
+                          ? "Admin (Mayor)"
                           : u.role === "admin"
                           ? "Administrator"
                           : u.role === "admin_limited"
