@@ -952,10 +952,7 @@ def read_residents(skip: int = 0,
     filter_barangay = barangay
     allowed_sectors = None
 
-    if current_user.role == "super_admin":
-        allowed_sectors = SUPER_ADMIN_ALLOWED_SECTORS
-
-    elif current_user.role not in ["admin", "admin_limited"]:
+    if current_user.role not in ["admin", "admin_limited", "super_admin"]:
         username_lower = current_user.username.lower()
         official_name = None
         for key in BARANGAY_MAPPING:
@@ -996,8 +993,7 @@ def read_resident(resident_id: int,
                   db: Session = Depends(get_db),
                   current_user: models.User = Depends(get_current_user)):
 
-    allowed_sectors = SUPER_ADMIN_ALLOWED_SECTORS if current_user.role == "super_admin" else None
-    resident = crud.get_resident(db, resident_id, allowed_sector_names=allowed_sectors)
+    resident = crud.get_resident(db, resident_id)
 
     if not resident:
         raise HTTPException(status_code=404)
