@@ -1,3 +1,5 @@
+from unicodedata import name
+
 from sqlalchemy.orm import Session, joinedload, subqueryload
 from sqlalchemy import or_, func
 from app import models, schemas
@@ -25,6 +27,7 @@ def apply_search_filter(query, search: str):
                 models.ResidentProfile.last_name.ilike(word_fmt),
                 models.ResidentProfile.first_name.ilike(word_fmt),
                 models.ResidentProfile.resident_code.ilike(word_fmt),
+                # Combined so "ALFEROS ERNESTO" can match across fields
                 func.concat(
                     func.coalesce(models.ResidentProfile.last_name, ""), " ",
                     func.coalesce(models.ResidentProfile.first_name, "")
@@ -56,6 +59,7 @@ def apply_sector_filter(query, sector: str):
 
     normalized = " ".join(sector.strip().upper().split())
 
+    # Canonical names only for sectors you want treated as the same
     sector_aliases = {
         "FARMER": "FARMERS",
         "FARMERS": "FARMERS",
@@ -108,33 +112,6 @@ def apply_sector_filter(query, sector: str):
     )
 
 
-def apply_hidden_sector_filter(query, hidden_sector_names: list[str] | None):
-    if not hidden_sector_names:
-        return query
-
-    normalized = [s.strip().upper() for s in hidden_sector_names if s and s.strip()]
-    if not normalized:
-        return query
-
-    sector_table_hidden = models.ResidentProfile.sectors.any(
-        func.upper(func.trim(models.Sector.name)).in_(normalized)
-    )
-
-    summary_hidden_conditions = [
-        func.upper(func.coalesce(models.ResidentProfile.sector_summary, "")).like(f"%{name}%")
-        for name in normalized
-    ]
-
-    summary_hidden = or_(*summary_hidden_conditions) if summary_hidden_conditions else False
-
-    return query.filter(
-        ~or_(
-            sector_table_hidden,
-            summary_hidden
-        )
-    )
-
-
 # =====================================================
 # CREATE RESIDENT
 # =====================================================
@@ -177,9 +154,7 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
         if sector_ids:
             sectors = db.query(models.Sector).filter(models.Sector.id.in_(sector_ids)).all()
             db_resident.sectors = sectors
-            db_resident.sector_summary = ", ".join(
-                [" ".join(s.name.strip().upper().split()) for s in sectors]
-            )
+            db_resident.sector_summary = ", ".join([" ".join(s.name.strip().upper().split()) for s in sectors])
         else:
             db_resident.sector_summary = "None"
 
@@ -192,7 +167,7 @@ def create_resident(db: Session, resident: schemas.ResidentCreate):
         db.refresh(db_resident)
         return db_resident
 
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
         raise ValueError("Database constraint error.")
 
@@ -382,8 +357,7 @@ def get_resident_count(
     db: Session,
     search: str = None,
     barangay: str = None,
-    sector: str = None,
-    hidden_sector_names: list[str] | None = None
+    sector: str = None
 ):
     query = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.is_deleted == False
@@ -392,7 +366,6 @@ def get_resident_count(
     query = apply_search_filter(query, search)
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
-    query = apply_hidden_sector_filter(query, hidden_sector_names)
 
     return query.count()
 
@@ -408,8 +381,7 @@ def get_residents(
     barangay: str = None,
     sector: str = None,
     sort_by: str = "last_name",
-    sort_order: str = "asc",
-    hidden_sector_names: list[str] | None = None
+    sort_order: str = "asc"
 ):
     query = db.query(models.ResidentProfile).options(
         subqueryload(models.ResidentProfile.family_members),
@@ -420,7 +392,6 @@ def get_residents(
     query = apply_search_filter(query, search)
     query = apply_barangay_filter(query, barangay)
     query = apply_sector_filter(query, sector)
-    query = apply_hidden_sector_filter(query, hidden_sector_names)
 
     if sort_order.lower() == "desc":
         query = query.order_by(
@@ -439,15 +410,14 @@ def get_residents(
 # =====================================================
 # DASHBOARD STATS
 # =====================================================
-def get_dashboard_stats(db: Session, hidden_sector_names: list[str] | None = None):
+def get_dashboard_stats(db: Session):
     base_query = db.query(models.ResidentProfile).filter(
         models.ResidentProfile.is_deleted == False
     )
-    base_query = apply_hidden_sector_filter(base_query, hidden_sector_names)
 
     total_residents = base_query.count() or 0
 
-    household_query = db.query(
+    total_households = db.query(
         func.count(
             func.distinct(
                 func.trim(models.ResidentProfile.barangay) +
@@ -455,9 +425,7 @@ def get_dashboard_stats(db: Session, hidden_sector_names: list[str] | None = Non
                 func.coalesce(func.trim(models.ResidentProfile.house_no), "")
             )
         )
-    ).filter(models.ResidentProfile.is_deleted == False)
-    household_query = apply_hidden_sector_filter(household_query, hidden_sector_names)
-    total_households = household_query.scalar() or 0
+    ).filter(models.ResidentProfile.is_deleted == False).scalar() or 0
 
     total_male = base_query.filter(
         func.lower(models.ResidentProfile.sex).in_(["male", "m"])
@@ -467,29 +435,23 @@ def get_dashboard_stats(db: Session, hidden_sector_names: list[str] | None = Non
         func.lower(models.ResidentProfile.sex).in_(["female", "f"])
     ).count() or 0
 
-    barangay_query = db.query(
+    barangay_counts = db.query(
         func.upper(func.trim(models.ResidentProfile.barangay)).label("barangay"),
         func.count(models.ResidentProfile.id)
     ).filter(
         models.ResidentProfile.is_deleted == False
-    )
-    barangay_query = apply_hidden_sector_filter(barangay_query, hidden_sector_names)
-
-    barangay_counts = barangay_query.group_by(
+    ).group_by(
         func.upper(func.trim(models.ResidentProfile.barangay))
     ).all()
 
     stats_barangay = {b: count for b, count in barangay_counts if b}
 
-    sector_query = db.query(
+    sector_counts = db.query(
         models.ResidentProfile.sector_summary,
         func.count(models.ResidentProfile.id)
     ).filter(
         models.ResidentProfile.is_deleted == False
-    )
-    sector_query = apply_hidden_sector_filter(sector_query, hidden_sector_names)
-
-    sector_counts = sector_query.group_by(
+    ).group_by(
         models.ResidentProfile.sector_summary
     ).all()
 
@@ -508,11 +470,6 @@ def get_dashboard_stats(db: Session, hidden_sector_names: list[str] | None = Non
 
         return sector_aliases.get(normalized, normalized)
 
-    hidden_normalized = {
-        " ".join((name or "").strip().upper().split())
-        for name in (hidden_sector_names or [])
-    }
-
     for summary, count in sector_counts:
         if not summary or summary.strip().lower() == "none":
             continue
@@ -520,8 +477,6 @@ def get_dashboard_stats(db: Session, hidden_sector_names: list[str] | None = Non
         parts = [p.strip() for p in summary.split(",") if p.strip()]
         for p in parts:
             key = norm_sector(p)
-            if key in hidden_normalized:
-                continue
             stats_sector[key] = stats_sector.get(key, 0) + count
 
     return {
