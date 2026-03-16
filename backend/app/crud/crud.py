@@ -141,7 +141,12 @@ def apply_allowed_sector_filter(query, allowed_sector_names: list[str] | None = 
 
     normalized_summary = func.concat(
         ",",
-        func.replace(func.upper(func.coalesce(models.ResidentProfile.sector_summary, "")), ", ", ","),
+        func.regexp_replace(
+            func.upper(func.coalesce(models.ResidentProfile.sector_summary, "")),
+            r"\s*,\s*",
+            ",",
+            "g"
+        ),
         ","
     )
 
