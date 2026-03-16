@@ -544,7 +544,7 @@ async def upload_resident_photo(
     current_user: models.User = Depends(get_current_user)
 ):
     # 🔒 Allow admin, admin_limited, and barangay to upload photo
-    allowed_roles = ["admin", "admin_limited", "barangay"]
+    allowed_roles = ["admin", "admin_limited", "barangay", "super_admin"]
     if current_user.role not in allowed_roles:
         raise HTTPException(status_code=403, detail="Not allowed")
 
