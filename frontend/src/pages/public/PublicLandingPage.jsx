@@ -267,10 +267,6 @@ export default function PublicLandingPage() {
 
       {/* ── Official Banner ── */}
       <div className="bg-red-950 py-3 text-center text-[11px] font-bold tracking-[0.2em] uppercase text-red-100/90 shadow-sm relative z-10 backdrop-blur-sm bg-opacity-95">
-        <span className="inline-flex items-center gap-2">
-          <ShieldCheck size={14} className="text-red-400" />
-          Official Public Verification · Municipality of San Felipe
-        </span>
       </div>
 
       {/* ── Hero Header ── */}
