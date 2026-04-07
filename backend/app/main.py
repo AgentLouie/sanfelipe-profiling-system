@@ -1002,8 +1002,7 @@ def get_public_resident_qr(
     if not resident:
         raise HTTPException(status_code=404, detail="Resident not found")
 
-    public_url = f"https://www.sanfelipeasone.ph/public/id/{resident.resident_code}"
-    qr = qrcode.make(public_url)
+    qr = qrcode.make(resident.resident_code)
 
     buffer = BytesIO()
     qr.save(buffer, format="PNG")
