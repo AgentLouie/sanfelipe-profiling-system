@@ -24,18 +24,23 @@ def apply_search_filter(query, search: str):
 
         query = query.filter(
             or_(
-                models.ResidentProfile.last_name.ilike(word_fmt),
-                models.ResidentProfile.first_name.ilike(word_fmt),
-                models.ResidentProfile.resident_code.ilike(word_fmt),
-                # Combined so "ALFEROS ERNESTO" can match across fields
-                func.concat(
-                    func.coalesce(models.ResidentProfile.last_name, ""), " ",
-                    func.coalesce(models.ResidentProfile.first_name, "")
-                ).ilike(word_fmt),
-                func.concat(
-                    func.coalesce(models.ResidentProfile.first_name, ""), " ",
-                    func.coalesce(models.ResidentProfile.last_name, "")
-                ).ilike(word_fmt),
+                func.unaccent(models.ResidentProfile.last_name).ilike(func.unaccent(word_fmt)),
+                func.unaccent(models.ResidentProfile.first_name).ilike(func.unaccent(word_fmt)),
+                func.unaccent(models.ResidentProfile.resident_code).ilike(func.unaccent(word_fmt)),
+
+                func.unaccent(
+                    func.concat(
+                        func.coalesce(models.ResidentProfile.last_name, ""), " ",
+                        func.coalesce(models.ResidentProfile.first_name, "")
+                    )
+                ).ilike(func.unaccent(word_fmt)),
+
+                func.unaccent(
+                    func.concat(
+                        func.coalesce(models.ResidentProfile.first_name, ""), " ",
+                        func.coalesce(models.ResidentProfile.last_name, "")
+                    )
+                ).ilike(func.unaccent(word_fmt)),
             )
         )
 
