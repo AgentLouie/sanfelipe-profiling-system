@@ -44,11 +44,10 @@ const CH = 816;
 
 const SX = CW / DOM_W;
 const SY = CH / DOM_H;
-const SCALE_AVG = (SX + SY) / 2;
 
 const X = (n) => n * SX;
 const Y = (n) => n * SY;
-const FS = (n) => Math.round(n * SCALE_AVG);
+const FS = (n) => Math.round(n * SX);
 
 const FONT_FAMILY = "Barlow, Arial, sans-serif";
 const FONT_BLACK = "900";
@@ -59,7 +58,7 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   const canvas = document.createElement("canvas");
   canvas.width = CW;
   canvas.height = CH;
-  const ctx = canvas.getContext("2d", { alpha: true, desynchronized: true });
+  const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas context not available");
 
   ctx.fillStyle = "#ffffff";
@@ -77,12 +76,10 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     const logo = await loadImage(logoUrl);
     ctx.save();
     ctx.globalAlpha = 0.12;
-
     const wmW = X(420);
     const wmH = Y(420);
     const wmX = CW - wmW + X(55);
     const wmY = CH - wmH + Y(70);
-
     ctx.drawImage(logo, wmX, wmY, wmW, wmH);
     ctx.restore();
   } catch (_) {}
@@ -91,8 +88,8 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(CW, 0);
-  ctx.lineTo(X(466.56), 0);
-  ctx.lineTo(0, Y(257.04));
+  ctx.lineTo(X(DOM_W * 0.72), 0);
+  ctx.lineTo(0, Y(DOM_H * 0.63));
   ctx.closePath();
   ctx.fillStyle = "#cc0000";
   ctx.fill();
@@ -100,7 +97,7 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
 
   ctx.strokeStyle = "rgba(255,255,255,0.8)";
   ctx.lineWidth = X(1);
-  ctx.strokeRect(X(10), Y(10), X(648 - 20), Y(408 - 20));
+  ctx.strokeRect(X(10), Y(10), X(DOM_W - 20), Y(DOM_H - 20));
 
   try {
     const logo = await loadImage(logoUrl);
@@ -108,7 +105,6 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
     const ly = Y(24);
     const lw = X(88);
     const lh = Y(88);
-
     ctx.save();
     ctx.beginPath();
     ctx.arc(lx + lw / 2, ly + lh / 2, Math.min(lw, lh) / 2, 0, Math.PI * 2);
@@ -121,25 +117,26 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   ctx.save();
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = "#d40000";
-  ctx.strokeStyle = "#ffffff";
+  ctx.fillStyle = "#ff0000";
+  ctx.strokeStyle = "#000000";
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  ctx.lineWidth = X(1.8);
+  ctx.lineWidth = X(2);
 
-  ctx.font = `${FONT_BLACK} ${FS(36)}px ${FONT_FAMILY}`;
-  ctx.strokeText("SAN FELIPE", CW / 2, Y(48));
-  ctx.fillText("SAN FELIPE", CW / 2, Y(48));
+  ctx.font = `${FONT_BLACK} ${FS(42)}px ${FONT_FAMILY}`;
+  ctx.strokeText("SAN FELIPE", CW / 2, Y(52));
+  ctx.fillText("SAN FELIPE", CW / 2, Y(52));
 
-  ctx.font = `${FONT_BLACK} ${FS(34)}px ${FONT_FAMILY}`;
-  ctx.strokeText("RESIDENT ID CARD", CW / 2, Y(84));
-  ctx.fillText("RESIDENT ID CARD", CW / 2, Y(84));
+  ctx.font = `${FONT_BLACK} ${FS(40)}px ${FONT_FAMILY}`;
+  ctx.strokeText("RESIDENT ID CARD", CW / 2, Y(85));
+  ctx.fillText("RESIDENT ID CARD", CW / 2, Y(85));
   ctx.restore();
 
   const px = X(95);
   const py = Y(140);
-  const pw = X(155);
-  const ph = Y(180);
+  const photoSize = X(170);
+  const pw = photoSize;
+  const ph = photoSize;
 
   ctx.fillStyle = "#efefef";
   ctx.fillRect(px, py, pw, ph);
@@ -150,111 +147,164 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   if (resident.photo_url) {
     try {
       const photo = await loadImage(resident.photo_url);
-      ctx.drawImage(photo, px, py, pw, ph);
+
+      const imgW = photo.width;
+      const imgH = photo.height;
+      const squareSide = Math.min(imgW, imgH);
+
+      const sx = (imgW - squareSide) / 2;
+      const sy = (imgH - squareSide) / 2;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(px, py, pw, ph);
+      ctx.clip();
+
+      ctx.fillStyle = "#efefef";
+      ctx.fillRect(px, py, pw, ph);
+
+      ctx.drawImage(
+        photo,
+        sx, sy, squareSide, squareSide,
+        px, py, pw, ph
+      );
+
+      ctx.restore();
     } catch (_) {}
   } else {
     ctx.fillStyle = "#888";
-    ctx.font = `${FONT_BOLD} ${FS(12)}px ${FONT_FAMILY}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+    ctx.font = `${FONT_BOLD} ${FS(14)}px ${FONT_FAMILY}`;
     ctx.fillText("NO PHOTO", px + pw / 2, py + ph / 2);
   }
 
   ctx.fillStyle = "#000";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
   ctx.font = `${FONT_BLACK} ${FS(28)}px ${FONT_FAMILY}`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText("RESIDENT", px + pw / 2, Y(356));
+  ctx.fillText("RESIDENT", px + pw / 2, py + ph + Y(38));
 
-  function drawField(label, value, x, y, w, valueFs = 16, labelFs = 13, opts = {}) {
-  const {
-    boxH = 24,
-    labelGap = 6,
+  const fx = X(320);
+  const fw = X(288);
+
+  const col1 = fw * 0.22;
+  const col2 = fw * 0.42;
+  const col3 = fw * 0.36;
+
+  function drawDomField({
+    label,
+    value,
+    x,
+    y,
+    w,
+    valueFs = 16,
+    labelFs = 13,
+    valueWeight = FONT_BOLD,
+    labelWeight = FONT_MEDIUM,
+    boxH = 26,
+    pb = 1,
+    labelGap = 1,
     nowrap = false,
-  } = opts;
+  }) {
+    const safeValue = String(value || "").trim() || " ";
+    const boxHeight = Y(boxH);
+    const paddingBottom = Y(pb);
+    const innerWidth = w - X(8);
 
-  const safeValue = String(value || "").trim() || " ";
-  const innerWidth = w - X(8);
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "#000";
+    ctx.font = `${valueWeight} ${FS(valueFs)}px ${FONT_FAMILY}`;
 
-  ctx.save();
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillStyle = "#000";
-  ctx.font = `${FONT_BOLD} ${FS(valueFs)}px ${FONT_FAMILY}`;
+    const lines = nowrap ? [safeValue] : wrapText(ctx, safeValue, innerWidth);
+    const lineHeight = Math.round(FS(valueFs) * 1.02);
 
-  const lines = nowrap ? [safeValue] : wrapText(ctx, safeValue, innerWidth);
-  const lineHeight = Math.round(FS(valueFs) * 1.02);
+    const firstBaseline =
+      y + boxHeight - paddingBottom - (lines.length - 1) * lineHeight;
 
-  // value sits near bottom of its box
-  const firstBaseline =
-    y + Y(boxH) - Y(2) - (lines.length - 1) * lineHeight;
+    lines.forEach((line, i) => {
+      ctx.fillText(line, x + w / 2, firstBaseline + i * lineHeight);
+    });
 
-  lines.forEach((line, i) => {
-    ctx.fillText(line, x + w / 2, firstBaseline + i * lineHeight);
+    ctx.fillStyle = "#111";
+    ctx.font = `${labelWeight} ${FS(labelFs)}px ${FONT_FAMILY}`;
+    const labelBaseline = y + boxHeight + FS(labelFs) + Y(labelGap);
+    ctx.fillText(label, x + w / 2, labelBaseline);
+
+    ctx.restore();
+  }
+
+  const row1Y = Y(142);
+  const row2Y = Y(218);
+  const row3Y = Y(286);
+
+  drawDomField({
+    label: "Last Name, First Name, M.I, Suffix",
+    value: fullName,
+    x: fx,
+    y: row1Y,
+    w: fw,
+    valueFs: 14,
+    labelFs: 12,
+    boxH: 32,
+    pb: 1,
+    labelGap: 2,
   });
 
-  ctx.fillStyle = "#222";
-  ctx.font = `${FONT_MEDIUM} ${FS(labelFs)}px ${FONT_FAMILY}`;
-  ctx.fillText(label, x + w / 2, y + Y(boxH + labelGap) + FS(labelFs));
-
-  ctx.restore();
-}
-
-    const fx = X(320);
-    const fw = X(648 - 320 - 40);
-
-    const col1 = fw * 0.22;
-    const col2 = fw * 0.42;
-    const col3 = fw * 0.36;
-
-    // tighter row positions to match your target image
-    const row1Y = Y(138);
-    const row2Y = Y(212);
-    const row3Y = Y(276);
-
-    drawField("Last Name, First Name, M.I", fullName, fx, row1Y, fw, 17, 13, {
-    boxH: 26,
-    labelGap: 4,
-    });
-
-    drawField("Sex", resident.sex || "", fx, row2Y, col1, 16, 13, {
-    boxH: 22,
-    labelGap: 4,
-    });
-
-    drawField(
-    "Date of Birth",
-    formattedBirthdate || "",
-    fx + col1,
-    row2Y,
-    col2,
-    15,
-    13,
-    {
-        boxH: 22,
-        labelGap: 4,
-    }
-    );
-
-    drawField(
-    "Civil Status",
-    (resident.civil_status || "").replace("Live-in Partner", "Live-in Partner"),
-    fx + col1 + col2,
-    row2Y,
-    col3,
-    15,
-    13,
-    {
-        boxH: 22,
-        labelGap: 4,
-        nowrap: true,
-    }
-    );
-
-    drawField("Contact No.", resident.contact_no || "", fx, row3Y, fw * 0.48, 16, 13, {
+  drawDomField({
+    label: "Sex",
+    value: resident.sex || "",
+    x: fx,
+    y: row2Y,
+    w: col1,
+    valueFs: 16,
+    labelFs: 13,
     boxH: 24,
-    labelGap: 4,
-    });
+    pb: 1,
+    labelGap: 1,
+  });
+
+  drawDomField({
+    label: "Date of Birth",
+    value: formattedBirthdate || "",
+    x: fx + col1,
+    y: row2Y,
+    w: col2,
+    valueFs: 15,
+    labelFs: 13,
+    boxH: 24,
+    pb: 1,
+    labelGap: 1,
+  });
+
+  drawDomField({
+    label: "Civil Status",
+    value: (resident.civil_status || "").replace("Live-in Partner", "Live-in Partner"),
+    x: fx + col1 + col2,
+    y: row2Y,
+    w: col3,
+    valueFs: 14,
+    labelFs: 13,
+    boxH: 24,
+    pb: 1,
+    labelGap: 1,
+    nowrap: true,
+  });
+
+  drawDomField({
+    label: "Contact No.",
+    value: resident.contact_no || "",
+    x: fx,
+    y: row3Y,
+    w: fw * 0.48,
+    valueFs: 16,
+    labelFs: 13,
+    boxH: 26,
+    pb: 1,
+    labelGap: 1,
+  });
 
   return canvas;
 }
@@ -271,7 +321,7 @@ async function drawBack(
   const canvas = document.createElement("canvas");
   canvas.width = CW;
   canvas.height = CH;
-  const ctx = canvas.getContext("2d", { alpha: true, desynchronized: true });
+  const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas context not available");
 
   ctx.fillStyle = "#ffffff";
@@ -289,12 +339,10 @@ async function drawBack(
     const logo = await loadImage(logoUrl);
     ctx.save();
     ctx.globalAlpha = 0.12;
-
     const wmW = X(420);
     const wmH = Y(420);
     const wmX = CW - wmW + X(55);
     const wmY = CH - wmH + Y(70);
-
     ctx.drawImage(logo, wmX, wmY, wmW, wmH);
     ctx.restore();
   } catch (_) {}
@@ -302,8 +350,8 @@ async function drawBack(
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(0, 0);
-  ctx.lineTo(X(648 * 0.7), 0);
-  ctx.lineTo(0, Y(408 * 0.6));
+  ctx.lineTo(X(DOM_W * 0.7), 0);
+  ctx.lineTo(0, Y(DOM_H * 0.6));
   ctx.closePath();
   ctx.fillStyle = "#cc0000";
   ctx.fill();
@@ -311,7 +359,7 @@ async function drawBack(
 
   ctx.strokeStyle = "rgba(255,255,255,0.8)";
   ctx.lineWidth = X(1);
-  ctx.strokeRect(X(10), Y(10), X(648 - 20), Y(408 - 20));
+  ctx.strokeRect(X(10), Y(10), X(DOM_W - 20), Y(DOM_H - 20));
 
   try {
     const logo = await loadImage(logoUrl);
@@ -319,7 +367,6 @@ async function drawBack(
     const ly = Y(24);
     const lw = X(88);
     const lh = Y(88);
-
     ctx.save();
     ctx.beginPath();
     ctx.arc(lx + lw / 2, ly + lh / 2, Math.min(lw, lh) / 2, 0, Math.PI * 2);
@@ -329,51 +376,54 @@ async function drawBack(
     ctx.restore();
   } catch (_) {}
 
-  const leftX = X(120);
+  const leftX = X(90);
   let topY = Y(190);
 
   ctx.fillStyle = "#000";
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.font = `${FONT_MEDIUM} ${FS(16)}px ${FONT_FAMILY}`;
-  ctx.fillText("In Case of Emergency", leftX, topY);
-  topY += Y(28);
+  ctx.fillText("In Case of Emergency", leftX, topY + FS(16));
+  topY += FS(16) + Y(12);
 
-  function drawEmergencyBlock(value, y, valueFs = 14, maxWidth = 235) {
+  const maxEmW = X(235);
+
+  function drawEmergencyLine(value, fontSize, mb = 12) {
     const val = String(value || " ").toUpperCase();
     ctx.fillStyle = "#000";
-    ctx.font = `${FONT_BOLD} ${FS(valueFs)}px ${FONT_FAMILY}`;
-    const lines = wrapText(ctx, val, X(maxWidth));
-    const lineHeight = FS(valueFs) + Y(3);
+    ctx.font = `${FONT_BOLD} ${FS(fontSize)}px ${FONT_FAMILY}`;
+    ctx.textAlign = "left";
+    const lines = wrapText(ctx, val, maxEmW);
+    const lh = FS(fontSize) + Y(3);
 
     lines.forEach((line, i) => {
-      ctx.fillText(line, leftX, y + i * lineHeight);
+      ctx.fillText(line, leftX, topY + i * lh + FS(fontSize));
     });
 
-    return y + lines.length * lineHeight + Y(14);
+    topY += lines.length * lh + Y(mb);
   }
 
-  topY = drawEmergencyBlock(emergencyName, topY, 14, 210);
-  topY = drawEmergencyBlock(emergencyContactNo, topY, 14, 210);
-  drawEmergencyBlock(emergencyAddress, topY, 13, 210);
+  drawEmergencyLine(emergencyName, 14, 12);
+  drawEmergencyLine(emergencyContactNo, 14, 12);
+  drawEmergencyLine(emergencyAddress, 13, 0);
 
-  const rx = X(648 - 34 - 285);
+  const rx = X(DOM_W - 34 - 285);
   const ry = Y(60);
 
   ctx.fillStyle = "#000";
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  ctx.font = `${FONT_BLACK} ${FS(22)}px ${FONT_FAMILY}`;
+  ctx.font = `${FONT_BLACK} ${FS(24)}px ${FONT_FAMILY}`;
 
-  const idY = ry + Y(30);
-  const label = "ID NUMBER:";
-  ctx.fillText(label, rx, idY);
+  const idLabel = "ID NUMBER:";
+  const idLabelW = ctx.measureText(idLabel).width;
+  const idY = ry + FS(24);
 
-  const labelWidth = ctx.measureText(label).width;
-  ctx.fillText(resident.resident_code || "—", rx + labelWidth + X(8), idY);
+  ctx.fillText(idLabel, rx, idY);
+  ctx.fillText(resident.resident_code || "—", rx + idLabelW + X(8), idY);
 
-  const qx = X(648 - 34 - 245);
-  const qy = Y(135);
+  const qx = X(DOM_W - 34 - 245);
+  const qy = Y(60) + FS(24) + Y(12);
   const qw = X(245);
   const qh = Y(205);
 
@@ -386,23 +436,17 @@ async function drawBack(
   if (qrSrc) {
     try {
       const qr = await loadImage(qrSrc);
-      ctx.drawImage(qr, qx + X(8), qy + Y(8), qw - X(16), qh - Y(16));
+      const pad = X(8);
+      ctx.drawImage(qr, qx + pad, qy + pad, qw - pad * 2, qh - pad * 2);
     } catch (_) {}
   }
 
+  const captionY = qy + qh + Y(12);
   ctx.textAlign = "center";
   ctx.fillStyle = "#000";
   ctx.font = `${FONT_MEDIUM} ${FS(11)}px ${FONT_FAMILY}`;
-  ctx.fillText(
-    "This QR Code contains verified resident data.",
-    qx + qw / 2,
-    qy + qh + Y(20)
-  );
-  ctx.fillText(
-    "Scan using authorized LGU devices only.",
-    qx + qw / 2,
-    qy + qh + Y(35)
-  );
+  ctx.fillText("This QR Code contains verified resident data.", qx + qw / 2, captionY + FS(11));
+  ctx.fillText("Scan using authorized LGU devices only.", qx + qw / 2, captionY + FS(11) + Y(14));
 
   return canvas;
 }
@@ -477,9 +521,32 @@ export default function PublicResidentPage() {
 
   const fullName = useMemo(() => {
     if (!resident) return "";
-    return `${resident.last_name || ""}, ${resident.first_name || ""}${
-      resident.middle_name ? `, ${resident.middle_name.charAt(0)}.` : ""
-    }`;
+
+    const rawLastName = (resident.last_name || "").trim().toUpperCase();
+    const rawFirstName = (resident.first_name || "").trim().toUpperCase();
+    const rawMiddleName = (resident.middle_name || "").trim().toUpperCase();
+    const rawSuffix = (resident.ext_name || "").trim().toUpperCase();
+
+    let cleanFirstName = rawFirstName;
+    let suffix = rawSuffix;
+
+    if (!suffix && rawFirstName.includes(",")) {
+      const parts = rawFirstName
+        .split(",")
+        .map((p) => p.trim())
+        .filter(Boolean);
+
+      cleanFirstName = parts[0] || "";
+      suffix = parts.slice(1).join(" ");
+    }
+
+    const middleInitial = rawMiddleName ? `${rawMiddleName.charAt(0)}.` : "";
+
+    return [rawLastName ? `${rawLastName},` : "", cleanFirstName, middleInitial, suffix]
+      .filter(Boolean)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
   }, [resident]);
 
   const emergencyName = useMemo(() => resident?.emergency_name || " ", [resident]);
@@ -496,17 +563,17 @@ export default function PublicResidentPage() {
 
       try {
         if (document.fonts) {
-          await document.fonts.load("900 36px Barlow");
-          await document.fonts.load("900 34px Barlow");
-          await document.fonts.load("900 28px Barlow");
-          await document.fonts.load("900 22px Barlow");
           await document.fonts.load("700 17px Barlow");
           await document.fonts.load("700 16px Barlow");
           await document.fonts.load("700 15px Barlow");
           await document.fonts.load("700 14px Barlow");
-          await document.fonts.load("500 16px Barlow");
           await document.fonts.load("500 13px Barlow");
+          await document.fonts.load("500 16px Barlow");
           await document.fonts.load("500 11px Barlow");
+          await document.fonts.load("900 42px Barlow");
+          await document.fonts.load("900 40px Barlow");
+          await document.fonts.load("900 28px Barlow");
+          await document.fonts.load("900 24px Barlow");
           await document.fonts.ready;
         }
 
@@ -577,17 +644,17 @@ export default function PublicResidentPage() {
     setDownloadingPdf(true);
     try {
       if (document.fonts) {
-        await document.fonts.load("900 36px Barlow");
-        await document.fonts.load("900 34px Barlow");
-        await document.fonts.load("900 28px Barlow");
-        await document.fonts.load("900 22px Barlow");
         await document.fonts.load("700 17px Barlow");
         await document.fonts.load("700 16px Barlow");
         await document.fonts.load("700 15px Barlow");
         await document.fonts.load("700 14px Barlow");
-        await document.fonts.load("500 16px Barlow");
         await document.fonts.load("500 13px Barlow");
+        await document.fonts.load("500 16px Barlow");
         await document.fonts.load("500 11px Barlow");
+        await document.fonts.load("900 42px Barlow");
+        await document.fonts.load("900 40px Barlow");
+        await document.fonts.load("900 28px Barlow");
+        await document.fonts.load("900 24px Barlow");
         await document.fonts.ready;
       }
 

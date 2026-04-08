@@ -144,8 +144,9 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
 
   const px = X(95);
   const py = Y(140);
-  const pw = X(155);
-  const ph = Y(180);
+  const photoSize = X(170);
+  const pw = photoSize;
+  const ph = photoSize;
 
   ctx.fillStyle = "#efefef";
   ctx.fillRect(px, py, pw, ph);
@@ -156,7 +157,29 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   if (resident.photo_url) {
     try {
       const photo = await loadImage(resident.photo_url);
-      ctx.drawImage(photo, px, py, pw, ph);
+
+      const imgW = photo.width;
+      const imgH = photo.height;
+      const squareSide = Math.min(imgW, imgH);
+
+      const sx = (imgW - squareSide) / 2;
+      const sy = (imgH - squareSide) / 2;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(px, py, pw, ph);
+      ctx.clip();
+
+      ctx.fillStyle = "#efefef";
+      ctx.fillRect(px, py, pw, ph);
+
+      ctx.drawImage(
+        photo,
+        sx, sy, squareSide, squareSide,
+        px, py, pw, ph
+      );
+
+      ctx.restore();
     } catch (_) {}
   } else {
     ctx.fillStyle = "#888";
@@ -228,16 +251,16 @@ async function drawFront(resident, formattedBirthdate, fullName, bgUrl, logoUrl)
   const row3Y = Y(286);
 
   drawDomField({
-    label: "Last Name, First Name, M.I",
+    label: "Last Name, First Name, M.I, Suffix",
     value: fullName,
     x: fx,
     y: row1Y,
     w: fw,
-    valueFs: 17,
-    labelFs: 13,
-    boxH: 30,
+    valueFs: 14,
+    labelFs: 12,
+    boxH: 32,
     pb: 1,
-    labelGap: 1,
+    labelGap: 2,
   });
 
   drawDomField({
@@ -468,6 +491,8 @@ export default function ResidentQRPage() {
       try {
         const response = await api.get(`/residents/code/${code}`);
         setResident(response.data);
+        
+        console.log("resident data:", response.data);
 
         const qrResponse = await api.get(`/residents/code/${code}/qr`, {
           responseType: "blob",
@@ -506,9 +531,32 @@ export default function ResidentQRPage() {
 
   const fullName = useMemo(() => {
     if (!resident) return "";
-    return `${resident.last_name || ""}, ${resident.first_name || ""}${
-      resident.middle_name ? `, ${resident.middle_name.charAt(0)}.` : ""
-    }`;
+
+    const rawLastName = (resident.last_name || "").trim().toUpperCase();
+    const rawFirstName = (resident.first_name || "").trim().toUpperCase();
+    const rawMiddleName = (resident.middle_name || "").trim().toUpperCase();
+    const rawSuffix = (resident.ext_name || "").trim().toUpperCase();
+
+    let cleanFirstName = rawFirstName;
+    let suffix = rawSuffix;
+
+    if (!suffix && rawFirstName.includes(",")) {
+      const parts = rawFirstName
+        .split(",")
+        .map((p) => p.trim())
+        .filter(Boolean);
+
+      cleanFirstName = parts[0] || "";
+      suffix = parts.slice(1).join(" ");
+    }
+
+    const middleInitial = rawMiddleName ? `${rawMiddleName.charAt(0)}.` : "";
+
+    return [rawLastName ? `${rawLastName},` : "", cleanFirstName, middleInitial, suffix]
+      .filter(Boolean)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
   }, [resident]);
 
   const emergencyName = useMemo(() => resident?.emergency_name || " ", [resident]);

@@ -1,13 +1,30 @@
-import { useState, useEffect } from 'react';
-import api from '../../api/api';
-import { 
-  X, Plus, Trash2, User, Users, MapPin, Briefcase, Heart, Save, Phone, 
-  Fingerprint, FileText, ChevronDown, Check, AlertCircle, Loader2 
-} from 'lucide-react';
-import toast, { Toaster } from 'react-hot-toast';
+import { useState, useEffect, useRef } from "react";
+import api from "../../api/api";
+import {
+  X,
+  Plus,
+  Trash2,
+  User,
+  Users,
+  MapPin,
+  Briefcase,
+  Heart,
+  Save,
+  Phone,
+  Fingerprint,
+  FileText,
+  ChevronDown,
+  Check,
+  AlertCircle,
+  Loader2,
+  Camera,
+  Upload,
+  Calendar,
+} from "lucide-react";
+import toast, { Toaster } from "react-hot-toast";
 import Cropper from "react-easy-crop";
 
-// --- REUSABLE COMPONENTS ---
+// --- IMAGE HELPERS ---
 
 const createImage = (url) =>
   new Promise((resolve, reject) => {
@@ -48,6 +65,27 @@ async function getCroppedImg(imageSrc, croppedAreaPixels) {
   });
 }
 
+// --- DATE HELPERS ---
+
+function isoToDisplayDate(isoDate) {
+  if (!isoDate) return "";
+  const clean = String(isoDate).split("T")[0];
+  const [year, month, day] = clean.split("-");
+  if (!year || !month || !day) return "";
+  return `${month}/${day}/${year.slice(-2)}`;
+}
+
+function displayDateToIso(displayDate) {
+  const clean = String(displayDate || "").trim();
+  const match = clean.match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
+  if (!match) return "";
+  const [, mm, dd, yy] = match;
+  const fullYear = Number(yy) >= 50 ? `19${yy}` : `20${yy}`;
+  return `${fullYear}-${mm}-${dd}`;
+}
+
+// --- REUSABLE COMPONENTS ---
+
 const SectionHeader = ({ icon: Icon, title, colorClass = "text-slate-600" }) => (
   <div className="flex items-center gap-3 border-b border-slate-100 pb-4 mb-6">
     <div className={`p-2 rounded-xl bg-white border border-slate-100 shadow-sm ${colorClass}`}>
@@ -68,7 +106,7 @@ const SelectGroup = ({
   required = false,
   disabled = false,
   placeholder,
-  className = ""
+  className = "",
 }) => (
   <div className="space-y-1.5 w-full">
     <label className="flex items-center text-[11px] font-normal text-slate-400 uppercase tracking-wider">
@@ -100,13 +138,11 @@ const SelectGroup = ({
 
         {options.map((opt) => {
           const optionValue =
-            typeof opt === "object" ? (opt.id ?? opt.value ?? opt.name) : opt;
-
+            typeof opt === "object" ? opt.id ?? opt.value ?? opt.name : opt;
           const optionLabel =
-            typeof opt === "object" ? (opt.label ?? opt.name ?? opt.id) : opt;
-
+            typeof opt === "object" ? opt.label ?? opt.name ?? opt.id : opt;
           const key =
-            typeof opt === "object" ? (opt.id ?? opt.value ?? opt.name) : opt;
+            typeof opt === "object" ? opt.id ?? opt.value ?? opt.name : opt;
 
           return (
             <option key={key} value={optionValue} className="uppercase">
@@ -132,7 +168,7 @@ const InputGroup = ({
   type = "text",
   required = false,
   placeholder,
-  className = ""
+  className = "",
 }) => (
   <div className={`flex flex-col gap-1.5 w-full ${className}`}>
     <label className="flex items-center text-[11px] font-normal text-slate-400 uppercase tracking-wider">
@@ -151,30 +187,254 @@ const InputGroup = ({
         bg-slate-50 border border-slate-200 rounded-xl
         text-sm font-normal text-slate-800 placeholder:text-slate-300
         focus:bg-white focus:border-red-400 focus:ring-4 focus:ring-red-50 hover:border-slate-300
-        outline-none transition-all
-        ${type === "date" ? "uppercase tracking-wide" : "uppercase"}
+        outline-none transition-all uppercase
       `}
     />
   </div>
 );
 
+// --- CALENDAR DATE PICKER ---
+
+const DatePickerInput = ({ label, name, value, onChange, required = false }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const now = new Date();
+
+  const parseDisplay = (val) => {
+    const match = String(val || "").match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
+    if (!match) return { month: null, day: null, year: null };
+    const [, mm, dd, yy] = match;
+    const fullYear = Number(yy) >= 50 ? 1900 + Number(yy) : 2000 + Number(yy);
+    return { month: Number(mm) - 1, day: Number(dd), year: fullYear };
+  };
+
+  const { month: selMonth, day: selDay, year: selYear } = parseDisplay(value);
+
+  const [viewMonth, setViewMonth] = useState(
+    selMonth !== null ? selMonth : now.getMonth()
+  );
+  const [viewYear, setViewYear] = useState(
+    selYear !== null ? selYear : now.getFullYear()
+  );
+
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+  const dayNames = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+  const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+  const handleDayClick = (day) => {
+    const mm = String(viewMonth + 1).padStart(2, "0");
+    const dd = String(day).padStart(2, "0");
+    const yy = String(viewYear).slice(-2);
+    onChange({ target: { name, value: `${mm}/${dd}/${yy}` } });
+    setOpen(false);
+  };
+
+  const prevMonth = () => {
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear((y) => y - 1);
+    } else {
+      setViewMonth((m) => m - 1);
+    }
+  };
+
+  const nextMonth = () => {
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear((y) => y + 1);
+    } else {
+      setViewMonth((m) => m + 1);
+    }
+  };
+
+  const isSelected = (day) =>
+    selDay === day && selMonth === viewMonth && selYear === viewYear;
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Sync view when value changes externally (e.g. edit mode)
+  useEffect(() => {
+    if (selMonth !== null && selYear !== null) {
+      setViewMonth(selMonth);
+      setViewYear(selYear);
+    }
+  }, [value]);
+
+  const cells = [];
+  for (let i = 0; i < firstDayOfMonth; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const yearOptions = Array.from({ length: 110 }, (_, i) => now.getFullYear() - i);
+
+  return (
+    <div className="flex flex-col gap-1.5 w-full relative" ref={ref}>
+      <label className="flex items-center text-[11px] font-normal text-slate-400 uppercase tracking-wider">
+        {label} {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`
+          w-full px-4 py-3 bg-slate-50 border rounded-xl text-sm font-normal text-left
+          outline-none transition-all uppercase flex items-center justify-between gap-2
+          ${open
+            ? "bg-white border-red-400 ring-4 ring-red-50"
+            : "border-slate-200 hover:border-slate-300"
+          }
+        `}
+      >
+        <span className={value ? "text-slate-800" : "text-slate-300"}>
+          {value || "MM/DD/YY"}
+        </span>
+        <Calendar size={16} className="text-slate-400 flex-shrink-0" strokeWidth={2} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 w-72 animate-in fade-in zoom-in-95 duration-150">
+
+          {/* Month/Year Navigation */}
+          <div className="flex items-center justify-between mb-4">
+            <button
+              type="button"
+              onClick={prevMonth}
+              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+
+            <div className="flex items-center gap-1.5">
+              <div className="relative">
+                <select
+                  value={viewMonth}
+                  onChange={(e) => setViewMonth(Number(e.target.value))}
+                  className="text-sm font-medium text-slate-700 bg-transparent border-none outline-none cursor-pointer appearance-none pr-4"
+                >
+                  {monthNames.map((m, i) => (
+                    <option key={i} value={i}>{m}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="relative">
+                <select
+                  value={viewYear}
+                  onChange={(e) => setViewYear(Number(e.target.value))}
+                  className="text-sm font-medium text-slate-700 bg-transparent border-none outline-none cursor-pointer appearance-none pr-4"
+                >
+                  {yearOptions.map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={nextMonth}
+              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Day Headers */}
+          <div className="grid grid-cols-7 mb-1">
+            {dayNames.map((d) => (
+              <div
+                key={d}
+                className="text-center text-[10px] font-medium text-slate-400 uppercase py-1"
+              >
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Day Cells */}
+          <div className="grid grid-cols-7 gap-y-1">
+            {cells.map((day, idx) =>
+              day === null ? (
+                <div key={`empty-${idx}`} />
+              ) : (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => handleDayClick(day)}
+                  className={`
+                    w-full aspect-square flex items-center justify-center text-xs rounded-lg transition-all font-normal
+                    ${
+                      isSelected(day)
+                        ? "bg-slate-900 text-white font-medium shadow-sm"
+                        : "text-slate-700 hover:bg-red-50 hover:text-red-600"
+                    }
+                  `}
+                >
+                  {day}
+                </button>
+              )
+            )}
+          </div>
+
+          {/* Footer: selected value display */}
+          {value && (
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-xs text-slate-400 uppercase tracking-wide">Selected</span>
+              <span className="text-xs font-medium text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">
+                {value}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // --- INITIAL STATE ---
+
 const getInitialFormState = () => ({
-  last_name: '', first_name: '', middle_name: '', ext_name: '',
-  house_no: '',
+  last_name: "",
+  first_name: "",
+  middle_name: "",
+  ext_name: "",
+  house_no: "",
   purok: "",
   barangay_id: "",
-  birthdate: '', sex: '', civil_status: '',
-  religion: '',
-  occupation: '', precinct_no: '', contact_no: '',
+  birthdate: "",
+  sex: "",
+  civil_status: "",
+  religion: "",
+  occupation: "",
+  precinct_no: "",
+  contact_no: "",
 
-  emergency_name: '',
-  emergency_contact_no: '',
-  emergency_address: '',
+  emergency_name: "",
+  emergency_contact_no: "",
+  emergency_address: "",
 
-  spouse_last_name: '', spouse_first_name: '', spouse_middle_name: '', spouse_ext_name: '',
-  sector_ids: [], family_members: [], other_sector_details: ''
+  spouse_last_name: "",
+  spouse_first_name: "",
+  spouse_middle_name: "",
+  spouse_ext_name: "",
+
+  sector_ids: [],
+  family_members: [],
+  other_sector_details: "",
 });
 
 export default function AddResidentForm({ onSuccess, onCancel, residentToEdit }) {
@@ -183,6 +443,7 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
   const [purokOptions, setPurokOptions] = useState([]);
   const [sectorOptions, setSectorOptions] = useState([]);
   const [loading, setLoading] = useState(false);
+
   const [photoFile, setPhotoFile] = useState(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -190,264 +451,339 @@ export default function AddResidentForm({ onSuccess, onCancel, residentToEdit })
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [imageSrc, setImageSrc] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
-  
-  const userRole = (localStorage.getItem('role') || 'staff').toLowerCase();
+
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraStream, setCameraStream] = useState(null);
+  const videoRef = useRef(null);
+
+  const userRole = (localStorage.getItem("role") || "staff").toLowerCase();
   const isAdmin = userRole === "admin";
   const isSuperAdmin = userRole === "super_admin";
   const isAdminLimited = userRole === "admin_limited";
   const isAdminLike = isAdmin || isSuperAdmin || isAdminLimited;
-  const isBarangayUser = userRole === "barangay";
 
   const relationshipOptions = [
-  "Son", "Daughter", "Mother", "Father", "Sibling",
-  "Grandparent", "Grandchild",
-  "Guardian", "In-laws", "Relative",
-];
-
-  const mergePurokAndSitio = (items) => {
-    const all = Array.isArray(items) ? items : [];
-
-    const purokOnly = all.filter((p) => {
-      const name = (p?.name || "").toLowerCase();
-      if (!name.includes("purok")) return false;
-      const match = name.match(/\d+/);
-      const n = match ? parseInt(match[0], 10) : NaN;
-      return n >= 1 && n <= 12;
-    });
-
-    const sitioOnly = all.filter((p) => {
-      const name = (p?.name || "").toLowerCase();
-      return name.includes("sitio") || name.includes("bantay");
-    });
-
-    const sitioLabeled = sitioOnly.map((s) => {
-      const name = s.name;
-      const sitioToPurok = {
-        "Sitio Sagpat": 6,
-        "Sitio Tektek": 6,
-        "Sitio Cabuyao": 7,
-        "Bantay Carmen": 4,
-        "Sitio Ticub": 7,
-        "Sitio Lalec": 7,
-        "Sitio Laoag": 8,
-      };
-
-      const n = sitioToPurok[name];
-      return {
-        value: name,
-        label: n ? `${name} (Purok ${n})` : name,
-      };
-    });
-
-    const purokLabeled = purokOnly.map((p) => ({
-      value: p.name,
-      label: p.name,
-    }));
-
-    return [...purokLabeled, ...sitioLabeled];
-  };
+    "Son",
+    "Daughter",
+    "Mother",
+    "Father",
+    "Sibling",
+    "Grandparent",
+    "Grandchild",
+    "Guardian",
+    "In-laws",
+    "Relative",
+  ];
 
   // --- FETCH DATA ---
+
   useEffect(() => {
     const fetchOptions = async () => {
       try {
-        const [bRes, sRes] = await Promise.all([
-          api.get('/barangays/'), 
-          api.get('/sectors/')
-        ]);
+        const [bRes, sRes] = await Promise.all([api.get("/barangays/"), api.get("/sectors/")]);
 
         setBarangayOptions(
-          (bRes.data || []).map(b => ({
+          (bRes.data || []).map((b) => ({
             ...b,
             value: b.id,
-            label: b.name
+            label: b.name,
           }))
         );
-        setSectorOptions(sRes.data);
-      } catch (err) { toast.error("System Error: Failed to load form options."); }
+        setSectorOptions(sRes.data || []);
+      } catch {
+        toast.error("System Error: Failed to load form options.");
+      }
     };
+
     fetchOptions();
   }, []);
 
   useEffect(() => {
-  const loadAreas = async () => {
-    if (!formData.barangay_id) {
-      setPurokOptions([]);
-      setFormData(prev => ({ ...prev, purok: "" }));
-      return;
-    }
-
-    try {
-      const res = await api.get(`/barangays/${formData.barangay_id}/areas`);
-      const opts = (res.data || []).map(a => ({
-        value: a.name,
-        label: a.parent_purok ? `${a.name} (${a.parent_purok})` : a.name
-      }));
-      setPurokOptions(opts);
-      setFormData(prev => ({
-        ...prev,
-        purok: prev.purok || (residentToEdit?.purok ?? "")
-      }));
-
-    } catch (err) {
-      setPurokOptions([]);
-      toast.error("Failed to load Purok/Sitio for selected barangay.");
-    }
-  };
-
-  loadAreas();
-}, [formData.barangay_id, residentToEdit]);
-
-useEffect(() => {
-  const loadMe = async () => {
-    try {
-      const res = await api.get("/me");
-      const { role, barangay_id } = res.data || {};
-
-      if (String(role).toLowerCase() === "barangay" && barangay_id) {
-        setFormData((prev) => ({ ...prev, barangay_id: String(barangay_id) }));
+    const loadAreas = async () => {
+      if (!formData.barangay_id) {
+        setPurokOptions([]);
+        setFormData((prev) => ({ ...prev, purok: "" }));
+        return;
       }
-    } catch (e) {
-    }
-  };
 
-  loadMe();
-}, []);
+      try {
+        const res = await api.get(`/barangays/${formData.barangay_id}/areas`);
+        const opts = (res.data || []).map((a) => ({
+          value: a.name,
+          label: a.parent_purok ? `${a.name} (${a.parent_purok})` : a.name,
+        }));
 
- // --- POPULATE EDIT DATA ---
-useEffect(() => {
-  if (!residentToEdit) return;
-  if (!barangayOptions.length) return;
+        setPurokOptions(opts);
+        setFormData((prev) => ({
+          ...prev,
+          purok: prev.purok || (residentToEdit?.purok ?? ""),
+        }));
+      } catch {
+        setPurokOptions([]);
+        toast.error("Failed to load Purok/Sitio for selected barangay.");
+      }
+    };
 
-  const normalizeText = (v) =>
-    String(v ?? "")
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, " ")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
+    loadAreas();
+  }, [formData.barangay_id, residentToEdit]);
 
-  const normalizePurokSitioKey = (v) => {
-    const t = normalizeText(v);
+  useEffect(() => {
+    const loadMe = async () => {
+      try {
+        const res = await api.get("/me");
+        const { role, barangay_id } = res.data || {};
 
-    const numMatch = t.match(/\b(\d{1,2})\b/);
-    if (t.includes("purok") && numMatch) return `purok-${numMatch[1]}`;
+        if (String(role).toLowerCase() === "barangay" && barangay_id) {
+          setFormData((prev) => ({ ...prev, barangay_id: String(barangay_id) }));
+        }
+      } catch {}
+    };
 
-    if (/^\d{1,2}$/.test(t)) return `purok-${t}`;
+    loadMe();
+  }, []);
 
-    return t;
-  };
+  // --- POPULATE EDIT DATA ---
 
-  const normalizeSelect = (value, options, mode = "text") => {
-    if (!value) return "";
+  useEffect(() => {
+    if (!residentToEdit) return;
+    if (!barangayOptions.length) return;
 
-    const targetKey =
-      mode === "purok" ? normalizePurokSitioKey(value) : normalizeText(value);
+    const normalizeText = (v) =>
+      String(v ?? "")
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, " ")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
 
-    const match = (options || []).find((opt) => {
-      const optionRaw =
-        typeof opt === "object"
-          ? (opt.value ?? opt.name ?? opt.label ?? opt.id)
-          : opt;
+    const normalizePurokSitioKey = (v) => {
+      const t = normalizeText(v);
+      const numMatch = t.match(/\b(\d{1,2})\b/);
+      if (t.includes("purok") && numMatch) return `purok-${numMatch[1]}`;
+      if (/^\d{1,2}$/.test(t)) return `purok-${t}`;
+      return t;
+    };
 
-      const optionKey =
-        mode === "purok"
-          ? normalizePurokSitioKey(optionRaw)
-          : normalizeText(optionRaw);
+    const normalizeSelect = (value, options, mode = "text") => {
+      if (!value) return "";
 
-      return optionKey === targetKey;
+      const targetKey =
+        mode === "purok" ? normalizePurokSitioKey(value) : normalizeText(value);
+
+      const match = (options || []).find((opt) => {
+        const optionRaw =
+          typeof opt === "object" ? opt.value ?? opt.name ?? opt.label ?? opt.id : opt;
+
+        const optionKey =
+          mode === "purok" ? normalizePurokSitioKey(optionRaw) : normalizeText(optionRaw);
+
+        return optionKey === targetKey;
+      });
+
+      return match
+        ? String(typeof match === "object" ? match.value ?? match.id ?? match.name : match)
+        : "";
+    };
+
+    const normalizeSex = (value) => {
+      if (!value) return "";
+      const v = String(value).toLowerCase().trim();
+      if (v === "m" || v === "male") return "Male";
+      if (v === "f" || v === "female") return "Female";
+      return "";
+    };
+
+    const normalizeCivilStatus = (value) => {
+      if (!value) return "";
+      const v = String(value).toLowerCase().trim();
+      if (v === "single") return "Single";
+      if (v === "married") return "Married";
+      if (v === "widowed") return "Widowed";
+      if (v.includes("live")) return "Live-in Partner";
+      if (v === "separated") return "Separated";
+      return "";
+    };
+
+    const barangayMatch = barangayOptions.find(
+      (b) => normalizeText(b.name) === normalizeText(residentToEdit?.barangay)
+    );
+
+    setFormData({
+      ...getInitialFormState(),
+      ...residentToEdit,
+      birthdate: residentToEdit.birthdate ? isoToDisplayDate(residentToEdit.birthdate) : "",
+      sex: normalizeSex(residentToEdit.sex),
+      civil_status: normalizeCivilStatus(residentToEdit.civil_status),
+      barangay_id: barangayMatch ? String(barangayMatch.value ?? barangayMatch.id) : "",
+      purok: residentToEdit.purok
+        ? normalizeSelect(residentToEdit.purok, purokOptions, "purok")
+        : "",
+      sector_ids: residentToEdit.sectors ? residentToEdit.sectors.map((s) => s.id) : [],
+      family_members: residentToEdit.family_members || [],
     });
 
-    return match
-      ? String(
-          typeof match === "object"
-            ? (match.value ?? match.id ?? match.name)
-            : match
-        )
-      : "";
+    setPhotoPreview(residentToEdit.photo_url || null);
+  }, [residentToEdit?.id, barangayOptions, purokOptions]);
+
+  // --- CLEANUP CAMERA ---
+
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [cameraStream]);
+
+  // --- PHOTO HANDLERS ---
+
+  const handlePhotoSelect = (file) => {
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      setImageSrc(reader.result);
+      setCrop({ x: 0, y: 0 });
+      setZoom(1);
+      setCropModalOpen(true);
+    };
   };
 
-  const normalizeSex = (value) => {
-    if (!value) return "";
-    const v = String(value).toLowerCase().trim();
-    if (v === "m" || v === "male") return "Male";
-    if (v === "f" || v === "female") return "Female";
-    return "";
+  const handleCropSave = async () => {
+    try {
+      const croppedImage = await getCroppedImg(imageSrc, croppedAreaPixels);
+      setPhotoFile(croppedImage);
+      setPhotoPreview(URL.createObjectURL(croppedImage));
+      setCropModalOpen(false);
+    } catch {
+      toast.error("Failed to crop photo.");
+    }
   };
 
-  const normalizeCivilStatus = (value) => {
-    if (!value) return "";
-    const v = String(value).toLowerCase().trim();
-    if (v === "single") return "Single";
-    if (v === "married") return "Married";
-    if (v === "widowed") return "Widowed";
-    if (v.includes("live")) return "Live-in Partner";
-    return "";
+  const removePhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setImageSrc(null);
   };
 
-  const barangayMatch = barangayOptions.find(
-    (b) => normalizeText(b.name) === normalizeText(residentToEdit?.barangay)
-  );
+  const openCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+        audio: false,
+      });
 
-  setFormData({
-    ...getInitialFormState(),
-    ...residentToEdit,
-    birthdate: residentToEdit.birthdate
-      ? residentToEdit.birthdate.split("T")[0]
-      : "",
-    sex: normalizeSex(residentToEdit.sex),
-    civil_status: normalizeCivilStatus(residentToEdit.civil_status),
+      setCameraStream(stream);
+      setCameraOpen(true);
 
-    barangay_id: barangayMatch ? String(barangayMatch.value ?? barangayMatch.id) : "",
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }, 100);
+    } catch (error) {
+      console.error(error);
+      toast.error("Unable to access camera.");
+    }
+  };
 
-    purok: residentToEdit.purok ? normalizeSelect(residentToEdit.purok, purokOptions, "purok") : "",
+  const closeCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+    }
+    setCameraStream(null);
+    setCameraOpen(false);
+  };
 
-    sector_ids: residentToEdit.sectors ? residentToEdit.sectors.map((s) => s.id) : [],
-    family_members: residentToEdit.family_members || [],
-  });
+  const capturePhoto = () => {
+    if (!videoRef.current) return;
 
-  setPhotoPreview(residentToEdit.photo_url || null);
-}, [residentToEdit?.id, barangayOptions]);
+    const video = videoRef.current;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-  // --- HANDLERS ---
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const dataUrl = canvas.toDataURL("image/jpeg");
+    setImageSrc(dataUrl);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setCropModalOpen(true);
+
+    closeCamera();
+  };
+
+  // --- FORM HANDLERS ---
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => {
+
+    setFormData((prev) => {
       const newState = { ...prev, [name]: value };
-      if (name === "civil_status" && value !== "Married" && value !== "Live-in Partner" && value !== "Separated") {
-        newState.spouse_last_name = '';
-        newState.spouse_first_name = '';
-        newState.spouse_middle_name = '';
-        newState.spouse_ext_name = '';
+
+      if (
+        name === "civil_status" &&
+        value !== "Married" &&
+        value !== "Live-in Partner" &&
+        value !== "Separated"
+      ) {
+        newState.spouse_last_name = "";
+        newState.spouse_first_name = "";
+        newState.spouse_middle_name = "";
+        newState.spouse_ext_name = "";
       }
+
       return newState;
     });
   };
 
   const handleSectorToggle = (id) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      sector_ids: prev.sector_ids.includes(id) 
-        ? prev.sector_ids.filter(sid => sid !== id) 
-        : [...prev.sector_ids, id]
+      sector_ids: prev.sector_ids.includes(id)
+        ? prev.sector_ids.filter((sid) => sid !== id)
+        : [...prev.sector_ids, id],
     }));
   };
 
   const addFamilyMember = () => {
-  setFormData(prev => ({
-    ...prev,
-    family_members: [
-      ...prev.family_members,
-      { first_name: '', middle_name: '', last_name: '', relationship: '' }
-    ]
-  }));
-};
+    setFormData((prev) => ({
+      ...prev,
+      family_members: [
+        ...prev.family_members,
+        { first_name: "", middle_name: "", last_name: "", relationship: "" },
+      ],
+    }));
+  };
 
   const handleFamilyChange = (index, field, value) => {
     const updated = [...formData.family_members];
     updated[index][field] = value;
     setFormData({ ...formData, family_members: updated });
   };
+
+  const removeFamilyMember = (index) => {
+    setFormData({
+      ...formData,
+      family_members: formData.family_members.filter((_, i) => i !== index),
+    });
+  };
+
+  const buildPayload = () => ({
+    ...formData,
+    birthdate: displayDateToIso(formData.birthdate),
+    barangay_id: formData.barangay_id ? Number(formData.barangay_id) : null,
+    sector_ids: Array.isArray(formData.sector_ids) ? formData.sector_ids.map(Number) : [],
+    family_members: (formData.family_members || []).map((m) => ({
+      first_name: m.first_name || "",
+      middle_name: m.middle_name || "",
+      last_name: m.last_name || "",
+      relationship: m.relationship || "",
+    })),
+  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -457,20 +793,7 @@ useEffect(() => {
       let response;
 
       if (residentToEdit) {
-        const payload = {
-          ...formData,
-          barangay_id: formData.barangay_id ? Number(formData.barangay_id) : null,
-          sector_ids: Array.isArray(formData.sector_ids)
-            ? formData.sector_ids.map(Number)
-            : [],
-          family_members: (formData.family_members || []).map((m) => ({
-            first_name: m.first_name || "",
-            middle_name: m.middle_name || "",
-            last_name: m.last_name || "",
-            relationship: m.relationship || "",
-          })),
-        };
-
+        const payload = buildPayload();
         console.log("UPDATE PAYLOAD:", payload);
 
         response = await api.put(`/residents/${residentToEdit.id}`, payload);
@@ -478,44 +801,26 @@ useEffect(() => {
         if (photoFile) {
           const form = new FormData();
           form.append("file", photoFile);
-          await api.post(
-            `/residents/${residentToEdit.id}/upload-photo`,
-            form,
-            { headers: { "Content-Type": "multipart/form-data" } }
-          );
+          await api.post(`/residents/${residentToEdit.id}/upload-photo`, form, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
         }
 
         toast.success("Resident Record Updated.");
         setTimeout(onSuccess, 1000);
-
       } else {
-        const payload = {
-          ...formData,
-          barangay_id: formData.barangay_id ? Number(formData.barangay_id) : null,
-          sector_ids: Array.isArray(formData.sector_ids)
-            ? formData.sector_ids.map(Number)
-            : [],
-          family_members: (formData.family_members || []).map((m) => ({
-            first_name: m.first_name || "",
-            middle_name: m.middle_name || "",
-            last_name: m.last_name || "",
-            relationship: m.relationship || "",
-          })),
-        };
-
+        const payload = buildPayload();
         console.log("CREATE PAYLOAD:", payload);
 
-        response = await api.post('/residents/', payload);
+        response = await api.post("/residents/", payload);
         const newResident = response.data;
 
         if (photoFile && newResident?.id) {
           const form = new FormData();
           form.append("file", photoFile);
-          await api.post(
-            `/residents/${newResident.id}/upload-photo`,
-            form,
-            { headers: { "Content-Type": "multipart/form-data" } }
-          );
+          await api.post(`/residents/${newResident.id}/upload-photo`, form, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
         }
 
         toast.success("New Resident Registered.");
@@ -523,123 +828,283 @@ useEffect(() => {
         setTimeout(() => {
           setFormData(getInitialFormState());
           setPhotoFile(null);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          setPhotoPreview(null);
+          setImageSrc(null);
+          window.scrollTo({ top: 0, behavior: "smooth" });
           setLoading(false);
           onSuccess();
         }, 1000);
       }
-
     } catch (err) {
+      console.error("FULL ERROR:", err);
+      console.error("ERROR RESPONSE DATA:", err.response?.data);
+      console.error("ERROR RESPONSE DETAIL:", err.response?.data?.detail);
+
       if (err.response?.data?.detail) {
-        toast.error(err.response.data.detail);
+        const detail = err.response.data.detail;
+
+        if (Array.isArray(detail)) {
+          const message = detail
+            .map((item) => {
+              const field = Array.isArray(item.loc) ? item.loc[item.loc.length - 1] : "field";
+              return `${field}: ${item.msg}`;
+            })
+            .join(" | ");
+
+          toast.error(message || "Validation failed.");
+        } else if (typeof detail === "string") {
+          toast.error(detail);
+        } else {
+          toast.error("Validation failed.");
+        }
       } else {
         toast.error("Registration failed.");
       }
+
       setLoading(false);
     }
-    
   };
 
-  const isOtherSelected = sectorOptions.find(s => s.name.toLowerCase().includes('other') && formData.sector_ids.includes(s.id));
+  const isOtherSelected = sectorOptions.find(
+    (s) => s.name.toLowerCase().includes("other") && formData.sector_ids.includes(s.id)
+  );
 
   return (
-    <div className="max-w-6xl mx-auto pb-32 animate-in fade-in duration-300 font-sans text-slate-800"> 
-      <Toaster position="top-right" toastOptions={{ style: { background: '#1e293b', color: '#fff', borderRadius: '12px', fontSize: '14px' } }} />
-      
-      {/* HEADER */}
+    <div className="max-w-6xl mx-auto pb-32 animate-in fade-in duration-300 font-sans text-slate-800">
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: "#1e293b",
+            color: "#fff",
+            borderRadius: "12px",
+            fontSize: "14px",
+          },
+        }}
+      />
+
       <div className="mb-8 border-b border-slate-200 pb-5">
         <div className="flex items-center gap-3.5">
           <div className="p-2.5 bg-slate-900 text-white rounded-xl shadow-sm">
-             {residentToEdit ? <FileText size={24} strokeWidth={1.5} /> : <User size={24} strokeWidth={1.5} />}
+            {residentToEdit ? (
+              <FileText size={24} strokeWidth={1.5} />
+            ) : (
+              <User size={24} strokeWidth={1.5} />
+            )}
           </div>
           <div>
             <h1 className="text-2xl font-medium text-slate-800 tracking-tight">
               {residentToEdit ? "Update Resident Profile" : "Resident Registration"}
             </h1>
             <p className="text-sm font-normal text-slate-400 mt-1">
-              {residentToEdit ? "Modify existing resident data and records." : "Enter details to register a new resident into the system."}
+              {residentToEdit
+                ? "Modify existing resident data and records."
+                : "Enter details to register a new resident into the system."}
             </p>
           </div>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
-        
-        {/* --- PERSONAL INFO --- */}
         <div className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
           <div className="px-6 md:px-8 py-6">
-             <SectionHeader icon={User} title="Personal Information" colorClass="text-blue-600" />
-             
+            <SectionHeader icon={User} title="Personal Information" colorClass="text-blue-600" />
+
             <div className="space-y-8">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                <InputGroup label="Last Name" name="last_name" value={formData.last_name} onChange={handleChange} required placeholder="DELA CRUZ" className="lg:col-span-1" />
-                <InputGroup label="First Name" name="first_name" value={formData.first_name} onChange={handleChange} required placeholder="JUAN" className="lg:col-span-1" />
-                <InputGroup label="Middle Name" name="middle_name" value={formData.middle_name} onChange={handleChange} placeholder="SANTOS" />
-                <InputGroup label="Suffix" name="ext_name" value={formData.ext_name} onChange={handleChange} placeholder="JR, SR, III" />
+                <InputGroup
+                  label="Last Name"
+                  name="last_name"
+                  value={formData.last_name}
+                  onChange={handleChange}
+                  required
+                  placeholder="DELA CRUZ"
+                />
+                <InputGroup
+                  label="First Name"
+                  name="first_name"
+                  value={formData.first_name}
+                  onChange={handleChange}
+                  required
+                  placeholder="JUAN"
+                />
+                <InputGroup
+                  label="Middle Name"
+                  name="middle_name"
+                  value={formData.middle_name}
+                  onChange={handleChange}
+                  placeholder="SANTOS"
+                />
+                <InputGroup
+                  label="Suffix"
+                  name="ext_name"
+                  value={formData.ext_name}
+                  onChange={handleChange}
+                  placeholder="JR, SR, III"
+                />
               </div>
-              
-              {/* PHOTO UPLOAD SECTION */}
+
               <div>
                 <label className="text-[11px] font-normal text-slate-400 uppercase tracking-wider block mb-3">
                   Resident Photo
                 </label>
+
                 <div className="flex items-center gap-6">
                   <div className="w-32 h-32 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center overflow-hidden flex-shrink-0">
                     {photoPreview ? (
-                      <img src={photoPreview} alt="Resident Preview" className="w-full h-full object-cover" />
+                      <img
+                        src={photoPreview}
+                        alt="Resident Preview"
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       <User size={32} className="text-slate-300" strokeWidth={1.5} />
                     )}
                   </div>
+
                   <div className="flex-1">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files[0];
-                        if (!file) return;
-                        const reader = new FileReader();
-                        reader.readAsDataURL(file);
-                        reader.onload = () => {
-                          setImageSrc(reader.result);
-                          setCropModalOpen(true);
-                        };
-                      }}
-                      className="block w-full text-sm text-slate-400 file:mr-4 file:py-2.5 file:px-5 file:rounded-xl file:border-0 file:text-sm file:font-normal file:bg-slate-100 file:text-slate-600 hover:file:bg-slate-200 transition-colors cursor-pointer"
-                    />
-                    <p className="text-xs text-slate-400 mt-2 font-normal">Recommended: Square image, max 5MB.</p>
+                    <div className="flex flex-wrap gap-3">
+                      <label className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-normal hover:bg-slate-200 transition-colors cursor-pointer">
+                        <Upload size={16} />
+                        Upload Photo
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handlePhotoSelect(e.target.files?.[0])}
+                          className="hidden"
+                        />
+                      </label>
+
+                      <button
+                        type="button"
+                        onClick={openCamera}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-normal hover:bg-slate-800 transition-colors"
+                      >
+                        <Camera size={16} />
+                        Take Photo
+                      </button>
+                    </div>
+
+                    {photoPreview && (
+                      <button
+                        type="button"
+                        onClick={removePhoto}
+                        className="mt-3 text-sm text-slate-500 hover:text-red-600 transition-colors"
+                      >
+                        Remove current photo
+                      </button>
+                    )}
+
+                    <p className="text-xs text-slate-400 mt-2 font-normal">
+                      Recommended: Square image, max 5MB.
+                    </p>
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                <InputGroup label="Date of Birth" name="birthdate" type="date" value={formData.birthdate} onChange={handleChange} required />
-                <SelectGroup label="Sex" name="sex" value={formData.sex} onChange={handleChange} options={['Male', 'Female']} required placeholder="Select Gender" />
-                <SelectGroup label="Civil Status" name="civil_status" value={formData.civil_status} onChange={handleChange} options={['Single', 'Married', 'Widowed', 'Live-in Partner', 'Separated']} required placeholder="Select Status" />
-                <InputGroup label="Religion" name="religion" value={formData.religion} onChange={handleChange} placeholder="ROMAN CATHOLIC" />
+                {/* DATE OF BIRTH — Calendar Picker */}
+                <DatePickerInput
+                  label="Date of Birth"
+                  name="birthdate"
+                  value={formData.birthdate}
+                  onChange={handleChange}
+                  required
+                />
+
+                <SelectGroup
+                  label="Sex"
+                  name="sex"
+                  value={formData.sex}
+                  onChange={handleChange}
+                  options={["Male", "Female"]}
+                  required
+                  placeholder="Select Gender"
+                />
+                <SelectGroup
+                  label="Civil Status"
+                  name="civil_status"
+                  value={formData.civil_status}
+                  onChange={handleChange}
+                  options={["Single", "Married", "Widowed", "Live-in Partner", "Separated"]}
+                  required
+                  placeholder="Select Status"
+                />
+                <InputGroup
+                  label="Religion"
+                  name="religion"
+                  value={formData.religion}
+                  onChange={handleChange}
+                  placeholder="ROMAN CATHOLIC"
+                />
               </div>
 
-              {/* SPOUSE SECTION */}
-              {(formData.civil_status === 'Married' || formData.civil_status === 'Live-in Partner') && (
+              {(formData.civil_status === "Married" ||
+                formData.civil_status === "Live-in Partner") && (
                 <div className="p-6 bg-slate-50 border border-slate-200 rounded-xl animate-in fade-in zoom-in-95 duration-200">
                   <div className="flex items-center gap-2 mb-5 text-slate-400">
                     <Heart size={16} className="text-red-400" strokeWidth={2} />
-                    <span className="text-[11px] font-normal uppercase tracking-wider">Spouse / Partner Details</span>
+                    <span className="text-[11px] font-normal uppercase tracking-wider">
+                      Spouse / Partner Details
+                    </span>
                   </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                    <InputGroup label="Spouse Last Name" name="spouse_last_name" value={formData.spouse_last_name} onChange={handleChange} />
-                    <InputGroup label="Spouse First Name" name="spouse_first_name" value={formData.spouse_first_name} onChange={handleChange} />
-                    <InputGroup label="Spouse Middle Name" name="spouse_middle_name" value={formData.spouse_middle_name} onChange={handleChange} />
-                    <InputGroup label="Suffix" name="spouse_ext_name" value={formData.spouse_ext_name} onChange={handleChange} />
+                    <InputGroup
+                      label="Spouse Last Name"
+                      name="spouse_last_name"
+                      value={formData.spouse_last_name}
+                      onChange={handleChange}
+                    />
+                    <InputGroup
+                      label="Spouse First Name"
+                      name="spouse_first_name"
+                      value={formData.spouse_first_name}
+                      onChange={handleChange}
+                    />
+                    <InputGroup
+                      label="Spouse Middle Name"
+                      name="spouse_middle_name"
+                      value={formData.spouse_middle_name}
+                      onChange={handleChange}
+                    />
+                    <InputGroup
+                      label="Suffix"
+                      name="spouse_ext_name"
+                      value={formData.spouse_ext_name}
+                      onChange={handleChange}
+                    />
                   </div>
                 </div>
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 border-t border-slate-100 pt-6">
-                <InputGroup label="Occupation / Profession" name="occupation" value={formData.occupation} onChange={handleChange} placeholder="E.G. FARMER, EMPLOYEE" />
-                <InputGroup label="Mobile Number" name="contact_no" value={formData.contact_no} onChange={(e) => { const val = e.target.value.replace(/\D/g, ''); setFormData(prev => ({ ...prev, contact_no: val })); }} placeholder="09XXXXXXXXX" />
-                <InputGroup label="Precinct / Voter ID" name="precinct_no" value={formData.precinct_no} onChange={handleChange} placeholder="OPTIONAL" />
+                <InputGroup
+                  label="Occupation / Profession"
+                  name="occupation"
+                  value={formData.occupation}
+                  onChange={handleChange}
+                  placeholder="E.G. FARMER, EMPLOYEE"
+                />
+                <InputGroup
+                  label="Mobile Number"
+                  name="contact_no"
+                  value={formData.contact_no}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "");
+                    setFormData((prev) => ({ ...prev, contact_no: val }));
+                  }}
+                  placeholder="09XXXXXXXXX"
+                />
+                <InputGroup
+                  label="Precinct / Voter ID"
+                  name="precinct_no"
+                  value={formData.precinct_no}
+                  onChange={handleChange}
+                  placeholder="OPTIONAL"
+                />
               </div>
+
               <div className="border-t border-slate-100 pt-6">
                 <div className="flex items-center gap-2 mb-5 text-slate-400">
                   <Phone size={16} className="text-red-400" strokeWidth={2} />
@@ -656,18 +1121,16 @@ useEffect(() => {
                     onChange={handleChange}
                     placeholder="FULL NAME"
                   />
-
                   <InputGroup
                     label="Emergency Contact Number"
                     name="emergency_contact_no"
                     value={formData.emergency_contact_no}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '');
-                      setFormData(prev => ({ ...prev, emergency_contact_no: val }));
+                      const val = e.target.value.replace(/\D/g, "");
+                      setFormData((prev) => ({ ...prev, emergency_contact_no: val }));
                     }}
                     placeholder="09XXXXXXXXX"
                   />
-
                   <InputGroup
                     label="Emergency Address"
                     name="emergency_address"
@@ -682,22 +1145,29 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* --- ADDRESS --- */}
         <div className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
           <div className="px-6 md:px-8 py-6">
-             <SectionHeader icon={MapPin} title="Residency & Location" colorClass="text-emerald-600" />
+            <SectionHeader icon={MapPin} title="Residency & Location" colorClass="text-emerald-600" />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              <InputGroup label="House No. / Street" name="house_no" value={formData.house_no} onChange={handleChange} placeholder="House No. / Street Name" />
-              <SelectGroup 
+              <InputGroup
+                label="House No. / Street"
+                name="house_no"
+                value={formData.house_no}
+                onChange={handleChange}
+                placeholder="House No. / Street Name"
+              />
+
+              <SelectGroup
                 label="Barangay"
-                name="barangay_id" 
-                value={formData.barangay_id} 
-                onChange={handleChange} 
-                options={barangayOptions} 
-                required={isAdminLike} 
-                disabled={!isAdminLike} 
+                name="barangay_id"
+                value={formData.barangay_id}
+                onChange={handleChange}
+                options={barangayOptions}
+                required={isAdminLike}
+                disabled={!isAdminLike}
                 placeholder={isAdminLike ? "Select Barangay" : "Auto-Assigned"}
               />
+
               <SelectGroup
                 label="Purok / Sitio"
                 name="purok"
@@ -711,148 +1181,236 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* --- SECTORS --- */}
         <div className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
-           <div className="px-6 md:px-8 py-6">
-             <SectionHeader icon={Briefcase} title="Sectoral Classification" colorClass="text-purple-600" />
-             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-               {[...sectorOptions]
+          <div className="px-6 md:px-8 py-6">
+            <SectionHeader
+              icon={Briefcase}
+              title="Sectoral Classification"
+              colorClass="text-purple-600"
+            />
+
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {[...sectorOptions]
                 .sort((a, b) => {
-                  const aIsOther = a.name.toLowerCase().includes('other');
-                  const bIsOther = b.name.toLowerCase().includes('other');
+                  const aIsOther = a.name.toLowerCase().includes("other");
+                  const bIsOther = b.name.toLowerCase().includes("other");
                   if (aIsOther && !bIsOther) return 1;
                   if (!aIsOther && bIsOther) return -1;
                   return 0;
                 })
                 .map((s) => (
-                <label
-                  key={s.id}
-                  className={`
-                    flex flex-col items-center justify-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all h-28 text-center select-none
-                    ${
-                      formData.sector_ids.includes(s.id)
-                        ? 'bg-slate-900 border-slate-900 text-white shadow-md transform scale-[1.02]'
-                        : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
-                    }
-                  `}
-                >
-                  <input
-                    type="checkbox"
-                    className="hidden"
-                    checked={formData.sector_ids.includes(s.id)}
-                    onChange={() => handleSectorToggle(s.id)}
-                  />
+                  <label
+                    key={s.id}
+                    className={`
+                      flex flex-col items-center justify-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all h-28 text-center select-none
+                      ${
+                        formData.sector_ids.includes(s.id)
+                          ? "bg-slate-900 border-slate-900 text-white shadow-md transform scale-[1.02]"
+                          : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
+                      }
+                    `}
+                  >
+                    <input
+                      type="checkbox"
+                      className="hidden"
+                      checked={formData.sector_ids.includes(s.id)}
+                      onChange={() => handleSectorToggle(s.id)}
+                    />
 
-                  {formData.sector_ids.includes(s.id) ? (
-                    <Check size={24} className="text-white" strokeWidth={2} />
-                  ) : (
-                    <div className="w-5 h-5 rounded-md border-2 border-slate-200"></div>
-                  )}
+                    {formData.sector_ids.includes(s.id) ? (
+                      <Check size={24} className="text-white" strokeWidth={2} />
+                    ) : (
+                      <div className="w-5 h-5 rounded-md border-2 border-slate-200"></div>
+                    )}
 
-                  <span className="text-xs font-normal uppercase tracking-wide leading-tight">
-                    {s.name}
-                  </span>
-                </label>
-              ))}
-             </div>
-             {isOtherSelected && (
-               <div className="mt-6 animate-in slide-in-from-top-4 duration-300">
-                 <InputGroup label="Please Specify Other Sector" name="other_sector_details" value={formData.other_sector_details} onChange={handleChange} placeholder="Enter Details" />
-               </div>
-             )}
-           </div>
+                    <span className="text-xs font-normal uppercase tracking-wide leading-tight">
+                      {s.name}
+                    </span>
+                  </label>
+                ))}
+            </div>
+
+            {isOtherSelected && (
+              <div className="mt-6 animate-in slide-in-from-top-4 duration-300">
+                <InputGroup
+                  label="Please Specify Other Sector"
+                  name="other_sector_details"
+                  value={formData.other_sector_details}
+                  onChange={handleChange}
+                  placeholder="Enter Details"
+                />
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* --- FAMILY MEMBERS --- */}
         <div className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
-           <div className="px-6 md:px-8 py-6">
-             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-               <div className="flex-1">
-                 <SectionHeader icon={Fingerprint} title="Household Members" colorClass="text-amber-600" />
-               </div>
-               <button type="button" onClick={addFamilyMember} className="flex items-center justify-center gap-2 text-xs font-normal uppercase tracking-wider bg-slate-100 text-slate-600 px-5 py-2.5 rounded-xl hover:bg-slate-200 transition-colors shadow-sm -mt-8 sm:mt-0">
-                  <Plus size={16} strokeWidth={2} /> Add Member
-               </button>
-             </div>
-             
-             <div className="space-y-4">
-               {formData.family_members.length === 0 && (
-                  <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
-                     <Users size={32} className="mx-auto text-slate-300 mb-3" strokeWidth={1.5} />
-                     <p className="text-sm font-normal text-slate-400">No additional household members listed.</p>
+          <div className="px-6 md:px-8 py-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div className="flex-1">
+                <SectionHeader
+                  icon={Fingerprint}
+                  title="Household Members"
+                  colorClass="text-amber-600"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={addFamilyMember}
+                className="flex items-center justify-center gap-2 text-xs font-normal uppercase tracking-wider bg-slate-100 text-slate-600 px-5 py-2.5 rounded-xl hover:bg-slate-200 transition-colors shadow-sm -mt-8 sm:mt-0"
+              >
+                <Plus size={16} strokeWidth={2} /> Add Member
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {formData.family_members.length === 0 && (
+                <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                  <Users size={32} className="mx-auto text-slate-300 mb-3" strokeWidth={1.5} />
+                  <p className="text-sm font-normal text-slate-400">
+                    No additional household members listed.
+                  </p>
+                </div>
+              )}
+
+              {formData.family_members.map((member, index) => (
+                <div
+                  key={index}
+                  className="flex flex-col md:flex-row gap-4 p-5 bg-slate-50 border border-slate-200 rounded-2xl relative items-end animate-in fade-in duration-300"
+                >
+                  <div className="flex-1 w-full">
+                    <InputGroup
+                      label="First Name"
+                      value={member.first_name}
+                      onChange={(e) => handleFamilyChange(index, "first_name", e.target.value)}
+                      placeholder="Given Name"
+                    />
                   </div>
-               )}
-               {formData.family_members.map((member, index) => (
-                 <div key={index} className="flex flex-col md:flex-row gap-4 p-5 bg-slate-50 border border-slate-200 rounded-2xl relative items-end animate-in fade-in duration-300">
-                   <div className="flex-1 w-full">
-                      <InputGroup
-                        label="First Name"
-                        value={member.first_name}
-                        onChange={(e) => handleFamilyChange(index, 'first_name', e.target.value)}
-                        placeholder="Given Name"
-                      />
-                    </div>
 
-                    <div className="flex-1 w-full">
-                      <InputGroup
-                        label="Middle Name"
-                        value={member.middle_name}
-                        onChange={(e) => handleFamilyChange(index, 'middle_name', e.target.value)}
-                        placeholder="Middle Name"
-                      />
-                    </div>
+                  <div className="flex-1 w-full">
+                    <InputGroup
+                      label="Middle Name"
+                      value={member.middle_name}
+                      onChange={(e) => handleFamilyChange(index, "middle_name", e.target.value)}
+                      placeholder="Middle Name"
+                    />
+                  </div>
 
-                    <div className="flex-1 w-full">
-                      <InputGroup
-                        label="Last Name"
-                        value={member.last_name}
-                        onChange={(e) => handleFamilyChange(index, 'last_name', e.target.value)}
-                        placeholder="Surname"
-                      />
-                    </div>
+                  <div className="flex-1 w-full">
+                    <InputGroup
+                      label="Last Name"
+                      value={member.last_name}
+                      onChange={(e) => handleFamilyChange(index, "last_name", e.target.value)}
+                      placeholder="Surname"
+                    />
+                  </div>
 
-                    <div className="flex-1 w-full">
-                      <SelectGroup
-                        label="Relationship"
-                        value={member.relationship}
-                        onChange={(e) => handleFamilyChange(index, 'relationship', e.target.value)}
-                        options={relationshipOptions}
-                        placeholder="Select Relation"
-                      />
-                    </div>
-                   <button type="button" onClick={() => setFormData({...formData, family_members: formData.family_members.filter((_, i) => i !== index)})} className="p-3 bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 rounded-xl transition-colors shrink-0" title="Remove Member">
-                      <Trash2 size={18} strokeWidth={2} />
-                   </button>
-                 </div>
-               ))}
-             </div>
-           </div>
+                  <div className="flex-1 w-full">
+                    <SelectGroup
+                      label="Relationship"
+                      value={member.relationship}
+                      onChange={(e) => handleFamilyChange(index, "relationship", e.target.value)}
+                      options={relationshipOptions}
+                      placeholder="Select Relation"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => removeFamilyMember(index)}
+                    className="p-3 bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 rounded-xl transition-colors shrink-0"
+                    title="Remove Member"
+                  >
+                    <Trash2 size={18} strokeWidth={2} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* STICKY FOOTER */}
         <div className="fixed bottom-0 left-0 lg:left-[280px] right-0 p-5 bg-white/90 backdrop-blur-md border-t border-slate-200 flex items-center justify-between z-40 shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.05)]">
-           <div className="hidden md:flex items-center gap-2.5 text-sm text-slate-400 font-normal px-4">
-             <AlertCircle size={18} className="text-blue-400" strokeWidth={2} />
-             <span>Please verify all data before saving to the registry.</span>
-           </div>
-           <div className="flex gap-3 w-full md:w-auto">
-              <button type="button" onClick={onCancel} className="flex-1 md:flex-none px-6 py-3 text-sm font-normal text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors shadow-sm">
-                Cancel
-              </button>
-              <button type="submit" disabled={loading} className="flex-1 md:flex-none px-8 py-3 bg-red-600 text-white rounded-xl text-sm font-normal shadow-sm hover:bg-red-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                {loading ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} strokeWidth={2} />}
-                {loading ? "Processing..." : (residentToEdit ? "Update Record" : "Save Registry")}
-              </button>
-           </div>
+          <div className="hidden md:flex items-center gap-2.5 text-sm text-slate-400 font-normal px-4">
+            <AlertCircle size={18} className="text-blue-400" strokeWidth={2} />
+            <span>Please verify all data before saving to the registry.</span>
+          </div>
+
+          <div className="flex gap-3 w-full md:w-auto">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="flex-1 md:flex-none px-6 py-3 text-sm font-normal text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors shadow-sm"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 md:flex-none px-8 py-3 bg-red-600 text-white rounded-xl text-sm font-normal shadow-sm hover:bg-red-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Save size={18} strokeWidth={2} />
+              )}
+              {loading ? "Processing..." : residentToEdit ? "Update Record" : "Save Registry"}
+            </button>
+          </div>
         </div>
       </form>
-      
+
+      {/* CAMERA MODAL */}
+      {cameraOpen && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[99998] p-4">
+          <div className="bg-white rounded-2xl p-5 w-full max-w-2xl shadow-2xl">
+            <h3 className="text-lg font-medium text-slate-800 mb-4">Take Photo</h3>
+
+            <div className="rounded-xl overflow-hidden bg-black">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="w-full h-[360px] object-cover"
+              />
+            </div>
+
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeCamera}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={capturePhoto}
+                className="px-4 py-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800"
+              >
+                Capture
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CROP MODAL */}
       {cropModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[99999] p-4">
           <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
-            <h3 className="text-lg font-medium text-slate-800 mb-4">Crop Photo</h3>
-            
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-slate-800">Crop Photo</h3>
+              <button
+                type="button"
+                onClick={() => setCropModalOpen(false)}
+                className="p-2 rounded-lg hover:bg-slate-100 text-slate-500"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
             <div className="relative w-full h-[300px] bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
               <Cropper
                 image={imageSrc}
@@ -864,28 +1422,29 @@ useEffect(() => {
                 objectFit="contain"
                 restrictPosition={false}
                 onCropChange={setCrop}
-                onZoomChange={setZoom}
-                onCropComplete={(croppedArea, croppedPixels) =>
-                  setCroppedAreaPixels(croppedPixels)
-                }
+                onZoomChange={(value) => setZoom(Number(value))}
+                onCropComplete={(_, croppedPixels) => setCroppedAreaPixels(croppedPixels)}
               />
             </div>
 
             <div className="mt-6 mb-2">
-              <label className="text-[11px] font-normal text-slate-400 uppercase tracking-wider">Zoom Adjust</label>
+              <label className="text-[11px] font-normal text-slate-400 uppercase tracking-wider">
+                Zoom Adjust
+              </label>
               <input
                 type="range"
                 value={zoom}
                 min={1}
                 max={3}
                 step={0.1}
-                onChange={(e) => setZoom(e.target.value)}
+                onChange={(e) => setZoom(Number(e.target.value))}
                 className="w-full mt-2 accent-red-600"
               />
             </div>
 
             <div className="mt-6 flex justify-end gap-3">
               <button
+                type="button"
                 onClick={() => setCropModalOpen(false)}
                 className="px-5 py-2.5 text-sm font-normal text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
               >
@@ -893,17 +1452,8 @@ useEffect(() => {
               </button>
 
               <button
-                onClick={async () => {
-                  const croppedImage = await getCroppedImg(
-                    imageSrc,
-                    croppedAreaPixels
-                  );
-
-                  setPhotoFile(croppedImage);
-                  setPhotoPreview(URL.createObjectURL(croppedImage));
-
-                  setCropModalOpen(false);
-                }}
+                type="button"
+                onClick={handleCropSave}
                 className="px-5 py-2.5 bg-slate-900 text-white text-sm font-normal rounded-xl hover:bg-slate-800 transition-colors"
               >
                 Apply Crop
